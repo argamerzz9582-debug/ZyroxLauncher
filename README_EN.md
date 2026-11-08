@@ -16,21 +16,20 @@
 
 </div>
 
-🌍 **Language**  
-[简体中文](./README.md) | English | [Русский язык](./README_RU.md)
+🌍 **Language**<br>English
 
-> ✨ **Project Introduction**  
-> 「Fold Craft Launcher」 is a Minecraft: Java Edition launcher for Android platforms developed by the FCL Team. Built upon the core functionalities of [HMCL](https://github.com/HMCL-dev/HMCL) and using the [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android) backend, it enables users to enjoy Java Edition MC on mobile devices, supporting mod loading and operation across all versions.
+> ✨ **Project Introduction**<br>
+> "Fold Craft Launcher" is a Minecraft: Java Edition launcher for Android platforms developed by the FCL Team. Built upon the core functionalities of [HMCL](https://github.com/HMCL-dev/HMCL) and using the [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android) backend, it enables users to enjoy Java Edition MC on mobile devices, supporting mod loading and operation across all versions.
 
 ---
 
 ## 🚀 Core Features
 
-✅ **Full Version Support**  
+✅ **Full Version Support**<br>
 - Native support for all Minecraft versions (including latest snapshots)
 - Mod loader support: Forge/NeoForge/LiteLoader/OptiFine/Fabric/Quilt/Cleanroom...
 
-⚙️ **Key Highlights**  
+⚙️ **Key Highlights**<br>
 - Built-in multi-version Java runtimes (Java 8/17/21/25) with custom Java import support
 - Virtual mouse and customizable key mapping
 - FCL↔ZalithLauncher2 control layout conversion, importing a ZL2 layout converts it automatically
@@ -38,6 +37,12 @@
 - Dynamic resource management (mods/modpacks/textures/shaders/saves)
 - Personalized theme customization (background/color schemes)
 - Supports [renderer pluginization](https://github.com/ShirosakiMio/FCLRendererPlugin)
+
+---
+
+## 📥 Download APK
+
+Download the latest APK from the [GitHub Releases page](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest). Release notes include direct links for each available device architecture; choose the universal build if you are unsure.
 
 ---
 

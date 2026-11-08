@@ -13,6 +13,8 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,9 +32,20 @@ jobs:
             found { print }
           ' CHANGELOG.md > RELEASE_BODY.md
 
+      - name: Add APK download links to release notes
+        run: |
+          {
+            printf '\n\n## APK Downloads\n\n'
+            find apks -type f -name '*.apk' -print0 | sort -z | while IFS= read -r -d '' apk; do
+              name="${apk##*/}"
+              printf -- '- [%s](https://github.com/%s/releases/download/%s/%s)\n' \
+                "$name" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$name"
+            done
+          } >> RELEASE_BODY.md
+
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
-          token: ${{ secrets.TOKEN }}
+          token: ${{ secrets.TOKEN || github.token }}
           files: apks/**/*.apk
           body_path: RELEASE_BODY.md
