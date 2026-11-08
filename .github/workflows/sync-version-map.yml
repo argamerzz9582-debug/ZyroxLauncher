@@ -1,7 +1,7 @@
 name: Sync version map
 
-# version_map.json 由维护者手动更新，本 workflow 只负责将其同步到
-# FCL-Repo 的 res/version_map.json（gitee 镜像的数据源，大陆用户检测更新走该文件）
+# Maintainers update version_map.json manually. This workflow syncs it to
+# FCL-Repo/res/version_map.json, the Gitee mirror used by mainland China users.
 on:
   push:
     branches:
@@ -10,8 +10,8 @@ on:
       - "version_map.json"
   workflow_dispatch:
 
-# push 事件可能被平台重复投递，同组并发会在 FCL-Repo 的 commit+push 上
-# 互相踩踏（non-fast-forward 被拒），只保留最新一个实例
+# Keep only the latest run to avoid concurrent pushes racing and causing
+# non-fast-forward errors in FCL-Repo.
 concurrency:
   group: sync-version-map
   cancel-in-progress: true
@@ -28,11 +28,11 @@ jobs:
         with:
           repository: FCL-Team/FCL-Repo
           ref: main
-          # TOKEN 需对 FCL-Team/FCL-Repo 有写权限
+          # TOKEN must have write access to FCL-Team/FCL-Repo.
           token: ${{ secrets.TOKEN }}
           path: fcl-repo
 
-      # 手动编辑的文件，推送前做一次 JSON 合法性校验，避免坏文件污染镜像
+      # Validate the manually maintained JSON before syncing it to the mirror.
       - name: Validate JSON
         run: python3 -m json.tool version_map.json > /dev/null
 
