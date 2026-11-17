@@ -94,9 +94,11 @@ public class InstanceAdapter extends BaseAdapter {
 
         // Set selected background if needed
         if(idx == mSelectionIndex && displaySelection) {
-            extendedTextView.setBackgroundColor(ColorUtils.setAlphaComponent(Color.WHITE, 60));
+            extendedTextView.setBackgroundColor(Color.parseColor("#38FF8C42"));
+            extendedTextView.setTextColor(Color.parseColor("#FF8C42"));
         }else {
             extendedTextView.setBackgroundColor(Color.TRANSPARENT);
+            extendedTextView.setTextColor(Color.parseColor("#FFF7ED"));
         }
     }
 
@@ -104,6 +106,7 @@ public class InstanceAdapter extends BaseAdapter {
         ExtendedTextView extendedTextView = (ExtendedTextView) v;
         extendedTextView.setCompoundDrawablesRelative(extra.icon, null, extendedTextView.getCompoundsDrawables()[2], null);
         extendedTextView.setText(extra.name);
+        extendedTextView.setTextColor(Color.parseColor("#FF8C42"));
         extendedTextView.setBackgroundColor(Color.TRANSPARENT);
     }
 

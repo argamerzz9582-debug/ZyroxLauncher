@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:layout_marginBottom="4dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_zyrox_rail_item"
+    android:paddingHorizontal="10dp">
+
+    <ImageView
+        android:id="@+id/iv_rail_instance_icon"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:scaleType="fitCenter"
+        tools:src="@drawable/ic_zyrox_grass_block" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="9dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_rail_instance_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/zyrox_rail_text"
+            android:textSize="11sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            tools:text="Fabric 1.20.4" />
+
+        <TextView
+            android:id="@+id/tv_rail_instance_version"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/zyrox_text_muted"
+            android:textSize="9.5sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            tools:text="1.20.4 - fabric-loader" />
+    </LinearLayout>
+</LinearLayout>

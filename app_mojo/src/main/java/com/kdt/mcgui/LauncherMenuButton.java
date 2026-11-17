@@ -1,22 +1,18 @@
 package com.kdt.mcgui;
 
 import android.content.Context;
-import android.content.res.Resources;
-import android.content.res.TypedArray;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.ViewGroup;
-import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
 
-
-import git.artdeell.mojo.R;
-
 import fr.spse.extended_view.ExtendedButton;
+import git.artdeell.mojo.R;
 
 public class LauncherMenuButton extends ExtendedButton {
 
@@ -24,26 +20,34 @@ public class LauncherMenuButton extends ExtendedButton {
         super(context);
         setSettings();
     }
+
     public LauncherMenuButton(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         setSettings();
     }
 
+    private void setSettings() {
+        float density = getContext().getResources().getDisplayMetrics().density;
+        int padH = Math.round(10f * density);
+        int iconPad = Math.round(10f * density);
+        int iconSize = Math.round(18f * density);
 
-    /** Set style stuff */
-    private void setSettings(){
-        Resources resources = getContext().getResources();
+        setCompoundDrawablePadding(iconPad);
+        setPaddingRelative(padH, 0, padH, 0);
+        setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        setAllCaps(true);
+        setLetterSpacing(0.06f);
+        setSingleLine(true);
+        setTextColor(Color.parseColor("#FF8C42"));
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f);
 
-        int padding = resources.getDimensionPixelSize(R.dimen._22sdp);
-        setCompoundDrawablePadding(padding);
-        setPaddingRelative(padding, 0, 0, 0);
-        setGravity(Gravity.CENTER_VERTICAL);
+        Typeface pixelFont = ResourcesCompat.getFont(getContext(), R.font.minecraft_ten);
+        if (pixelFont != null) {
+            setTypeface(pixelFont);
+        }
 
-        setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimensionPixelSize(R.dimen._12ssp));
-
-        // Set drawable size
         int[] sizes = getExtendedViewData().getSizeCompounds();
-        sizes[0] = resources.getDimensionPixelSize(R.dimen._30sdp);
+        sizes[0] = iconSize;
         getExtendedViewData().setSizeCompounds(sizes);
         postProcessDrawables();
     }

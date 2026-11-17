@@ -1,141 +1,411 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Home Hub (Main Dashboard) — Horizontal Left-Docked Command Center -->
 <androidx.constraintlayout.widget.ConstraintLayout
-	xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:app="http://schemas.android.com/apk/res-auto"
-	xmlns:tools="http://schemas.android.com/tools"
-	android:id="@+id/fragment_menu_main"
-	android:gravity="top"
-	android:layout_width="match_parent"
-	android:layout_height="match_parent"
-	android:orientation="vertical"
-	android:background="@color/background_app">
-	<ScrollView
-		android:layout_width="match_parent"
-		android:layout_height="0dp"
-		app:layout_constraintTop_toTopOf="parent"
-		app:layout_constraintBottom_toTopOf="@id/mc_version_spinner">
-		<androidx.constraintlayout.widget.ConstraintLayout
-			android:layout_width="match_parent"
-			android:layout_height="wrap_content">
-			<androidx.constraintlayout.widget.Guideline
-				android:id="@+id/center_guideline"
-				android:layout_width="0dp"
-				android:layout_height="0dp"
-				android:orientation="vertical"
-				app:layout_constraintGuide_percent="0.5"/>
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/news_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="0dp"
-				android:text="@string/mcl_tab_wiki"
-				android:drawableStart="@drawable/ic_px_book"
-				app:layout_constraintTop_toTopOf="parent"
-				app:layout_constraintStart_toStartOf="parent"
-				app:layout_constraintEnd_toStartOf="@id/social_divider" />
-			<View
-				android:id="@+id/social_divider"
-				style="@style/LauncherFragment_Divider"
-				android:layout_marginVertical="@dimen/padding_large"
-				app:layout_constraintTop_toTopOf="parent"
-				app:layout_constraintStart_toStartOf="@id/center_guideline"
-				app:layout_constraintEnd_toEndOf="@id/center_guideline"
-				app:layout_constraintBottom_toBottomOf="@id/news_button"/>
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/social_media_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="0dp"
-				android:text="@string/mcl_button_social_media"
-				android:drawableStart="@drawable/ic_social_media"
-				app:layout_constraintTop_toTopOf="parent"
-				app:layout_constraintStart_toEndOf="@id/social_divider"
-				app:layout_constraintEnd_toEndOf="parent"/>
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/fragment_menu_main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent">
 
+    <!-- 1. LEFT SIDEBAR DOCK (270dp fixed width, full height, frosted obsidian + 2dp right amber border) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/zyrox_left_dock"
+        android:layout_width="270dp"
+        android:layout_height="0dp"
+        android:background="@drawable/bg_zyrox_left_dock"
+        android:paddingStart="12dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/custom_control_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="match_parent"
-				android:drawableStart="@drawable/ic_px_gamepad"
-				android:text="@string/mcl_option_customcontrol"
-				app:layout_constraintTop_toBottomOf="@id/news_button" />
+        <!-- Reserved slot for persistent Activity AccountSpinner Card (44dp) -->
+        <Space
+            android:id="@+id/zyrox_account_slot"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            app:layout_constraintTop_toTopOf="parent" />
 
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/install_jar_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="match_parent"
-				android:drawableStart="@drawable/ic_px_java_run"
-				android:text="@string/main_install_jar_file"
-				app:layout_constraintTop_toBottomOf="@id/custom_control_button" />
+        <!-- Primary Glowing Amber PLAY CTA -->
+        <com.kdt.mcgui.MineButton
+            android:id="@+id/play_button"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_zyrox_play"
+            android:text="@string/main_play"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="16sp"
+            android:letterSpacing="0.14"
+            android:textAllCaps="true"
+            android:shadowColor="#CC9A3412"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="6"
+            android:elevation="4dp"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            app:layout_constraintTop_toBottomOf="@id/zyrox_account_slot"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/share_logs_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="match_parent"
-				android:drawableStart="@drawable/ic_px_sharelog"
-				android:text="@string/main_share_logs"
-				app:layout_constraintTop_toBottomOf="@id/install_jar_button" />
+        <!-- Version / Instance Selector Glass Pill directly below PLAY -->
+        <LinearLayout
+            android:id="@+id/zyrox_version_pill"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="7dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_zyrox_input"
+            app:layout_constraintTop_toBottomOf="@id/play_button"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
-			<com.kdt.mcgui.LauncherMenuButton
-				android:id="@+id/open_files_button"
-				style="@style/LauncherMenuButton.Universal"
-				android:layout_width="match_parent"
-				android:drawableStart="@drawable/ic_px_folder"
-				android:text="@string/mcl_button_open_directory"
-				app:layout_constraintTop_toBottomOf="@id/share_logs_button" />
-		</androidx.constraintlayout.widget.ConstraintLayout>
-	</ScrollView>
+            <com.kdt.mcgui.mcVersionSpinner
+                android:id="@+id/mc_version_spinner"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:textColor="@color/zyrox_text_primary"
+                android:drawableEnd="@drawable/spinner_arrow"
+                app:drawableEndPadding="4dp"
+                app:drawableEndSize="10dp"
+                app:drawableStartIntegerScaling="true"
+                app:drawableStartSize="22dp" />
 
-	<com.kdt.mcgui.mcVersionSpinner
-		android:id="@+id/mc_version_spinner"
-		android:layout_width="0dp"
-		android:layout_height="@dimen/_52sdp"
-		android:background="@android:color/transparent"
-		android:drawableEnd="@drawable/spinner_arrow"
+            <View
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:background="@color/zyrox_divider" />
 
-		app:drawableEndSize="@dimen/padding_heavy"
-		app:drawableStartIntegerScaling="true"
-		app:drawableStartSize="@dimen/_36sdp"
-		app:drawableEndPadding="@dimen/_1sdp"
+            <ImageButton
+                android:id="@+id/edit_profile_button"
+                android:layout_width="34dp"
+                android:layout_height="match_parent"
+                android:background="?android:attr/selectableItemBackground"
+                android:src="@drawable/ic_px_edit"
+                app:tint="@color/zyrox_amber"
+                android:scaleType="centerInside"
+                android:padding="8dp"
+                android:contentDescription="@string/global_edit" />
+        </LinearLayout>
 
-		app:layout_constraintBottom_toTopOf="@id/play_button"
-		app:layout_constraintEnd_toStartOf="@+id/edit_profile_button"
-		app:layout_constraintStart_toStartOf="parent" />
+        <!-- Cosmetic compatibility view -->
+        <View
+            android:id="@+id/_background_display_view"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="7dp"
+            android:background="@color/zyrox_divider"
+            app:layout_constraintTop_toBottomOf="@id/zyrox_version_pill"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
-	<ImageButton
-		android:id="@+id/edit_profile_button"
-		android:layout_width="@dimen/_52sdp"
-		android:layout_height="@dimen/_52sdp"
-		android:background="?android:attr/selectableItemBackground"
+        <!-- Scrollable Vertical Pixel-Font Navigation Stack -->
+        <ScrollView
+            android:id="@+id/zyrox_nav_scroll"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:scrollbars="none"
+            android:overScrollMode="never"
+            app:layout_constraintTop_toBottomOf="@id/_background_display_view"
+            app:layout_constraintBottom_toTopOf="@id/tv_zyrox_watermark"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
-		android:src="@drawable/ic_px_edit"
-		app:layout_constraintBottom_toBottomOf="@+id/mc_version_spinner"
-		app:layout_constraintEnd_toEndOf="parent"
-		app:layout_constraintTop_toTopOf="@+id/mc_version_spinner" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/modpacks_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_store"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_modpacks" />
 
-	<!-- This view is for cosmetic purpose only -->
-	<View
-		android:id="@+id/_background_display_view"
-		android:layout_width="match_parent"
-		android:layout_height="0dp"
-		android:background="@color/background_bottom_bar"
-		android:translationZ="-1dp"
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/instances_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_instances"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_instances" />
 
-		app:layout_constraintBottom_toBottomOf="parent"
-		app:layout_constraintTop_toTopOf="@id/mc_version_spinner" />
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/install_jar_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_java_run"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_install_jar" />
 
-	<com.kdt.mcgui.MineButton
-		android:id="@+id/play_button"
-		android:layout_width="match_parent"
-		android:layout_height="@dimen/_62sdp"
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/custom_control_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_gamepad"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_controls" />
 
-		android:layout_marginHorizontal="@dimen/_17sdp"
-		android:layout_marginBottom="@dimen/_15sdp"
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/home_settings_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_sliders"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_settings" />
 
-		android:textAllCaps="true"
-		android:text="@string/main_play"
-		app:layout_constraintBottom_toBottomOf="parent"
-		/>
+                <com.kdt.mcgui.LauncherMenuButton
+                    android:id="@+id/share_logs_button"
+                    style="@style/LauncherMenuButton.Universal"
+                    android:layout_width="match_parent"
+                    android:layout_height="31dp"
+                    android:drawableStart="@drawable/ic_px_console"
+                    app:drawableTint="@color/zyrox_amber"
+                    android:text="@string/zyrox_nav_logs" />
+
+                <!-- Compact Utility Bar preserving Game Dir, Wiki/Gamepad & Community actions -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/open_files_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_nav_item"
+                        android:text="@string/zyrox_nav_files"
+                        android:textColor="@color/zyrox_text_subtle"
+                        android:textSize="9sp"
+                        android:stateListAnimator="@null"
+                        android:fontFamily="@font/minecraft_pixel"
+                        app:fontFamily="@font/minecraft_pixel" />
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="12dp"
+                        android:background="@color/zyrox_divider" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/news_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_nav_item"
+                        android:text="@string/mcl_tab_wiki"
+                        android:textColor="@color/zyrox_text_subtle"
+                        android:textSize="9sp"
+                        android:stateListAnimator="@null"
+                        android:fontFamily="@font/minecraft_pixel"
+                        app:fontFamily="@font/minecraft_pixel" />
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="12dp"
+                        android:background="@color/zyrox_divider" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/social_media_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_nav_item"
+                        android:text="@string/mcl_button_social_media"
+                        android:textColor="@color/zyrox_text_subtle"
+                        android:textSize="9sp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:stateListAnimator="@null"
+                        android:fontFamily="@font/minecraft_pixel"
+                        app:fontFamily="@font/minecraft_pixel" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- Footer Engine Watermark -->
+        <TextView
+            android:id="@+id/tv_zyrox_watermark"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="start|center_vertical"
+            android:paddingStart="6dp"
+            android:text="@string/zyrox_engine_watermark"
+            android:textColor="@color/zyrox_text_muted"
+            android:textSize="8.5sp"
+            android:letterSpacing="0.12"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- 2. CENTER HERO BRAND ZONE (top-aligned, leaving center-bottom open for animated shader scene) -->
+    <LinearLayout
+        android:id="@+id/zyrox_hero_brand"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toEndOf="@id/zyrox_left_dock"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tv_zyrox_hero_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/zyrox_brand_title"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="44sp"
+            android:letterSpacing="0.1"
+            android:includeFontPadding="false"
+            android:shadowColor="#F2F97316"
+            android:shadowDx="0"
+            android:shadowDy="3"
+            android:shadowRadius="18"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel" />
+
+        <TextView
+            android:id="@+id/tv_zyrox_hero_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/zyrox_brand_subtitle"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="14sp"
+            android:letterSpacing="0.34"
+            android:shadowColor="#CC0A0807"
+            android:shadowDx="0"
+            android:shadowDy="2"
+            android:shadowRadius="8"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel" />
+
+        <View
+            android:layout_width="110dp"
+            android:layout_height="2dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/zyrox_glass_border_strong" />
+    </LinearLayout>
+
+    <!-- 3. BOTTOM-RIGHT UPDATES / CHANGELOG GLASS CARD (240dp) -->
+    <LinearLayout
+        android:id="@+id/zyrox_updates_card"
+        android:layout_width="244dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="14dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_card_soft"
+        android:padding="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:background="@drawable/bg_zyrox_dot_amber" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="7dp"
+                android:text="@string/zyrox_updates_title"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="11sp"
+                android:letterSpacing="0.08"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="1dp"
+                android:background="@drawable/bg_zyrox_badge"
+                android:text="@string/zyrox_updates_badge"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginVertical="7dp"
+            android:background="@color/zyrox_divider" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/zyrox_updates_line1"
+            android:textColor="@color/zyrox_text_secondary"
+            android:textSize="10.5sp"
+            android:lineSpacingExtra="1dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="@string/zyrox_updates_line2"
+            android:textColor="@color/zyrox_text_secondary"
+            android:textSize="10.5sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text="@string/zyrox_updates_line3"
+            android:textColor="@color/zyrox_text_secondary"
+            android:textSize="10.5sp" />
+
+        <TextView
+            android:id="@+id/tv_zyrox_engine_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
+            android:paddingTop="5dp"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="9sp"
+            android:letterSpacing="0.05"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            tools:text="RAM 2048 MB  •  ZINK VULKAN" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-

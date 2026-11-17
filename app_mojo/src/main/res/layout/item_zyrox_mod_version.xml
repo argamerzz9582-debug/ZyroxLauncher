@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="6dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_zyrox_input"
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="7dp">
+
+    <TextView
+        android:id="@+id/tv_mod_version_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="8dp"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="11.5sp"
+        android:maxLines="2"
+        android:ellipsize="end"
+        tools:text="1.20.4 — v5.12.1 (Fabric)" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn_mod_version_install"
+        android:layout_width="74dp"
+        android:layout_height="28dp"
+        android:background="@drawable/btn_zyrox_play"
+        android:text="@string/zyrox_install"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="9sp"
+        android:stateListAnimator="@null"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel" />
+</LinearLayout>

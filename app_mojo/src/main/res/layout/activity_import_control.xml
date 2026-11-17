@@ -1,72 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/zyrox_bg_base">
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:elevation="-10dp"
         android:scaleType="centerCrop"
-        android:src="@drawable/ic_setting_sign_in_background" />
+        android:src="@drawable/bg_zyrox_shader_scene"
+        android:contentDescription="@string/app_short_name" />
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <View
         android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_zyrox_vignette" />
+
+    <LinearLayout
+        android:layout_width="420dp"
         android:layout_height="wrap_content"
-
-
-        android:layout_marginHorizontal="@dimen/_15sdp"
-        android:background="@drawable/menu_background"
-        android:paddingVertical="20dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.3"
-        tools:layout_editor_absoluteX="16dp">
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:padding="20dp"
+        android:elevation="16dp">
 
         <TextView
             android:id="@+id/textView_import_control_file_name"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="5dp"
-            android:text="File name:"
-            app:layout_constraintBottom_toTopOf="@+id/editText_import_control_file_name"
-            app:layout_constraintStart_toStartOf="@+id/editText_import_control_file_name" />
+            android:text="@string/global_name"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="12sp"
+            android:letterSpacing="0.06"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel" />
 
         <com.kdt.mcgui.MineEditText
             android:id="@+id/editText_import_control_file_name"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="35dp"
-            android:layout_marginBottom="20dp"
-            android:hint="File name"
-            android:imeOptions="flagForceAscii"
-
-            app:layout_constraintBottom_toTopOf="@+id/mineButton_import_control" />
+            android:layout_height="42dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_zyrox_input"
+            android:paddingHorizontal="12dp"
+            android:hint="@string/global_name"
+            android:textColor="@color/zyrox_text_primary"
+            android:textColorHint="@color/zyrox_text_muted"
+            android:imeOptions="flagForceAscii|flagNoExtractUi"
+            android:singleLine="true" />
 
         <com.kdt.mcgui.MineButton
             android:id="@+id/mineButton_import_control"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="15dp"
-
-            android:background="@drawable/mine_button_background"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="14dp"
             android:onClick="startImport"
-
             android:text="@string/import_control_import_button"
-            android:textColor="@android:color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@+id/editText_import_control_file_name"
-
-            app:layout_constraintStart_toStartOf="@+id/editText_import_control_file_name"
-
-            app:layout_constraintVertical_bias="0.70" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
-
-
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="12sp" />
+    </LinearLayout>
+</FrameLayout>

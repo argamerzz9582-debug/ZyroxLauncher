@@ -1,85 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app">
+    android:orientation="vertical"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="8dp">
 
     <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toTopOf="@+id/gamepad_remapper_recycler"
-        app:layout_constraintEnd_toStartOf="@+id/guideline4"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:textColor="?android:attr/textColorPrimary"
-            android:text="@string/controller_remapper_exit_part1" />
-
-        <ImageView
-            android:id="@+id/imageView2"
-            android:layout_width="30sp"
-            android:layout_height="30sp"
-            android:layout_gravity="center_vertical"
-            android:contentDescription="@string/controller_button_select"
-            app:srcCompat="@drawable/button_select" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:textColor="?android:attr/textColorPrimary"
-            android:text="@string/controller_remapper_exit_part2" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/gamepad_remapper_mode_container"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="@dimen/padding_heavy"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/guideline4"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/gamepad_remapper_mode_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:text="@string/controller_remapper_operating_mode"
-            android:textColor="?android:attr/textColorPrimary" />
-
-        <Spinner
-            android:id="@+id/gamepad_remapper_mode_spinner"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp" />
-    </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/gamepad_remapper_recycler"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="@dimen/padding_heavy"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/gamepad_remapper_mode_container" />
-
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/guideline4"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.5" />
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:padding="12dp">
 
+        <!-- Top Mode & Exit Hint Header -->
+        <LinearLayout
+            android:id="@+id/gamepad_remapper_mode_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_zyrox_glass_card"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp">
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="12sp"
+                android:text="@string/controller_remapper_exit_part1" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <ImageView
+                android:id="@+id/imageView2"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginHorizontal="6dp"
+                android:contentDescription="@string/controller_button_select"
+                app:srcCompat="@drawable/button_select" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="12sp"
+                android:text="@string/controller_remapper_exit_part2" />
+
+            <TextView
+                android:id="@+id/gamepad_remapper_mode_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/controller_remapper_operating_mode"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="10sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <Spinner
+                android:id="@+id/gamepad_remapper_mode_spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:minWidth="140dp"
+                android:background="@drawable/bg_zyrox_input"
+                android:popupBackground="@drawable/bg_zyrox_glass_modal"
+                android:paddingHorizontal="10dp" />
+        </LinearLayout>
+
+        <!-- Controller Key Mapping List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/gamepad_remapper_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:overScrollMode="never"
+            android:scrollbars="vertical" />
+    </LinearLayout>
+</LinearLayout>

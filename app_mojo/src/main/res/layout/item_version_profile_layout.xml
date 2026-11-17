@@ -3,18 +3,18 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:background="?attr/selectableItemBackground"
     android:layout_width="match_parent"
-    android:layout_height="@dimen/_52sdp"
-    android:paddingStart="@dimen/_17sdp"
-    app:drawableStartSize="@dimen/_36sdp"
+    android:layout_height="40dp"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:textSize="12sp"
+    android:textColor="@color/zyrox_text_primary"
+    android:singleLine="true"
+    android:ellipsize="end"
+    app:drawableStartSize="24dp"
     app:drawableStartIntegerScaling="true"
-
     android:gravity="center_vertical"
-    android:drawablePadding="@dimen/_19sdp"
-    tools:drawableStart="@drawable/ic_gamepad_pointer"
-    tools:text="FORGE - Forge-1.7.10-1664"
-    tools:ignore="RtlSymmetry">
-
-
-</fr.spse.extended_view.ExtendedTextView>
+    android:drawablePadding="10dp"
+    tools:drawableStart="@drawable/ic_zyrox_grass_block"
+    tools:text="1.20.4 - Fabric"
+    tools:ignore="RtlSymmetry" />

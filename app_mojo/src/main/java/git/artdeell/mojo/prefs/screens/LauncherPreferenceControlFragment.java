@@ -11,7 +11,7 @@ import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.prefs.CustomSeekBarPreference;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 
-public class LauncherPreferenceControlFragment extends LauncherPreferenceFragment {
+public class LauncherPreferenceControlFragment extends LauncherPreferenceBaseFragment {
     private boolean mGyroAvailable = false;
     @Override
     public void onCreatePreferences(Bundle b, String str) {

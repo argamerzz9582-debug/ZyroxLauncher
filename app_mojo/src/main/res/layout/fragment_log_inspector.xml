@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:padding="12dp"
+        android:elevation="12dp">
+
+        <!-- Terminal Status Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_log_status_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_zyrox_badge"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:text="@string/zyrox_console_title"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="9.5sp"
+                android:letterSpacing="0.06"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <TextView
+                android:id="@+id/tv_log_meta"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="10dp"
+                android:textColor="@color/zyrox_text_muted"
+                android:textSize="11sp"
+                android:singleLine="true"
+                android:ellipsize="middle"
+                android:fontFamily="monospace"
+                tools:text="latestlog.txt  •  18.4 KB" />
+
+            <Button
+                android:id="@+id/btn_log_refresh"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:minHeight="30dp"
+                android:paddingHorizontal="10dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:text="@string/zyrox_refresh_log"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="9.5sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <Button
+                android:id="@+id/btn_log_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:minHeight="30dp"
+                android:layout_marginStart="6dp"
+                android:paddingHorizontal="10dp"
+                android:background="@drawable/btn_zyrox_danger"
+                android:text="@string/zyrox_clear_log"
+                android:textColor="@color/zyrox_danger"
+                android:textSize="9.5sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+        </LinearLayout>
+
+        <!-- Recessed Monospace Terminal Log Box (#090706) -->
+        <ScrollView
+            android:id="@+id/sv_log_terminal"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginVertical="8dp"
+            android:background="@drawable/bg_zyrox_terminal"
+            android:padding="10dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+
+            <TextView
+                android:id="@+id/tv_log_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/zyrox_log_empty"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp"
+                android:fontFamily="monospace"
+                android:textIsSelectable="true" />
+        </ScrollView>
+
+        <!-- Floating Bottom Action Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end|center_vertical">
+
+            <com.kdt.mcgui.MineButton
+                android:id="@+id/btn_log_copy"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:tag="custom_bg"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="@string/zyrox_copy_log"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="10.5sp" />
+
+            <com.kdt.mcgui.MineButton
+                android:id="@+id/btn_log_share"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:tag="custom_bg"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="@string/zyrox_share_log"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="10.5sp" />
+
+            <com.kdt.mcgui.MineButton
+                android:id="@+id/btn_log_relaunch"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:paddingHorizontal="16dp"
+                android:text="@string/zyrox_relaunch"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

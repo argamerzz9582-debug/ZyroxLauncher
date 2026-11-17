@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Warm atmospheric radial vignette -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.58"
+                android:centerY="0.46"
+                android:gradientRadius="560dp"
+                android:startColor="#260A0807"
+                android:centerColor="#660A0807"
+                android:endColor="#BF0A0807" />
+        </shape>
+    </item>
+    <!-- Top & bottom subtle cinematic darkening -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#660A0807"
+                android:centerColor="#000A0807"
+                android:endColor="#8C0A0807" />
+        </shape>
+    </item>
+</layer-list>

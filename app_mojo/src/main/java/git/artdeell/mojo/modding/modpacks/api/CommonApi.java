@@ -56,6 +56,10 @@ public class CommonApi implements ModpackApi {
 
         Future<?>[] futures = new Future<?>[mModpackApis.length];
         for(int i = 0; i < mModpackApis.length; i++) {
+            ModpackApi api = mModpackApis[i];
+            if(searchFilters.platform == SearchFilters.PLATFORM_MODRINTH && api != mModrinthApi) continue;
+            if(searchFilters.platform == SearchFilters.PLATFORM_CURSEFORGE && api != mCurseforgeApi) continue;
+            if(searchFilters.projectTypeOverride != null && api != mModrinthApi) continue;
             // If there is an array and its length is zero, this means that we've exhausted the results for this
             // search query and we don't need to actually do the search
             if(results[i] != null && results[i].results.length == 0) continue;

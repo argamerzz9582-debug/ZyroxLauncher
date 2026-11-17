@@ -1,11 +1,11 @@
 package git.artdeell.mojo.dialogs;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.widget.Button;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -16,17 +16,22 @@ public abstract class PackageSelector {
 
     public void show() {
         this.refresh();
-        if(mDialog != null) mDialog.show();
+        if (mDialog != null) mDialog.show();
     }
+
     public void close() {
-        if(mDialog != null) mDialog.cancel();
+        if (mDialog != null) mDialog.cancel();
     }
+
     public void onDismiss(Runnable runnable) {
-        if(mDialog != null) mDialog.setOnDismissListener(d -> runnable.run());
+        if (mDialog != null) mDialog.setOnDismissListener(d -> runnable.run());
     }
 
     public void prepare(Context context, ActivityResultLauncher<Object> launcher) {
         mDialogView = new RecyclerView(context);
+        int pad = (int) (10 * context.getResources().getDisplayMetrics().density);
+        mDialogView.setPadding(pad, pad / 2, pad, pad / 2);
+        mDialogView.setClipToPadding(false);
         mDialogView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         PackageAdapter<?> adapter = createAdapter(context, this);
         mDialogView.setAdapter(adapter);
@@ -50,11 +55,11 @@ public abstract class PackageSelector {
         });
     }
 
-    @SuppressLint("NotifyDataSetChanged") //only used to completely refresh the list, it is necessary
+    @SuppressLint("NotifyDataSetChanged")
     public void refresh() {
-        if(mDialogView == null) return;
+        if (mDialogView == null) return;
         RecyclerView.Adapter<?> adapter = mDialogView.getAdapter();
-        if(adapter != null) adapter.notifyDataSetChanged();
+        if (adapter != null) adapter.notifyDataSetChanged();
     }
 
     protected abstract int getTitleRes();

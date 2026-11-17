@@ -182,7 +182,19 @@ public class AWTActivity extends BaseActivity implements View.OnTouchListener {
             }else {
                 MojoApplication.sExecutorService.execute(()->startModInstallerWithUri(resourceUri, javaArgs));
             }
-            if(extras.getBoolean("openLogOutput", false)) openLogOutput(null);
+            if(extras.getBoolean("openLogOutput", false)) {
+                openLogOutput(null);
+            } else {
+                View installerStrip = findViewById(R.id.zyrox_installer_progress_strip);
+                View hideStripBtn = findViewById(R.id.btn_installer_hide_card);
+                if (installerStrip != null) {
+                    installerStrip.setVisibility(View.VISIBLE);
+                    installerStrip.postDelayed(() -> installerStrip.setVisibility(View.GONE), 4500);
+                    if (hideStripBtn != null) {
+                        hideStripBtn.setOnClickListener(v -> installerStrip.setVisibility(View.GONE));
+                    }
+                }
+            }
         } catch (Throwable th) {
             Tools.showError(this, th, true);
         }
