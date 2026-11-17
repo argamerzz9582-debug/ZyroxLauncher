@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Global Zyrox Shell & Brand -->
+    <string name="zyrox_brand_title">ZYROX</string>
+    <string name="zyrox_brand_subtitle">LAUNCHER</string>
+    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0</string>
+    <string name="zyrox_back">&lt; BACK</string>
+    <string name="zyrox_home">HOME</string>
+
+    <!-- Navigation Stack (Home Hub) -->
+    <string name="zyrox_nav_modpacks">MODPACKS &amp; MODS</string>
+    <string name="zyrox_nav_instances">INSTANCES</string>
+    <string name="zyrox_nav_install_jar">INSTALL .JAR</string>
+    <string name="zyrox_nav_controls">CONTROLS</string>
+    <string name="zyrox_nav_settings">SETTINGS</string>
+    <string name="zyrox_nav_logs">LOGS</string>
+    <string name="zyrox_nav_files">FILES</string>
+
+    <!-- Home Updates Card -->
+    <string name="zyrox_updates_title">ZYROX UPDATES</string>
+    <string name="zyrox_updates_badge">v1.0</string>
+    <string name="zyrox_updates_line1">• HolyGL4ES, LTW &amp; Zink Vulkan ready</string>
+    <string name="zyrox_updates_line2">• Modrinth &amp; CurseForge store live</string>
+    <string name="zyrox_updates_line3">• Multi-JRE 8 / 17 / 21 turbo runner</string>
+    <string name="zyrox_updates_status_fmt">RAM %1$d MB  •  %2$s</string>
+
+    <!-- Page Titles -->
+    <string name="zyrox_title_instance_studio">INSTANCE STUDIO</string>
+    <string name="zyrox_title_create_instance">NEW INSTANCE STUDIO</string>
+    <string name="zyrox_title_mod_store">MODRINTH &amp; MODPACK STORE</string>
+    <string name="zyrox_title_control_center">ZYROX CONTROL CENTER</string>
+    <string name="zyrox_title_account_vault">ZYROX ACCOUNT VAULT</string>
+    <string name="zyrox_title_microsoft_login">MICROSOFT AUTH</string>
+    <string name="zyrox_title_elyby_login">ELY.BY AUTH</string>
+    <string name="zyrox_title_modloader_install">MODLOADER INSTALLER</string>
+    <string name="zyrox_title_file_browser">FILE EXPLORER</string>
+    <string name="zyrox_title_gamepad">CONTROLLER MAPPER</string>
+    <string name="zyrox_title_log_inspector">ZYROX LOG INSPECTOR</string>
+    <string name="zyrox_title_crash_report">ZYROX CRASH REPORT</string>
+    <string name="zyrox_title_jar_installer">ZYROX RUNTIME &amp; JAR INSTALLER</string>
+
+    <!-- Instance & Profile Studio -->
+    <string name="zyrox_new_instance">+ NEW INSTANCE</string>
+    <string name="zyrox_new_short">+ NEW</string>
+    <string name="zyrox_save_instance">SAVE INSTANCE</string>
+    <string name="zyrox_delete_instance">DELETE</string>
+    <string name="zyrox_saved_profiles">SAVED PROFILES</string>
+    <string name="zyrox_instance_config">INSTANCE CONFIGURATION</string>
+    <string name="zyrox_jvm_ram_label">JVM RAM ALLOCATION</string>
+    <string name="zyrox_renderer_hint_default">Uses global Zyrox Control Center graphics engine</string>
+    <string name="zyrox_renderer_hint_gles">High FPS &amp; widest compatibility (MC 1.21.4 and lower)</string>
+    <string name="zyrox_renderer_hint_ltw">Modern OpenGL ES 3 pipeline — great for 1.17+ &amp; Sodium</string>
+    <string name="zyrox_renderer_hint_zink">Desktop OpenGL via Vulkan — best for shaders &amp; modern packs</string>
+    <string name="zyrox_renderer_hint_freedreno">Direct Adreno Turnip/KGSL acceleration — peak Snapdragon FPS</string>
+
+    <!-- Modrinth & Modpack Store -->
+    <string name="zyrox_search_mods_hint">Search mods, modpacks, shaders...</string>
+    <string name="zyrox_import_mrpack">IMPORT PACK</string>
+    <string name="zyrox_platform_all">ALL</string>
+    <string name="zyrox_platform_modrinth">MODRINTH</string>
+    <string name="zyrox_platform_curseforge">CURSEFORGE</string>
+    <string name="zyrox_chip_all">ALL</string>
+    <string name="zyrox_chip_modpacks">MODPACKS</string>
+    <string name="zyrox_chip_optimization">OPTIMIZATION</string>
+    <string name="zyrox_chip_shaders">SHADERS</string>
+    <string name="zyrox_chip_fabric">FABRIC</string>
+    <string name="zyrox_chip_forge">FORGE</string>
+    <string name="zyrox_chip_quilt">QUILT</string>
+    <string name="zyrox_chip_neoforge">NEOFORGE</string>
+    <string name="zyrox_install">INSTALL</string>
+    <string name="zyrox_installed">QUEUED</string>
+    <string name="zyrox_select_version_title">COMPATIBLE VERSIONS</string>
+    <string name="zyrox_loading_versions">Fetching compatible game versions...</string>
+
+    <!-- Settings / Zyrox Control Center -->
+    <string name="zyrox_cat_video">VIDEO &amp; RENDERER</string>
+    <string name="zyrox_cat_controls">CONTROLS &amp; INPUT</string>
+    <string name="zyrox_cat_java">JAVA &amp; MEMORY</string>
+    <string name="zyrox_cat_misc">MISCELLANEOUS</string>
+    <string name="zyrox_cat_experimental">EXPERIMENTAL</string>
+    <string name="zyrox_pref_animated_bg_title">Animated shader background</string>
+    <string name="zyrox_pref_animated_bg_summary">Enable live Minecraft shader motion, warm ambient embers, or custom zyrox_bg.mp4 loop.</string>
+    <string name="zyrox_pref_select_bg_video_title">Custom background video (.mp4)</string>
+    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or long-press reset to built-in shader scene.</string>
+    <string name="zyrox_pref_reset_bg_video_title">Reset shader wallpaper</string>
+    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Create-Mod golden-hour shader canvas.</string>
+    <string name="zyrox_ram_status_fmt">Allocated: %1$d MB  •  Free: %2$d MB / %3$d MB Total</string>
+
+    <!-- Account & Skin Vault -->
+    <string name="zyrox_microsoft_login">MICROSOFT LOGIN</string>
+    <string name="zyrox_elyby_login">ELY.BY LOGIN</string>
+    <string name="zyrox_or_offline">OR OFFLINE / LOCAL PROFILE</string>
+    <string name="zyrox_offline_hint">Enter SteveName...</string>
+    <string name="zyrox_add_offline">ADD OFFLINE ACCOUNT</string>
+    <string name="zyrox_badge_microsoft">PREMIUM ACCOUNT</string>
+    <string name="zyrox_badge_elyby">ELY.BY ACCOUNT</string>
+    <string name="zyrox_badge_offline">OFFLINE PROFILE</string>
+    <string name="zyrox_badge_no_account">NO ACCOUNT</string>
+
+    <!-- Custom Controls Touch HUD Editor -->
+    <string name="zyrox_hud_add_btn">+ BUTTON</string>
+    <string name="zyrox_hud_add_drawer">+ DRAWER</string>
+    <string name="zyrox_hud_add_joy">+ JOYSTICK</string>
+    <string name="zyrox_hud_load">LOAD</string>
+    <string name="zyrox_hud_save">SAVE</string>
+    <string name="zyrox_hud_more">PRESETS</string>
+    <string name="zyrox_hud_exit">EXIT</string>
+    <string name="zyrox_hud_hint">TAP ANY BUTTON TO EDIT OPACITY, SCALE, RADIUS &amp; KEYCODES  •  DRAG TO ALIGN ON GRID</string>
+
+    <!-- Crash & Log Inspector + Installer -->
+    <string name="zyrox_copy_log">COPY LOG</string>
+    <string name="zyrox_share_log">SHARE LOG</string>
+    <string name="zyrox_relaunch">RELAUNCH ZYROX</string>
+    <string name="zyrox_clear_log">CLEAR</string>
+    <string name="zyrox_refresh_log">REFRESH</string>
+    <string name="zyrox_log_copied">Log copied to clipboard</string>
+    <string name="zyrox_log_empty">No log entries recorded yet. Launch an instance or installer to capture live JVM &amp; renderer output.</string>
+    <string name="zyrox_console_title">ZYROX CONSOLE</string>
+    <string name="zyrox_installer_running">Executing Java Runtime &amp; Mod Installer...</string>
+    <string name="zyrox_toggle_console">CONSOLE</string>
+    <string name="zyrox_hide_card">SHOW GUI</string>
+</resources>

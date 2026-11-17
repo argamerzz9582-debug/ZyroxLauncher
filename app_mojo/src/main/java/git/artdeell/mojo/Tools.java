@@ -261,7 +261,7 @@ public final class Tools {
         // The status bars are completely transparent and will take their color from the inset view
         // background drawable.
         if(!noSystemBars) bgColor = activity.getResources().getColor(R.color.background_status_bar);
-        else bgColor = Color.BLACK;
+        else bgColor = Color.parseColor("#0D0B0A");
 
         // On API 35 onwards, apps are edge-to-edge by default and are controlled entirely though the
         // inset API. On levels below, we still need to set the correct cutout mode.

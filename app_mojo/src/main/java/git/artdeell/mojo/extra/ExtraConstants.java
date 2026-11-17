@@ -23,4 +23,6 @@ public class ExtraConstants {
     public static final String LAUNCH_GAME = "launch_game";
     /* ExtraCore constant: Notify the account spinner that user has returned to the main menu. */
     public static final String REFRESH_ACCOUNT_SPINNER = "refresh_account_spinner";
+    /* ExtraCore constant: Refresh Zyrox shader / video background state. */
+    public static final String REFRESH_BG_VIDEO = "zyrox_refresh_bg_video";
 }

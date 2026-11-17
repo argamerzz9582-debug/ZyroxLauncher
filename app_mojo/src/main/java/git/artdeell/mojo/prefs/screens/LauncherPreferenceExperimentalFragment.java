@@ -8,7 +8,7 @@ import git.artdeell.mojo.utils.GpuUtils;
 
 import git.artdeell.mojo.R;
 
-public class LauncherPreferenceExperimentalFragment extends LauncherPreferenceFragment {
+public class LauncherPreferenceExperimentalFragment extends LauncherPreferenceBaseFragment {
 
     @Override
     public void onCreatePreferences(Bundle b, String str) {

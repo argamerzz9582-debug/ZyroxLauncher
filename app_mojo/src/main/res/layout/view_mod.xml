@@ -1,84 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox 2-Column Horizontal Glass Mod Card -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/background_line"
-    android:paddingHorizontal="@dimen/_2sdp"
-    android:paddingVertical="@dimen/_2sdp"
-    android:layout_marginVertical="@dimen/padding_medium"
-    >
+    android:layout_margin="4dp"
+    android:background="@drawable/bg_zyrox_glass_card_soft"
+    android:padding="10dp">
 
+    <!-- Left: 56dp rounded mod icon -->
     <ImageView
         android:id="@+id/mod_thumbnail_imageview"
-        android:layout_width="@dimen/_65sdp"
-        android:layout_height="@dimen/_65sdp"
-
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_zyrox_input"
+        android:padding="2dp"
+        android:scaleType="centerCrop"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-
-        tools:src="@mipmap/ic_launcher_foreground"
-        />
-
-    <ImageView
-        android:id="@+id/mod_source_imageview"
-        android:layout_width="@dimen/_13sdp"
-        android:layout_height="@dimen/_13sdp"
-        android:layout_marginTop="3dp"
-
-        android:layout_marginEnd="3dp"
-        android:scaleType="centerCrop"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:src="@mipmap/ic_launcher_foreground" />
-
-    <TextView
-        android:id="@+id/mod_title_textview"
-        style="@style/TextAppearance.AppCompat.Body2"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:maxLines="1"
-        android:layout_marginStart="@dimen/padding_moderate"
-        android:ellipsize="end"
-
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintEnd_toStartOf="@+id/mod_source_imageview"
-        app:layout_constraintStart_toEndOf="@+id/mod_thumbnail_imageview"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:text="Feed the beast - Reforged" />
-
-    <TextView
-        android:id="@+id/mod_body_textview"
-        style="@style/TextAppearance.AppCompat.Body1"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/padding_medium"
-        android:layout_marginEnd="@dimen/padding_medium"
-        android:ellipsize="end"
-        android:maxLines="3"
-
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/mod_title_textview"
-        app:layout_constraintTop_toBottomOf="@+id/mod_title_textview"
-        app:layout_constraintHorizontal_bias="0.0"
-        app:layout_constraintVertical_bias="0.0"
-        tools:text="Feed the beast - Reforged is a machine and magic focused modpack, with no respect for the minimum requirements of minecraft. Very long text" />
+        tools:src="@drawable/ic_mojo_full" />
 
+    <!-- Right: Compact Glowing Amber INSTALL Button -->
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/mod_install_button"
+        android:layout_width="74dp"
+        android:layout_height="30dp"
+        android:background="@drawable/btn_zyrox_play"
+        android:text="@string/zyrox_install"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="9.5sp"
+        android:letterSpacing="0.04"
+        android:stateListAnimator="@null"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
-    <!--
-        When clicked for the first time, the view is extended with more information.
-        Inflating later is cheaper, hence the stub
-     -->
+    <!-- Middle: Crisp white Title + Author + 2-line summary + Amber Download/Platform Badge -->
+    <LinearLayout
+        android:id="@+id/mod_info_column"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical"
+        app:layout_constraintStart_toEndOf="@id/mod_thumbnail_imageview"
+        app:layout_constraintEnd_toStartOf="@id/mod_install_button"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:id="@+id/mod_title_textview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="12.5sp"
+            android:textStyle="bold"
+            tools:text="Fabulously Optimized" />
+
+        <TextView
+            android:id="@+id/mod_body_textview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/zyrox_text_secondary"
+            android:textSize="10.5sp"
+            tools:text="Lightning fast Minecraft FPS and shader support powered by Sodium &amp; Iris." />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/mod_source_imageview"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:scaleType="fitCenter"
+                tools:src="@drawable/ic_modrinth" />
+
+            <TextView
+                android:id="@+id/mod_downloads_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="1dp"
+                android:background="@drawable/bg_zyrox_badge"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="8.5sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel"
+                tools:text="4.2M DL" />
+
+            <TextView
+                android:id="@+id/mod_author_textview"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/zyrox_text_muted"
+                android:textSize="9.5sp"
+                tools:text="by robotkoer" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Preserved fallback ViewStub -->
     <ViewStub
         android:id="@+id/mod_limited_state_stub"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout="@layout/view_mod_extended"
-        app:layout_constraintTop_toBottomOf="@id/mod_thumbnail_imageview"/>
-
-
+        app:layout_constraintTop_toBottomOf="@id/mod_info_column" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

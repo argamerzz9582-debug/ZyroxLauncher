@@ -29,7 +29,7 @@ import git.artdeell.mojo.vulkan.ui.DriverConfigDialog;
 /**
  * Fragment for any settings video related
  */
-public class LauncherPreferenceVideoFragment extends LauncherPreferenceFragment {
+public class LauncherPreferenceVideoFragment extends LauncherPreferenceBaseFragment {
     private Boolean hasAngle = null;
 
     private DriverConfigDialog mDialogScreen;

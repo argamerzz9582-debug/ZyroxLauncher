@@ -57,7 +57,12 @@ public class ModrinthApi implements ModpackApi{
         HashMap<String, Object> params = new HashMap<>();
         StringBuilder facetString = new StringBuilder();
         facetString.append("[");
-        facetString.append(String.format("[\"project_type:%s\"]", searchFilters.isModpack ? "modpack" : "mod"));
+        String projectType = (searchFilters.projectTypeOverride != null && !searchFilters.projectTypeOverride.isEmpty())
+                ? searchFilters.projectTypeOverride
+                : (searchFilters.isModpack ? "modpack" : "mod");
+        facetString.append(String.format("[\"project_type:%s\"]", projectType));
+        if(searchFilters.category != null && !searchFilters.category.isEmpty())
+            facetString.append(String.format(",[\"categories:%s\"]", searchFilters.category));
         if(searchFilters.mcVersion != null && !searchFilters.mcVersion.isEmpty())
             facetString.append(String.format(",[\"versions:%s\"]", searchFilters.mcVersion));
         facetString.append("]");
@@ -76,13 +81,21 @@ public class ModrinthApi implements ModpackApi{
         ModItem[] items = new ModItem[responseHits.size()];
         for(int i=0; i<responseHits.size(); ++i){
             JsonObject hit = responseHits.get(i).getAsJsonObject();
+            String author = (hit.has("author") && !hit.get("author").isJsonNull())
+                    ? hit.get("author").getAsString() : null;
+            long downloads = (hit.has("downloads") && !hit.get("downloads").isJsonNull())
+                    ? hit.get("downloads").getAsLong() : -1L;
+            String iconUrl = (hit.has("icon_url") && !hit.get("icon_url").isJsonNull())
+                    ? hit.get("icon_url").getAsString() : "";
             items[i] = new ModItem(
                     Constants.SOURCE_MODRINTH,
                     hit.get("project_type").getAsString().equals("modpack"),
                     hit.get("project_id").getAsString(),
                     hit.get("title").getAsString(),
                     hit.get("description").getAsString(),
-                    hit.get("icon_url").getAsString()
+                    iconUrl,
+                    author,
+                    downloads
             );
         }
         if(modrinthSearchResult == null) modrinthSearchResult = new ModrinthSearchResult();

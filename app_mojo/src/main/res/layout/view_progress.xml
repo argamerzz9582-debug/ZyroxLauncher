@@ -3,10 +3,24 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <LinearLayout
+        android:id="@+id/progress_linear_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="visible"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/progress_generic_progressbar"
+        tools:visibility="visible" />
+
     <ProgressBar
         android:id="@+id/progress_generic_progressbar"
-        android:layout_width="@dimen/_40sdp"
-        android:layout_height="@dimen/_30sdp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginVertical="4dp"
+        android:indeterminateTint="@color/zyrox_amber"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -14,44 +28,29 @@
         android:id="@+id/progress_textview"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:gravity="center"
-        android:textSize="@dimen/_12ssp"
-        android:textColor="@android:color/white"
-        android:paddingEnd="@dimen/_40sdp"
-
-        tools:text="5 tasks in progress"
-
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_marginStart="8dp"
+        android:gravity="start|center_vertical"
+        android:textSize="11sp"
+        android:letterSpacing="0.06"
+        android:textColor="@color/zyrox_amber"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        tools:text="2 TASKS IN PROGRESS"
+        app:layout_constraintBottom_toBottomOf="@id/progress_generic_progressbar"
         app:layout_constraintEnd_toStartOf="@id/progress_flip_arrow"
         app:layout_constraintStart_toEndOf="@+id/progress_generic_progressbar"
-        app:layout_constraintTop_toTopOf="@+id/progress_generic_progressbar"
-        tools:ignore="RtlSymmetry" />
+        app:layout_constraintTop_toTopOf="@+id/progress_generic_progressbar" />
 
     <ImageView
         android:id="@+id/progress_flip_arrow"
-        android:layout_width="@dimen/padding_extra_large"
-        android:layout_height="@dimen/padding_extra_large"
-        android:layout_marginEnd="@dimen/_8sdp"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="12dp"
+        android:rotation="180"
+        app:tint="@color/zyrox_amber"
         app:layout_constraintBottom_toBottomOf="@id/progress_generic_progressbar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/progress_generic_progressbar"
         app:srcCompat="@drawable/spinner_arrow" />
-
-    <LinearLayout
-        android:id="@+id/progress_linear_layout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:paddingHorizontal="@dimen/padding_heavy"
-        android:paddingTop="@dimen/padding_heavy"
-        android:weightSum="3"
-
-
-        app:layout_constraintBottom_toTopOf="@+id/progress_generic_progressbar"
-        tools:layout_height="@dimen/_100sdp"
-        tools:visibility="visible"
-        >
-    </LinearLayout>
 
 </merge>

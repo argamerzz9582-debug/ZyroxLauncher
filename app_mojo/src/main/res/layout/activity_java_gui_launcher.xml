@@ -1,201 +1,321 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
-	xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:app="http://schemas.android.com/apk/res-auto"
-	xmlns:tools="http://schemas.android.com/tools"
-	android:layout_height="match_parent"
-	android:layout_width="match_parent">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/zyrox_bg_base">
 
-	<androidx.constraintlayout.widget.ConstraintLayout
-		android:layout_width="match_parent"
-		android:layout_height="match_parent"
-		android:background="#000000">
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/zyrox_bg_base">
 
-		<git.artdeell.mojo.input.keyboard.TouchCharInput
-			android:id="@+id/awt_touch_char"
-			android:layout_width="1dp"
-			android:layout_height="1dp"
-			android:background="@android:color/darker_gray"
-			android:ems="10"
-			android:imeOptions="flagNoFullscreen|flagNoExtractUi|flagNoPersonalizedLearning|actionDone"
-			android:inputType="textFilter|textImeMultiLine|textAutoComplete|textAutoCorrect"
-			tools:ignore="TouchTargetSizeCheck"
-			/>
+        <git.artdeell.mojo.input.keyboard.TouchCharInput
+            android:id="@+id/awt_touch_char"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:background="@android:color/transparent"
+            android:ems="10"
+            android:imeOptions="flagNoFullscreen|flagNoExtractUi|flagNoPersonalizedLearning|actionDone"
+            android:inputType="textFilter|textImeMultiLine|textAutoComplete|textAutoCorrect"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:ignore="TouchTargetSizeCheck" />
 
-		<git.artdeell.mojo.awt.AWTView
-			android:id="@+id/installmod_surfaceview"
-			android:layout_width="match_parent"
-			android:layout_height="match_parent"
-			android:foregroundGravity="bottom"
-			app:layout_constraintBottom_toBottomOf="parent"
-			app:layout_constraintEnd_toEndOf="parent"
-			app:layout_constraintStart_toStartOf="parent"
-			app:layout_constraintTop_toTopOf="parent" />
+        <!-- Interactive Java AWT Installer Surface -->
+        <git.artdeell.mojo.awt.AWTView
+            android:id="@+id/installmod_surfaceview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:foregroundGravity="bottom"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-		<LinearLayout
-			android:id="@+id/main_touchpad"
-			android:layout_width="0dp"
-			android:layout_height="0dp"
-			android:orientation="vertical"
-			app:layout_constraintStart_toStartOf="@id/installmod_surfaceview"
-			app:layout_constraintTop_toTopOf="@id/installmod_surfaceview"
+        <!-- Optional Virtual Touchpad & Cursor -->
+        <LinearLayout
+            android:id="@+id/main_touchpad"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:orientation="vertical"
             app:layout_constraintBottom_toBottomOf="@id/installmod_surfaceview"
             app:layout_constraintEnd_toEndOf="@id/installmod_surfaceview"
-            >
+            app:layout_constraintStart_toStartOf="@id/installmod_surfaceview"
+            app:layout_constraintTop_toTopOf="@id/installmod_surfaceview">
 
-			<ImageView
-				android:id="@+id/main_mouse_pointer"
-				android:layout_width="18dp"
-				android:layout_height="27dp"
-				android:src="@drawable/ic_mouse_pointer" />
+            <ImageView
+                android:id="@+id/main_mouse_pointer"
+                android:layout_width="18dp"
+                android:layout_height="27dp"
+                android:src="@drawable/ic_mouse_pointer"
+                android:contentDescription="@string/control_mouse" />
+        </LinearLayout>
 
-		</LinearLayout>
+        <!-- TOP FLOATING OBSIDIAN INSTALLER TOOLBAR -->
+        <LinearLayout
+            android:id="@+id/zyrox_awt_toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_zyrox_floating_pill"
+            android:paddingHorizontal="8dp"
+            android:elevation="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
-		<Button
-			android:id="@+id/installmod_btn2"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentRight="true"
-			android:background="@drawable/control_button"
-			android:onClick="forceClose"
-			android:text="@string/control_forceclose"
-			app:layout_constraintRight_toRightOf="parent"
-			app:layout_constraintTop_toTopOf="parent" />
+            <Button
+                android:id="@+id/button"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:onClick="toggleKeyboard"
+                android:text="KEYBD"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel"
+                tools:ignore="HardcodedText" />
 
-		<Button
-			android:id="@+id/installmod_btn3"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_toLeftOf="@id/installmod_btn2"
-			android:layout_marginTop="2dp"
-			android:background="@drawable/control_button"
-			android:onClick="openLogOutput"
-			android:text="@string/control_viewout"
-			app:layout_constraintEnd_toEndOf="parent"
-			app:layout_constraintRight_toLeftOf="@id/installmod_btn2"
-			app:layout_constraintTop_toBottomOf="@+id/installmod_btn2" />
+            <Button
+                android:id="@+id/button3"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:layout_marginStart="4dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:onClick="performCopy"
+                android:text="@android:string/copy"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
 
-		<Button
-			android:id="@+id/button2"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_toLeftOf="@id/installmod_btn3"
-			android:layout_marginTop="2dp"
-			android:background="@drawable/control_button"
-			android:onClick="toggleVirtualMouse"
-			android:text="@string/control_mouse"
-			app:layout_constraintEnd_toEndOf="parent"
-			app:layout_constraintRight_toLeftOf="@id/installmod_btn3"
-			app:layout_constraintTop_toBottomOf="@+id/installmod_btn3" />
+            <Button
+                android:id="@+id/installmod_btn_paste"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:layout_marginStart="4dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:onClick="performPaste"
+                android:text="PASTE"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel"
+                tools:ignore="HardcodedText" />
 
-		<Button
-			android:id="@+id/button"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="2dp"
-			android:layout_marginTop="2dp"
-			android:background="@drawable/control_button"
-			android:onClick="toggleKeyboard"
-			android:text="Keyboard"
-			app:layout_constraintStart_toStartOf="parent"
-			app:layout_constraintTop_toTopOf="parent" />
+            <View
+                android:layout_width="1dp"
+                android:layout_height="16dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@color/zyrox_divider" />
 
-		<Button
-			android:id="@+id/button3"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="2dp"
-			android:layout_marginTop="2dp"
-			android:background="@drawable/control_button"
-			android:onClick="performCopy"
-			android:text="Copy"
-			app:layout_constraintStart_toStartOf="parent"
-			app:layout_constraintTop_toBottomOf="@+id/button" />
+            <Button
+                android:id="@+id/button2"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:onClick="toggleVirtualMouse"
+                android:text="@string/control_mouse"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
 
-		<Button
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_marginStart="2dp"
-			android:layout_marginTop="2dp"
-			android:background="@drawable/control_button"
-			android:onClick="performPaste"
-			android:text="Paste"
-			app:layout_constraintStart_toStartOf="parent"
-			app:layout_constraintTop_toBottomOf="@+id/button3" />
+            <Button
+                android:id="@+id/installmod_btn3"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:layout_marginStart="4dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:onClick="openLogOutput"
+                android:text="@string/zyrox_toggle_console"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
 
-		<Button
-			android:id="@+id/installmod_mouse_pri"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:layout_marginBottom="2dp"
-			android:background="@drawable/control_button"
-			android:text="@string/control_primary"
-			app:layout_constraintBottom_toTopOf="@+id/installmod_mouse_sec"
-			app:layout_constraintStart_toStartOf="parent" />
+            <Button
+                android:id="@+id/installmod_btn2"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:minHeight="26dp"
+                android:minWidth="0dp"
+                android:layout_marginStart="4dp"
+                android:paddingHorizontal="8dp"
+                android:background="@drawable/btn_zyrox_danger"
+                android:onClick="forceClose"
+                android:text="@string/control_forceclose"
+                android:textColor="@color/zyrox_danger"
+                android:textSize="9sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+        </LinearLayout>
 
-		<Button
-			android:id="@+id/installmod_mouse_sec"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:layout_toRightOf="@id/installmod_mouse_pri"
-			android:background="@drawable/control_button"
-			android:text="@string/control_secondary"
-			app:layout_constraintBottom_toBottomOf="parent"
-			app:layout_constraintLeft_toRightOf="@id/installmod_mouse_pri"
-			app:layout_constraintStart_toStartOf="parent" />
+        <!-- Bottom-Left Glass Mouse Buttons -->
+        <Button
+            android:id="@+id/installmod_mouse_pri"
+            android:layout_width="64dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/control_button"
+            android:text="@string/control_primary"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="10sp"
+            app:layout_constraintBottom_toTopOf="@+id/installmod_mouse_sec"
+            app:layout_constraintStart_toStartOf="parent" />
 
-		<Button
-			android:id="@+id/installmod_window_moveleft"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:background="@drawable/control_button"
-			android:text="◀"
-			app:layout_constraintBottom_toBottomOf="parent"
-			app:layout_constraintEnd_toEndOf="parent" />
+        <Button
+            android:id="@+id/installmod_mouse_sec"
+            android:layout_width="64dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/control_button"
+            android:text="@string/control_secondary"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="10sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
-		<Button
-			android:id="@+id/installmod_window_moveright"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:layout_toRightOf="@id/installmod_mouse_pri"
-			android:background="@drawable/control_button"
-			android:text="▶"
-			app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
-			app:layout_constraintEnd_toEndOf="@+id/installmod_window_moveleft" />
+        <!-- Bottom-Right Glass Window Pan Pad -->
+        <Button
+            android:id="@+id/installmod_window_moveleft"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/control_button"
+            android:text="◀"
+            android:textColor="@color/zyrox_amber"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:ignore="HardcodedText" />
 
-		<Button
-			android:id="@+id/installmod_window_moveup"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:layout_toRightOf="@id/installmod_mouse_pri"
-			android:background="@drawable/control_button"
-			android:text="▲"
-			app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
-			app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveright" />
+        <Button
+            android:id="@+id/installmod_window_moveright"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/control_button"
+            android:text="▶"
+            android:textColor="@color/zyrox_amber"
+            app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
+            app:layout_constraintEnd_toEndOf="@+id/installmod_window_moveleft"
+            tools:ignore="HardcodedText" />
 
-		<Button
-			android:id="@+id/installmod_window_movedown"
-			android:layout_width="wrap_content"
-			android:layout_height="wrap_content"
-			android:layout_alignParentBottom="true"
-			android:background="@drawable/control_button"
-			android:text="▼"
-			app:layout_constraintBottom_toBottomOf="parent"
-			app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveleft" />
+        <Button
+            android:id="@+id/installmod_window_moveup"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/control_button"
+            android:text="▲"
+            android:textColor="@color/zyrox_amber"
+            app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
+            app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveright"
+            tools:ignore="HardcodedText" />
 
-	</androidx.constraintlayout.widget.ConstraintLayout>
+        <Button
+            android:id="@+id/installmod_window_movedown"
+            android:layout_width="42dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/control_button"
+            android:text="▼"
+            android:textColor="@color/zyrox_amber"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveleft"
+            tools:ignore="HardcodedText" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-	<com.kdt.LoggerView
-		android:id="@+id/launcherLoggerView"
-		android:layout_width="match_parent"
-		android:layout_height="match_parent"
-		android:visibility="gone"
-		/>
+    <!-- Full-Width Zyrox Syntax-Highlighted Installer Console Overlay -->
+    <FrameLayout
+        android:id="@+id/zyrox_installer_progress_strip"
+        android:layout_width="480dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="48dp"
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:padding="12dp"
+        android:elevation="14dp"
+        android:visibility="gone">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_installer_status"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/zyrox_installer_running"
+                    android:textColor="@color/zyrox_amber"
+                    android:textSize="10.5sp"
+                    android:singleLine="true"
+                    android:ellipsize="middle"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+
+                <TextView
+                    android:id="@+id/btn_installer_hide_card"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_zyrox_badge"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="3dp"
+                    android:text="@string/zyrox_hide_card"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="9sp"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+            </LinearLayout>
+
+            <ProgressBar
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="8dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/zyrox_amber" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <com.kdt.LoggerView
+        android:id="@+id/launcherLoggerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:elevation="20dp"
+        android:visibility="gone" />
 </FrameLayout>
-

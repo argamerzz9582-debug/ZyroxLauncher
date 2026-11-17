@@ -1,24 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    A modified version of the simple_list_item_1 android offers
-    So I could modify it to suit the standard look and feel of the app
--->
-
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@android:id/text1"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-
-    android:paddingTop="@dimen/padding_input_top"
-    android:paddingBottom="@dimen/padding_input_bottom"
-    android:textAppearance="?android:attr/textAppearanceListItemSmall"
-
-
-    android:textSize="@dimen/_13ssp"
+    android:minHeight="40dp"
+    android:paddingVertical="8dp"
+    android:paddingHorizontal="12dp"
+    android:background="?attr/selectableItemBackground"
+    android:textColor="@color/zyrox_text_primary"
+    android:textSize="12.5sp"
+    android:fontFamily="sans-serif-medium"
     android:gravity="center_vertical"
-    android:paddingStart="?android:attr/listPreferredItemPaddingStart"
-    android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
-
-    tools:text="PojavLauncher version: Foxglove"
-    />
+    tools:text="Zyrox Launcher 1.21.4" />

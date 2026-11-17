@@ -127,9 +127,10 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         setOnItemSelectedListener(this);
         reload();
 
-        setBackgroundColor(getResources().getColor(R.color.background_status_bar));
-        mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
-        mLoginBarPaint.setStrokeWidth(getResources().getDimensionPixelOffset(R.dimen._2sdp));
+        setBackground(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_input, getContext().getTheme()));
+        setPopupBackgroundDrawable(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_glass_modal, getContext().getTheme()));
+        mLoginBarPaint.setColor(getResources().getColor(R.color.zyrox_amber));
+        mLoginBarPaint.setStrokeWidth(Math.max(2f, 2f * getResources().getDisplayMetrics().density));
         mLoginStepAnimator.addUpdateListener(this);
         mLoginStep = mMaxSteps;
 
@@ -296,19 +297,23 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
             Resources.Theme theme = getContext().getTheme();
 
             ExtendedTextView textview = view.findViewById(R.id.account_item);
+            android.widget.TextView badgeView = view.findViewById(R.id.account_type_badge);
             ImageView deleteButton = view.findViewById(R.id.delete_account_button);
 
             if(position == 0) {
                 // "Add account" button
                 Drawable plusDrawable = ResourcesCompat.getDrawable(resources, R.drawable.ic_add, theme);
-                textview.setCompoundDrawables(plusDrawable, null, null, null);
+                textview.setCompoundDrawablesRelative(plusDrawable, null, null, null);
                 textview.setText(R.string.main_add_account);
+                textview.setTextColor(resources.getColor(R.color.zyrox_amber));
+                if (badgeView != null) badgeView.setVisibility(View.GONE);
                 deleteButton.setVisibility(View.GONE);
-                // Only activate the listener behaviour when in drop-down mode
-                // or when there's no accounts
                 if(isDropDown || getCount() == 1) view.setOnClickListener(v-> createAccount());
                 return;
             }
+            view.setOnClickListener(null);
+            view.setClickable(false);
+            textview.setTextColor(resources.getColor(R.color.zyrox_text_primary));
 
             if(isDropDown) {
                 deleteButton.setVisibility(View.VISIBLE);
@@ -327,16 +332,35 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
                 authType = ResourcesCompat.getDrawable(resources, authTypeResource, theme);
             }
 
+            Drawable avatarDrawable;
             int headCacheHash = System.identityHashCode(account);
             BitmapDrawable accountHead = mSkinHeadCache.get(headCacheHash);
             if (accountHead == null){
                 Bitmap accountSkinFace = account.getSkinFace();
-                accountHead = new BitmapDrawable(resources, accountSkinFace);
-                mSkinHeadCache.put(headCacheHash, accountHead);
+                if (accountSkinFace != null) {
+                    accountHead = new BitmapDrawable(resources, accountSkinFace);
+                    mSkinHeadCache.put(headCacheHash, accountHead);
+                }
+            }
+            if (accountHead != null) {
+                avatarDrawable = accountHead;
+            } else {
+                avatarDrawable = ResourcesCompat.getDrawable(resources, R.drawable.ic_default_steve_face, theme);
+            }
+
+            if (badgeView != null) {
+                badgeView.setVisibility(View.VISIBLE);
+                if (account.authType == AuthType.MICROSOFT) {
+                    badgeView.setText(R.string.zyrox_badge_microsoft);
+                } else if (account.authType == AuthType.ELY_BY) {
+                    badgeView.setText(R.string.zyrox_badge_elyby);
+                } else {
+                    badgeView.setText(R.string.zyrox_badge_offline);
+                }
             }
 
             textview.setText(account.username);
-            textview.setCompoundDrawablesRelative(accountHead, null, authType, null);
+            textview.setCompoundDrawablesRelative(avatarDrawable, null, authType, null);
         }
 
         private void showDeleteDialog(Context context, int position) {

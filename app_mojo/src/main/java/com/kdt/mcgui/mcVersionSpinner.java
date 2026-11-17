@@ -112,21 +112,26 @@ public class mcVersionSpinner extends ExtendedTextView {
     /** Initialize various behaviors */
     private void init(){
         // Setup various attributes
-        setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimensionPixelSize(R.dimen._12ssp));
+        float density = getResources().getDisplayMetrics().density;
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
         setGravity(Gravity.CENTER_VERTICAL);
-        int startPadding = getContext().getResources().getDimensionPixelOffset(R.dimen._17sdp);
-        int endPadding = getContext().getResources().getDimensionPixelOffset(R.dimen._5sdp);
+        setSingleLine(true);
+        setEllipsize(android.text.TextUtils.TruncateAt.END);
+        int startPadding = Math.round(10f * density);
+        int endPadding = Math.round(8f * density);
         setPaddingRelative(startPadding, 0, endPadding, 0);
-        setCompoundDrawablePadding(startPadding);
+        setCompoundDrawablePadding(Math.round(8f * density));
         addOnAttachStateChangeListener(new ExtraAttachListener());
         setSelection(0);
 
         // Popup window behavior
         setOnClickListener(new OnClickListener() {
-            final int offset = -getContext().getResources().getDimensionPixelOffset(R.dimen._4sdp);
+            final int offset = Math.round(4f * density);
             @Override
             public void onClick(View v) {
                 if(mPopupWindow == null) getPopupWindow();
+                int popupWidth = Math.max(getWidth(), Math.round(250f * density));
+                mPopupWindow.setWidth(popupWidth);
 
                 if(mPopupWindow.isShowing()){
                     mPopupWindow.dismiss();
@@ -164,8 +169,10 @@ public class mcVersionSpinner extends ExtendedTextView {
             }
         });
 
-        mPopupWindow = new PopupWindow(mListView, MATCH_PARENT, getContext().getResources().getDimensionPixelOffset(R.dimen._184sdp));
-        mPopupWindow.setElevation(5);
+        int defaultPopupWidth = Math.round(250f * getContext().getResources().getDisplayMetrics().density);
+        int defaultPopupHeight = Math.round(210f * getContext().getResources().getDisplayMetrics().density);
+        mPopupWindow = new PopupWindow(mListView, defaultPopupWidth, defaultPopupHeight);
+        mPopupWindow.setElevation(12);
         mPopupWindow.setClippingEnabled(false);
 
         // Block clicking outside of the popup window

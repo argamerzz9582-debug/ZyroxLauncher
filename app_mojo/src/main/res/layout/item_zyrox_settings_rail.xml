@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="44dp"
+    android:layout_marginBottom="5dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_zyrox_rail_item"
+    android:paddingHorizontal="10dp">
+
+    <ImageView
+        android:id="@+id/iv_settings_cat_icon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:scaleType="fitCenter"
+        app:tint="@color/zyrox_amber"
+        tools:src="@drawable/ic_px_image_renderer" />
+
+    <TextView
+        android:id="@+id/tv_settings_cat_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:textColor="@color/zyrox_rail_text"
+        android:textSize="10.5sp"
+        android:letterSpacing="0.05"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        tools:text="VIDEO &amp; RENDERER" />
+</LinearLayout>

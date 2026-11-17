@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -5,8 +6,8 @@
     android:id="@+id/edit_layout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingHorizontal="@dimen/padding_moderate"
-    android:paddingVertical="@dimen/padding_moderate"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="8dp"
     app:layout_optimizationLevel="standard|dimensions|chains">
 
     <!-- Resolution settings -->
@@ -14,226 +15,238 @@
         android:id="@+id/editResolution_textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_5sdp"
-        android:gravity="center"
-        android:paddingEnd="5dp"
         android:text="@string/mcl_setting_title_resolution_scaler"
-
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/editResolution_textView_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editResolution_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editResolution_textView"
+        tools:text="75%" />
 
     <com.kdt.CustomSeekbar
         android:id="@+id/editResolution_seekbar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/_36sdp"
+        android:layout_height="34dp"
         android:min="@integer/resolution_seekbar_min"
         app:seekBarIncrement="@integer/resolution_seekbar_increment"
-
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/editResolution_textView" />
 
-    <TextView
-        android:id="@+id/editResolution_textView_percent"
-        android:layout_width="150dp"
-        android:layout_height="0dp"
-        android:gravity="end"
-        tools:text="50%"
-
-        app:layout_constraintBottom_toBottomOf="@id/editResolution_textView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/editResolution_textView" />
-
-    <!-- Gyroscope settings -->
+    <!-- Gyroscope switches -->
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/checkboxGyro"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_36sdp"
+        android:layout_height="40dp"
         android:text="@string/preference_enable_gyro_title"
-
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/editResolution_seekbar"/>
+        app:layout_constraintTop_toBottomOf="@id/editResolution_seekbar" />
 
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/checkboxGyroX"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_36sdp"
+        android:layout_height="40dp"
         android:text="@string/preference_gyro_invert_x_axis"
-
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/checkboxGyro"/>
+        app:layout_constraintTop_toBottomOf="@id/checkboxGyro" />
 
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/checkboxGyroY"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_36sdp"
+        android:layout_height="40dp"
         android:text="@string/preference_gyro_invert_y_axis"
-
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/checkboxGyroX"/>
+        app:layout_constraintTop_toBottomOf="@id/checkboxGyroX" />
 
     <!-- Gyroscope sensitivity -->
     <TextView
         android:id="@+id/editGyro_textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_5sdp"
-        android:gravity="center"
-        android:paddingEnd="5dp"
+        android:layout_marginTop="6dp"
         android:text="@string/preference_gyro_sensitivity_title"
-
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/checkboxGyroY" />
+
+    <TextView
+        android:id="@+id/editGyro_textView_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editGyro_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editGyro_textView"
+        tools:text="100%" />
 
     <com.kdt.CustomSeekbar
         android:id="@+id/editGyro_seekbar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/_36sdp"
-
+        android:layout_height="34dp"
         android:min="@integer/gyro_speed_seekbar_min"
         android:max="@integer/gyro_speed_seekbar_max"
         app:seekBarIncrement="@integer/gyro_speed_seekbar_increment"
-
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/editGyro_textView" />
-
-    <TextView
-        android:id="@+id/editGyro_textView_percent"
-        android:layout_width="150dp"
-        android:layout_height="0dp"
-        android:gravity="end"
-        tools:text="100%"
-
-        app:layout_constraintBottom_toBottomOf="@id/editGyro_textView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/editGyro_textView" />
-
 
     <!-- Mouse settings -->
     <TextView
         android:id="@+id/editMouseSpeed_textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_5sdp"
-        android:gravity="center"
-        android:paddingEnd="5dp"
+        android:layout_marginTop="6dp"
         android:text="@string/mcl_setting_title_mousespeed"
-
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/editGyro_seekbar" />
+
+    <TextView
+        android:id="@+id/editMouseSpeed_textView_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editMouseSpeed_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editMouseSpeed_textView"
+        tools:text="100%" />
 
     <com.kdt.CustomSeekbar
         android:id="@+id/editMouseSpeed_seekbar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/_36sdp"
-
+        android:layout_height="34dp"
         android:min="@integer/mouse_speed_seekbar_min"
         android:max="@integer/mouse_speed_seekbar_max"
         app:seekBarIncrement="@integer/mouse_speed_seekbar_increment"
-
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/editMouseSpeed_textView" />
-
-    <TextView
-        android:id="@+id/editMouseSpeed_textView_percent"
-        android:layout_width="150dp"
-        android:layout_height="0dp"
-        android:gravity="end"
-        tools:text="100%"
-
-        app:layout_constraintBottom_toBottomOf="@id/editMouseSpeed_textView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/editMouseSpeed_textView" />
 
     <!-- Gesture toggle -->
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/checkboxGesture"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/_36sdp"
+        android:layout_height="40dp"
         android:text="@string/mcl_disable_gestures"
-
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/editMouseSpeed_seekbar"/>
+        app:layout_constraintTop_toBottomOf="@id/editMouseSpeed_seekbar" />
 
-    <!-- gesture settings -->
+    <!-- Gesture delay -->
     <TextView
         android:id="@+id/editGestureDelay_textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_5sdp"
-        android:gravity="center"
-        android:paddingEnd="5dp"
+        android:layout_marginTop="6dp"
         android:text="@string/mcl_setting_title_longpresstrigger"
-
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/checkboxGesture" />
+
+    <TextView
+        android:id="@+id/editGestureDelay_textView_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editGestureDelay_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editGestureDelay_textView"
+        tools:text="270 ms" />
 
     <com.kdt.CustomSeekbar
         android:id="@+id/editGestureDelay_seekbar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/_36sdp"
-
+        android:layout_height="34dp"
         android:min="@integer/gesture_delay_seekbar_min"
         android:max="@integer/gesture_delay_seekbar_max"
         app:seekBarIncrement="@integer/gesture_delay_seekbar_increment"
-
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/editGestureDelay_textView" />
 
-    <TextView
-        android:id="@+id/editGestureDelay_textView_percent"
-        android:layout_width="150dp"
-        android:layout_height="0dp"
-        android:gravity="end"
-        tools:text="270 ms"
-
-        app:layout_constraintBottom_toBottomOf="@id/editGestureDelay_textView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/editGestureDelay_textView" />
-
-    <!-- button transparency seekbar -->
+    <!-- Button transparency -->
     <TextView
         android:id="@+id/buttonTransparency_textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/_5sdp"
-        android:gravity="center"
-        android:paddingEnd="5dp"
+        android:layout_marginTop="6dp"
         android:text="@string/preference_button_transparency"
-
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/editGestureDelay_seekbar" />
+
+    <TextView
+        android:id="@+id/buttonTransparency_textView_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/buttonTransparency_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/buttonTransparency_textView"
+        tools:text="100%" />
 
     <com.kdt.CustomSeekbar
         android:id="@+id/buttonTransparency_seekBar"
         android:layout_width="0dp"
-        android:layout_height="@dimen/_36sdp"
-
+        android:layout_height="34dp"
         android:min="0"
         android:max="100"
         app:seekBarIncrement="5"
-
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/buttonTransparency_textView" />
-
-    <TextView
-        android:id="@+id/buttonTransparency_textView_percent"
-        android:layout_width="150dp"
-        android:layout_height="0dp"
-        android:gravity="end"
-        tools:text="%"
-
-        app:layout_constraintBottom_toBottomOf="@id/buttonTransparency_textView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@id/buttonTransparency_textView" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

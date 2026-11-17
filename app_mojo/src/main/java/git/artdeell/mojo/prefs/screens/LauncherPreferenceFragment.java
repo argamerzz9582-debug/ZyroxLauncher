@@ -1,91 +1,131 @@
 package git.artdeell.mojo.prefs.screens;
 
-
-import android.Manifest;
-import android.app.Activity;
-import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.preference.Preference;
-import androidx.preference.PreferenceFragmentCompat;
+import androidx.annotation.StringRes;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import git.artdeell.mojo.LauncherActivity;
 import git.artdeell.mojo.R;
-import git.artdeell.mojo.prefs.LauncherPreferences;
 
 /**
- * Preference for the main screen, any sub-screen should inherit this class for consistent behavior,
- * overriding only onCreatePreferences
+ * Page 4: Zyrox Control Center — Horizontal 2-Pane Settings Shell
+ * (220dp Left Category Rail + Right Frosted Glass Preference Pane).
  */
-public class LauncherPreferenceFragment extends PreferenceFragmentCompat implements SharedPreferences.OnSharedPreferenceChangeListener {
-    protected Runnable mVisibilityUpdater = () -> {};
+public class LauncherPreferenceFragment extends Fragment {
+    private static final String STATE_SELECTED_TAB = "zyrox_selected_pref_tab";
+
+    private static final class CategoryItem {
+        final @StringRes int titleRes;
+        final @DrawableRes int iconRes;
+        final Class<? extends Fragment> fragmentClass;
+
+        CategoryItem(@StringRes int titleRes, @DrawableRes int iconRes, Class<? extends Fragment> fragmentClass) {
+            this.titleRes = titleRes;
+            this.iconRes = iconRes;
+            this.fragmentClass = fragmentClass;
+        }
+    }
+
+    private static final CategoryItem[] CATEGORIES = new CategoryItem[]{
+            new CategoryItem(R.string.zyrox_cat_video, R.drawable.ic_px_image_renderer, LauncherPreferenceVideoFragment.class),
+            new CategoryItem(R.string.zyrox_cat_controls, R.drawable.ic_px_gamepad, LauncherPreferenceControlFragment.class),
+            new CategoryItem(R.string.zyrox_cat_java, R.drawable.ic_px_ram, LauncherPreferenceJavaFragment.class),
+            new CategoryItem(R.string.zyrox_cat_misc, R.drawable.ic_px_alt_sliders, LauncherPreferenceMiscellaneousFragment.class),
+            new CategoryItem(R.string.zyrox_cat_experimental, R.drawable.ic_px_experiment, LauncherPreferenceExperimentalFragment.class)
+    };
+
+    private int mSelectedTab = 0;
+    private CategoryRailAdapter mAdapter;
+
+    public LauncherPreferenceFragment() {
+        super(R.layout.fragment_zyrox_split_shell);
+    }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        view.setBackgroundColor(getResources().getColor(R.color.background_app));
         super.onViewCreated(view, savedInstanceState);
-    }
-
-    @Override
-    public void onCreatePreferences(Bundle b, String str) {
-        mVisibilityUpdater = this::updateVisibility;
-        addPreferencesFromResource(R.xml.pref_main);
-        setupNotificationRequestPreference();
-    }
-
-    private void updateVisibility(){
-        requirePreference("notification_permission_request").setVisible(!getLauncherActivity().checkForPermission(33, Manifest.permission.POST_NOTIFICATIONS));
-    }
-
-    private void setupNotificationRequestPreference() {
-        Preference mRequestNotificationPermissionPreference = requirePreference("notification_permission_request");
-        Activity activity = getActivity();
-        if(activity instanceof LauncherActivity) {
-            mRequestNotificationPermissionPreference.setOnPreferenceClickListener(preference -> {
-                ((LauncherActivity) activity).askForPermission(33, Manifest.permission.POST_NOTIFICATIONS);
-                return true;
-            });
-        }else{
-            mRequestNotificationPermissionPreference.setVisible(false);
+        if (savedInstanceState != null) {
+            mSelectedTab = Math.max(0, Math.min(CATEGORIES.length - 1,
+                    savedInstanceState.getInt(STATE_SELECTED_TAB, 0)));
         }
-        updateVisibility();
+
+        RecyclerView leftRail = view.findViewById(R.id.zyrox_left_list);
+        leftRail.setLayoutManager(new LinearLayoutManager(view.getContext()));
+        mAdapter = new CategoryRailAdapter();
+        leftRail.setAdapter(mAdapter);
+
+        if (savedInstanceState == null || getChildFragmentManager().findFragmentById(R.id.zyrox_right_container) == null) {
+            showCategory(mSelectedTab, true);
+        }
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        SharedPreferences sharedPreferences = getPreferenceManager().getSharedPreferences();
-        if(sharedPreferences != null) sharedPreferences.registerOnSharedPreferenceChangeListener(this);
-        mVisibilityUpdater.run();
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_SELECTED_TAB, mSelectedTab);
     }
 
-    @Override
-    public void onPause() {
-        SharedPreferences sharedPreferences = getPreferenceManager().getSharedPreferences();
-        if(sharedPreferences != null) sharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
-        super.onPause();
+    private void showCategory(int index, boolean force) {
+        if (!force && index == mSelectedTab) return;
+        int prev = mSelectedTab;
+        mSelectedTab = index;
+        if (mAdapter != null) {
+            mAdapter.notifyItemChanged(prev);
+            mAdapter.notifyItemChanged(mSelectedTab);
+        }
+        CategoryItem item = CATEGORIES[index];
+        getChildFragmentManager().beginTransaction()
+                .setReorderingAllowed(true)
+                .replace(R.id.zyrox_right_container, item.fragmentClass, null, item.fragmentClass.getSimpleName())
+                .commit();
     }
 
-    @Override
-    public void onSharedPreferenceChanged(SharedPreferences p, String s) {
-        LauncherPreferences.loadPreferences(getContext());
-    }
+    private class CategoryRailAdapter extends RecyclerView.Adapter<CategoryRailAdapter.VH> {
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_zyrox_settings_rail, parent, false);
+            return new VH(v);
+        }
 
-    protected Preference requirePreference(CharSequence key) {
-        Preference preference = findPreference(key);
-        if(preference != null) return preference;
-        throw new IllegalStateException("Preference "+key+" is null");
-    }
-    @SuppressWarnings("unchecked")
-    protected <T extends Preference> T requirePreference(CharSequence key, Class<T> preferenceClass) {
-        Preference preference = requirePreference(key);
-        if(preferenceClass.isInstance(preference)) return (T)preference;
-        throw new IllegalStateException("Preference "+key+" is not an instance of "+preferenceClass.getSimpleName());
-    }
-    protected LauncherActivity getLauncherActivity(){
-        return ((LauncherActivity) getActivity());
+        @Override
+        public void onBindViewHolder(@NonNull VH holder, int position) {
+            CategoryItem cat = CATEGORIES[position];
+            holder.icon.setImageResource(cat.iconRes);
+            holder.title.setText(cat.titleRes);
+            holder.itemView.setSelected(position == mSelectedTab);
+            holder.itemView.setOnClickListener(v -> {
+                int pos = holder.getAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) {
+                    showCategory(pos, false);
+                }
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return CATEGORIES.length;
+        }
+
+        class VH extends RecyclerView.ViewHolder {
+            final ImageView icon;
+            final TextView title;
+
+            VH(@NonNull View itemView) {
+                super(itemView);
+                icon = itemView.findViewById(R.id.iv_settings_cat_icon);
+                title = itemView.findViewById(R.id.tv_settings_cat_title);
+            }
+        }
     }
 }

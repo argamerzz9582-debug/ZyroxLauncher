@@ -2,6 +2,7 @@ package com.kdt;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.text.Editable;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.ImageButton;
@@ -14,17 +15,18 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 
 import git.artdeell.mojo.Logger;
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.ui.ZyroxLogHighlighter;
 
 /**
- * A class able to display logs to the user.
- * It has support for the Logger class
+ * Zyrox Live JVM Console overlay view with real-time error (#EF4444) and warning (#FF8C42) highlighting.
  */
 public class LoggerView extends ConstraintLayout {
+    private static final int MAX_BUFFER_CHARS = 96 * 1024;
+
     private Logger.eventLogListener mLogListener;
     private ToggleButton mLogToggle;
     private DefocusableScrollView mScrollView;
     private TextView mLogTextView;
-
 
     public LoggerView(@NonNull Context context) {
         this(context, null);
@@ -38,64 +40,60 @@ public class LoggerView extends ConstraintLayout {
     @Override
     public void setVisibility(int visibility) {
         super.setVisibility(visibility);
-        // Triggers the log view shown state by default when viewing it
         mLogToggle.setChecked(visibility == VISIBLE);
     }
 
-    /**
-     * Inflate the layout, and add component behaviors
-     */
-    private void init(){
+    private void init() {
         inflate(getContext(), R.layout.view_logger, this);
         mLogTextView = findViewById(R.id.content_log_view);
         mLogTextView.setTypeface(Typeface.MONOSPACE);
-        //TODO clamp the max text so it doesn't go oob
         mLogTextView.setMaxLines(Integer.MAX_VALUE);
         mLogTextView.setEllipsize(null);
         mLogTextView.setVisibility(GONE);
 
-        // Toggle log visibility
         mLogToggle = findViewById(R.id.content_log_toggle_log);
         mLogToggle.setOnCheckedChangeListener(
                 (compoundButton, isChecked) -> {
                     mLogTextView.setVisibility(isChecked ? VISIBLE : GONE);
-                    if(isChecked) {
+                    if (isChecked) {
                         Logger.setLogListener(mLogListener);
-                    }else{
+                    } else {
                         mLogTextView.setText("");
-                        Logger.setLogListener(null); // Makes the JNI code be able to skip expensive logger callbacks
-                        // NOTE: was tested by rapidly smashing the log on/off button, no sync issues found :)
+                        Logger.setLogListener(null);
                     }
                 });
         mLogToggle.setChecked(false);
 
-        // Remove the loggerView from the user View
         ImageButton cancelButton = findViewById(R.id.log_view_cancel);
         cancelButton.setOnClickListener(view -> LoggerView.this.setVisibility(GONE));
 
-        // Set the scroll view
         mScrollView = findViewById(R.id.content_log_scroll);
         mScrollView.setKeepFocusing(true);
 
-        //Set up the autoscroll switch
         ToggleButton autoscrollToggle = findViewById(R.id.content_log_toggle_autoscroll);
         autoscrollToggle.setOnCheckedChangeListener(
                 (compoundButton, isChecked) -> {
-                    if(isChecked) mScrollView.fullScroll(View.FOCUS_DOWN);
+                    if (isChecked) mScrollView.fullScroll(View.FOCUS_DOWN);
                     mScrollView.setKeepFocusing(isChecked);
                 }
         );
         autoscrollToggle.setChecked(true);
 
-        // Listen to logs
         mLogListener = text -> {
-            if(mLogTextView.getVisibility() != VISIBLE) return;
+            if (mLogTextView.getVisibility() != VISIBLE) return;
+            CharSequence styled = ZyroxLogHighlighter.highlightLine(text);
             post(() -> {
-                mLogTextView.append(text + '\n');
-                if(mScrollView.isKeepFocusing()) mScrollView.fullScroll(View.FOCUS_DOWN);
+                if (mLogTextView.length() > MAX_BUFFER_CHARS) {
+                    CharSequence cur = mLogTextView.getText();
+                    if (cur instanceof Editable) {
+                        ((Editable) cur).delete(0, cur.length() / 3);
+                    } else {
+                        mLogTextView.setText(cur.subSequence(cur.length() / 3, cur.length()));
+                    }
+                }
+                mLogTextView.append(styled);
+                if (mScrollView.isKeepFocusing()) mScrollView.fullScroll(View.FOCUS_DOWN);
             });
-
         };
     }
-
 }

@@ -1,9 +1,66 @@
-<WebView
-
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:focusable="true"
-    android:focusableInTouchMode="true">
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="8dp">
 
-</WebView>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:padding="8dp"
+        android:elevation="12dp">
+
+        <!-- Styled Zyrox OAuth Status Strip -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="6dp">
+
+            <View
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:background="@drawable/bg_zyrox_dot_amber" />
+
+            <TextView
+                android:id="@+id/oauth_url_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/zyrox_title_microsoft_login"
+                android:textColor="@color/zyrox_text_secondary"
+                android:textSize="10.5sp"
+                android:singleLine="true"
+                android:ellipsize="middle"
+                android:fontFamily="monospace" />
+
+            <ProgressBar
+                android:id="@+id/oauth_progress_bar"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:indeterminateTint="@color/zyrox_amber" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginBottom="4dp"
+            android:background="@color/zyrox_divider" />
+
+        <WebView
+            android:id="@+id/oauth_webview"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+    </LinearLayout>
+</FrameLayout>

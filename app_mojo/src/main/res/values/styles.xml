@@ -1,15 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Light or not? -->
+    <!-- Zyrox Launcher Master Theme (dark obsidian glass + warm amber steampunk) -->
     <style name="MojoLauncher" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:statusBarColor">@color/background_status_bar</item>
-        <item name="android:navigationBarColor">@color/background_app</item>
+        <item name="android:windowBackground">@color/zyrox_bg_base</item>
+        <item name="android:colorBackground">@color/zyrox_bg_base</item>
+        <item name="colorBackgroundFloating">@color/zyrox_glass_elevated</item>
+        <item name="colorPrimary">@color/zyrox_amber_bright</item>
+        <item name="colorPrimaryDark">@color/zyrox_bg_base</item>
+        <item name="colorAccent">@color/zyrox_amber</item>
+        <item name="colorControlActivated">@color/zyrox_amber</item>
+        <item name="colorControlHighlight">@color/zyrox_amber_tint</item>
+        <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
+        <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
+        <item name="android:textColorHint">@color/zyrox_text_muted</item>
+        <item name="android:statusBarColor">@color/zyrox_bg_base</item>
+        <item name="android:navigationBarColor">@color/zyrox_bg_base</item>
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
-        <item name="android:textSize">@dimen/_12ssp</item>
-        <item name="dialogCornerRadius">0dp</item>
+        <item name="alertDialogTheme">@style/Zyrox.AlertDialog</item>
+        <item name="android:alertDialogTheme">@style/Zyrox.AlertDialog</item>
+        <item name="android:textSize">13sp</item>
+        <item name="dialogCornerRadius">8dp</item>
         <item name="android:seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="android:switchStyle">@style/MojoLauncher.Switch</item>
@@ -18,51 +31,142 @@
         <item name="android:buttonStyleToggle">@style/MojoLauncher.Button.Toggle</item>
     </style>
 
-    <style name="MojoLauncher.AppTheme" parent="MojoLauncher"/>
+    <style name="MojoLauncher.AppTheme" parent="MojoLauncher" />
+
+    <style name="Zyrox.AlertDialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="colorAccent">@color/zyrox_amber</item>
+        <item name="colorPrimary">@color/zyrox_amber_bright</item>
+        <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
+        <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
+        <item name="android:background">@color/zyrox_glass_elevated</item>
+        <item name="android:windowBackground">@drawable/bg_zyrox_glass_modal</item>
+        <item name="dialogCornerRadius">8dp</item>
+    </style>
+
+    <style name="Zyrox.DialogActivity" parent="Theme.AppCompat.Dialog">
+        <item name="windowNoTitle">true</item>
+        <item name="colorAccent">@color/zyrox_amber</item>
+        <item name="colorPrimary">@color/zyrox_amber_bright</item>
+        <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
+        <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
+        <item name="android:windowBackground">@drawable/bg_zyrox_glass_modal</item>
+        <item name="alertDialogTheme">@style/Zyrox.AlertDialog</item>
+    </style>
 
     <style name="MojoLauncher.SeekBar" parent="Widget.AppCompat.SeekBar">
         <item name="android:progressDrawable">@drawable/minepb_progress</item>
-        <item name="android:thumb">@drawable/mineknob_on_unfiltered</item>
+        <item name="android:thumb">@drawable/bg_zyrox_seekbar_thumb</item>
         <item name="android:thumbOffset">0dp</item>
-        <item name="android:maxHeight">4dp</item>
-        <item name="android:minHeight">4dp</item>
+        <item name="android:maxHeight">6dp</item>
+        <item name="android:minHeight">6dp</item>
+        <item name="android:splitTrack">false</item>
     </style>
 
     <style name="MojoLauncher.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
-        <item name="track">@drawable/mineknob_track_mask_unfiltered</item>
-        <item name="trackTint">@color/mineknob_track_tint</item>
-        <item name="trackTintMode">multiply</item>
-        <item name="android:thumb">@drawable/mineknob_switch</item>
-        <item name="switchMinWidth">40dp</item>
+        <item name="track">@drawable/bg_zyrox_switch_track</item>
+        <item name="android:thumb">@drawable/bg_zyrox_switch_thumb</item>
+        <item name="switchMinWidth">42dp</item>
+        <item name="showText">false</item>
     </style>
 
     <style name="MojoLauncher.Button" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/button_flat</item>
+        <item name="android:background">@drawable/btn_zyrox_secondary</item>
+        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
     </style>
 
     <style name="MojoLauncher.Button.Toggle" parent="MojoLauncher.Button">
         <item name="android:background">@drawable/button_flat_toggle</item>
+        <item name="android:textColor">@color/zyrox_text_primary</item>
     </style>
 
+    <!-- Zyrox Typography & Component Styles -->
+    <style name="Zyrox.SectionLabel" parent="Widget.AppCompat.TextView">
+        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
+    </style>
+
+    <style name="Zyrox.NavItem" parent="Widget.AppCompat.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:background">@drawable/bg_zyrox_nav_item</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:drawablePadding">10dp</item>
+        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
+    </style>
+
+    <style name="Zyrox.FilterChip" parent="Widget.AppCompat.TextView">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">28dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:layout_marginEnd">6dp</item>
+        <item name="android:background">@drawable/bg_zyrox_chip</item>
+        <item name="android:textColor">@color/zyrox_chip_text</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
+    </style>
+
+    <style name="Zyrox.HudPillAction" parent="Widget.AppCompat.TextView">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:background">@drawable/bg_zyrox_nav_item</item>
+        <item name="android:textColor">@color/zyrox_text_primary</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
+    </style>
 
     <style name="LauncherFragment_Divider">
-        <item name="android:layout_width">@dimen/padding_tiny</item>
+        <item name="android:layout_width">1dp</item>
         <item name="android:layout_height">0dp</item>
-        <item name="android:background">@color/divider</item>
+        <item name="android:background">@color/zyrox_divider</item>
     </style>
 
     <style name="LauncherMenuButton" parent="Widget.AppCompat.Button">
-        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:background">@drawable/bg_zyrox_nav_item</item>
+        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:fontFamily">@font/minecraft_pixel</item>
+        <item name="fontFamily">@font/minecraft_pixel</item>
     </style>
 
     <style name="LauncherMenuButton.Universal" parent="LauncherMenuButton">
-        <item name="android:layout_height">@dimen/_66sdp</item>
+        <item name="android:layout_height">36dp</item>
     </style>
 
     <style name="ThickDivider">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">@dimen/_1sdp</item>
-        <item name="android:background">?android:attr/listDivider</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/zyrox_divider</item>
     </style>
 
     <item name="dimension_tracker" type="id" />

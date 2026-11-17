@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reusable Zyrox 2-Column Horizontal Split Shell (Settings, Instance Studio & Sub-views) -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#660D0B0A"
+    android:padding="12dp">
+
+    <!-- Optional Standalone Top Navigation Header Bar (hidden when LauncherActivity Global Header is active) -->
+    <LinearLayout
+        android:id="@+id/zyrox_top_bar"
+        android:layout_width="0dp"
+        android:layout_height="46dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_zyrox_glass_card"
+        android:paddingHorizontal="14dp"
+        android:layout_marginBottom="10dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/btn_zyrox_back"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="@string/zyrox_back"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="13sp"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            android:paddingEnd="16dp" />
+
+        <TextView
+            android:id="@+id/tv_zyrox_page_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/zyrox_title_control_center"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="15sp"
+            android:letterSpacing="0.08"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_zyrox_top_action"
+            android:layout_width="130dp"
+            android:layout_height="32dp"
+            android:background="@drawable/btn_zyrox_play"
+            android:text="@string/zyrox_new_short"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="11sp"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Left Rail (220dp Category / Instance List) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/zyrox_left_list"
+        android:layout_width="220dp"
+        android:layout_height="0dp"
+        android:background="@drawable/bg_zyrox_glass_card"
+        android:padding="8dp"
+        android:clipToPadding="false"
+        android:scrollbars="vertical"
+        android:scrollbarThumbVertical="@color/zyrox_amber"
+        app:layout_constraintTop_toBottomOf="@id/zyrox_top_bar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Right Content Pane (Settings Pane / Editor Form / Grid) -->
+    <FrameLayout
+        android:id="@+id/zyrox_right_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/bg_zyrox_glass_card"
+        android:padding="12dp"
+        app:layout_constraintTop_toBottomOf="@id/zyrox_top_bar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/zyrox_left_list"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

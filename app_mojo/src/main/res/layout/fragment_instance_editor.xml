@@ -1,272 +1,452 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<!-- Page 2: Zyrox Instance & Profile Studio — 2-Column Horizontal Split -->
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
-    android:orientation="vertical"
-    >
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fadeScrollbars="true"
-        android:scrollbarThumbVertical="@color/minebutton_color">
+    android:background="#660D0B0A"
+    android:padding="12dp">
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+    <!-- LEFT RAIL (230dp): Saved Profiles / Instances + Quick + NEW Button -->
+    <LinearLayout
+        android:id="@+id/zyrox_instance_left_rail"
+        android:layout_width="230dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_card"
+        android:padding="10dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            style="@style/Zyrox.SectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="@dimen/fragment_padding_medium">
+            android:paddingHorizontal="4dp"
+            android:paddingBottom="6dp"
+            android:text="@string/zyrox_saved_profiles" />
 
-            <ImageView
-                android:id="@+id/vprof_editor_instance_icon"
-                android:layout_width="@dimen/_50sdp"
-                android:layout_height="@dimen/_50sdp"
-                android:layout_marginTop="@dimen/padding_heavy"
-                android:paddingHorizontal="@dimen/profile_editor_image_padding"
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginBottom="6dp"
+            android:background="@color/zyrox_divider" />
 
-                android:paddingVertical="@dimen/profile_editor_image_padding"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                tools:src="@tools:sample/avatars" />
-
-            <ImageView
-                android:layout_width="@dimen/_14sdp"
-                android:layout_height="@dimen/_14sdp"
-                android:src="@drawable/ic_px_edit"
-                android:background="@drawable/background_icon_edit"
-                app:layout_constraintBottom_toBottomOf="@+id/vprof_editor_instance_icon"
-                app:layout_constraintEnd_toEndOf="@+id/vprof_editor_instance_icon"/>
-
-            <TextView
-                android:id="@+id/vprof_editor_profile_name_sub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/profiles_profile_name"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_instance_name"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_instance_name" />
-
-            <EditText
-                android:id="@+id/vprof_editor_instance_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/padding_large"
-                android:background="@drawable/background_line"
-                android:textSize="@dimen/_13ssp"
-
-                android:ems="10"
-                android:hint="@string/unnamed"
-                android:inputType="textPersonName"
-                android:paddingHorizontal="@dimen/padding_heavy"
-                app:layout_constraintTop_toBottomOf="@id/vprof_editor_instance_icon" />
-
-
-            <TextView
-                android:id="@+id/textView4"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/profiles_profile_version"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_version_spinner"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_version_spinner" />
-
-            <TextView
-                android:id="@+id/vprof_editor_version_spinner"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:layout_marginEnd="@dimen/padding_medium"
-                android:background="@drawable/background_line"
-                android:hint="@string/version_select_hint"
-                android:paddingHorizontal="@dimen/padding_heavy"
-                android:textSize="@dimen/_13ssp"
-
-                app:layout_constraintEnd_toStartOf="@+id/vprof_editor_version_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_instance_name" />
-
-            <Button
-                android:id="@+id/vprof_editor_version_button"
-                android:layout_width="wrap_content"
-                android:layout_height="0dp"
-                android:paddingHorizontal="@dimen/padding_large"
-                android:paddingVertical="0px"
-
-
-                android:text="@string/global_select"
-
-                app:layout_constraintBottom_toBottomOf="@+id/vprof_editor_version_spinner"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@+id/vprof_editor_version_spinner" />
-
-
-            <TextView
-                android:id="@+id/textView7"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/default_control"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_ctrl_spinner"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_ctrl_spinner" />
-
-            <TextView
-                android:id="@+id/vprof_editor_ctrl_spinner"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:layout_marginEnd="@dimen/padding_medium"
-
-                android:background="@drawable/background_line"
-                android:hint="@string/use_global_default"
-                android:paddingHorizontal="@dimen/padding_heavy"
-                android:textSize="@dimen/_13ssp"
-
-                app:layout_constraintEnd_toStartOf="@id/vprof_editor_ctrl_button"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_version_spinner" />
-
-            <Button
-                android:id="@+id/vprof_editor_ctrl_button"
-                android:layout_width="wrap_content"
-                android:layout_height="0dp"
-                android:paddingHorizontal="@dimen/padding_large"
-                android:text="@string/global_select"
-
-
-                app:layout_constraintBottom_toBottomOf="@id/vprof_editor_ctrl_spinner"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintTop_toTopOf="@id/vprof_editor_ctrl_spinner" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/instance_shared_data"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_data_checkbox_container"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_data_checkbox_container"/>
-
-            <CheckBox
-                android:id="@+id/vprof_editor_data_checkbox_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
-                android:paddingHorizontal="@dimen/padding_heavy"
-                android:button="@null"
-                android:text="@string/instance_shared_data_off"
-                android:textColor="@color/checkbox_text_color"
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_ctrl_spinner"
-                tools:layout_editor_absoluteX="22dp"/>
-
-
-            <TextView
-                android:id="@+id/textView6"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/pvc_jvmArgs"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_jre_args"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_jre_args" />
-
-            <EditText
-                android:id="@+id/vprof_editor_jre_args"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
-                android:ems="10"
-                android:hint="@string/use_global_default"
-                android:inputType="text"
-                android:paddingHorizontal="@dimen/padding_heavy"
-                android:textSize="@dimen/_13ssp"
-
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_data_checkbox_container" />
-
-            <TextView
-                android:id="@+id/textView2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/pedit_java_runtime"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_spinner_runtime"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_spinner_runtime" />
-
-            <Spinner
-                android:id="@+id/vprof_editor_spinner_runtime"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/background_line"
-                android:paddingVertical="0px"
-                android:layout_marginTop="32dp"
-                app:layout_constraintTop_toBottomOf="@id/vprof_editor_jre_args"
-                tools:paddingVertical="@dimen/_12sdp" />
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="@dimen/_8sdp"
-                android:paddingHorizontal="@dimen/_8sdp"
-                android:rotation="180"
-                android:src="@drawable/spinner_arrow"
-
-                app:layout_constraintBottom_toBottomOf="@id/vprof_editor_spinner_runtime"
-                app:layout_constraintEnd_toEndOf="@id/vprof_editor_spinner_runtime"
-                app:layout_constraintTop_toTopOf="@id/vprof_editor_spinner_runtime" />
-
-
-            <TextView
-                android:id="@+id/textView3"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/pedit_renderer"
-                app:layout_constraintBottom_toTopOf="@+id/vprof_editor_instance_renderer"
-                app:layout_constraintStart_toStartOf="@+id/vprof_editor_instance_renderer" />
-
-            <Spinner
-                android:id="@+id/vprof_editor_instance_renderer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:background="@drawable/background_line"
-                android:dropDownWidth="match_parent"
-                android:paddingVertical="0px"
-
-
-                app:layout_constraintTop_toBottomOf="@+id/vprof_editor_spinner_runtime"
-                tools:paddingVertical="@dimen/_12sdp" />
-
-            <ImageView
-                android:layout_width="wrap_content"
-                android:layout_height="@dimen/_8sdp"
-                android:paddingHorizontal="@dimen/_8sdp"
-                android:rotation="180"
-                android:src="@drawable/spinner_arrow"
-
-                app:layout_constraintBottom_toBottomOf="@id/vprof_editor_instance_renderer"
-                app:layout_constraintEnd_toEndOf="@id/vprof_editor_instance_renderer"
-                app:layout_constraintTop_toTopOf="@id/vprof_editor_instance_renderer" />
-
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-    </ScrollView>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/fragment_padding_medium"
-        android:layout_marginVertical="13dp"
-        >
-        <com.kdt.mcgui.MineButton
-            android:id="@+id/vprof_editor_save_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/zyrox_instance_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:text="@string/global_save"
-            android:layout_marginEnd="@dimen/padding_medium" />
+            android:scrollbars="vertical"
+            android:scrollbarThumbVertical="@color/zyrox_amber"
+            android:clipToPadding="false" />
 
-        <com.kdt.mcgui.MineButton
-            android:id="@+id/vprof_editor_delete_button"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="@dimen/padding_medium"
-            android:text="@string/global_delete" />
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_rail_new_instance"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/btn_zyrox_secondary"
+            android:text="@string/zyrox_new_instance"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="10.5sp"
+            android:letterSpacing="0.06"
+            android:stateListAnimator="@null"
+            android:fontFamily="@font/minecraft_pixel"
+            app:fontFamily="@font/minecraft_pixel" />
     </LinearLayout>
-</LinearLayout>
+
+    <!-- RIGHT PANE: Scrollable Glass Instance Editor Form + Sticky Action Bar -->
+    <LinearLayout
+        android:id="@+id/zyrox_instance_right_pane"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_zyrox_glass_card"
+        android:padding="12dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/zyrox_instance_left_rail"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fadeScrollbars="false"
+            android:scrollbarThumbVertical="@color/zyrox_amber">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingEnd="4dp">
+
+                <!-- Row 1: Icon Picker + Profile Name -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <FrameLayout
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_zyrox_input"
+                        android:padding="6dp">
+
+                        <ImageView
+                            android:id="@+id/vprof_editor_instance_icon"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="fitCenter"
+                            tools:src="@drawable/ic_zyrox_grass_block" />
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="bottom|end"
+                            android:src="@drawable/ic_px_edit"
+                            app:tint="@color/zyrox_amber"
+                            android:background="@drawable/bg_zyrox_badge"
+                            android:padding="2dp" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/vprof_editor_profile_name_sub"
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/profiles_profile_name" />
+
+                        <EditText
+                            android:id="@+id/vprof_editor_instance_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:hint="@string/unnamed"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textColorHint="@color/zyrox_text_muted"
+                            android:textSize="13sp"
+                            android:singleLine="true"
+                            android:imeOptions="flagNoExtractUi|actionDone"
+                            android:inputType="textPersonName"
+                            android:paddingHorizontal="12dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Row 2: Minecraft Version Selector -->
+                <TextView
+                    android:id="@+id/textView4"
+                    style="@style/Zyrox.SectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/profiles_profile_version" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/vprof_editor_version_spinner"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_zyrox_input"
+                        android:hint="@string/version_select_hint"
+                        android:textColor="@color/zyrox_text_primary"
+                        android:textColorHint="@color/zyrox_text_muted"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textSize="12.5sp" />
+
+                    <Button
+                        android:id="@+id/vprof_editor_version_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:paddingHorizontal="14dp"
+                        android:background="@drawable/btn_zyrox_secondary"
+                        android:textColor="@color/zyrox_amber"
+                        android:text="@string/global_select" />
+                </LinearLayout>
+
+                <!-- Row 3: Graphics Renderer + Compatibility Subtitle -->
+                <TextView
+                    android:id="@+id/textView3"
+                    style="@style/Zyrox.SectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/pedit_renderer" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_zyrox_input">
+
+                    <Spinner
+                        android:id="@+id/vprof_editor_instance_renderer"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@android:color/transparent"
+                        android:popupBackground="@drawable/bg_zyrox_glass_modal"
+                        android:paddingEnd="28dp" />
+
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_gravity="end|center_vertical"
+                        android:layout_marginEnd="10dp"
+                        android:rotation="180"
+                        android:src="@drawable/spinner_arrow"
+                        app:tint="@color/zyrox_amber" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/tv_renderer_hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="@string/zyrox_renderer_hint_default"
+                    android:textColor="@color/zyrox_text_muted"
+                    android:textSize="10.5sp" />
+
+                <!-- Row 4: 2-Column Java Runtime + Control Layout -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/textView2"
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/pedit_java_runtime" />
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_zyrox_input">
+
+                            <Spinner
+                                android:id="@+id/vprof_editor_spinner_runtime"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:background="@android:color/transparent"
+                                android:popupBackground="@drawable/bg_zyrox_glass_modal"
+                                android:paddingEnd="26dp" />
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_gravity="end|center_vertical"
+                                android:layout_marginEnd="8dp"
+                                android:rotation="180"
+                                android:src="@drawable/spinner_arrow"
+                                app:tint="@color/zyrox_amber" />
+                        </FrameLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/textView7"
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/default_control" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/vprof_editor_ctrl_spinner"
+                                android:layout_width="0dp"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="6dp"
+                                android:gravity="center_vertical"
+                                android:background="@drawable/bg_zyrox_input"
+                                android:hint="@string/use_global_default"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textColorHint="@color/zyrox_text_muted"
+                                android:paddingHorizontal="10dp"
+                                android:singleLine="true"
+                                android:ellipsize="end"
+                                android:textSize="11.5sp" />
+
+                            <Button
+                                android:id="@+id/vprof_editor_ctrl_button"
+                                android:layout_width="wrap_content"
+                                android:layout_height="match_parent"
+                                android:minWidth="56dp"
+                                android:paddingHorizontal="10dp"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:textColor="@color/zyrox_amber"
+                                android:textSize="10sp"
+                                android:text="@string/global_select" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Row 5: JVM RAM Slider (live numeric badge) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        style="@style/Zyrox.SectionLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/zyrox_jvm_ram_label" />
+
+                    <TextView
+                        android:id="@+id/tv_vprof_ram_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="2dp"
+                        android:background="@drawable/bg_zyrox_badge"
+                        android:textColor="@color/zyrox_amber"
+                        android:textSize="10sp"
+                        android:fontFamily="@font/minecraft_pixel"
+                        app:fontFamily="@font/minecraft_pixel"
+                        tools:text="2048 MB" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/vprof_ram_seekbar"
+                    style="@style/MojoLauncher.SeekBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:layout_marginTop="2dp" />
+
+                <!-- Row 6: JVM Launch Arguments + Shared Directory -->
+                <TextView
+                    android:id="@+id/textView6"
+                    style="@style/Zyrox.SectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/pvc_jvmArgs" />
+
+                <EditText
+                    android:id="@+id/vprof_editor_jre_args"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_zyrox_input"
+                    android:hint="@string/use_global_default"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textColorHint="@color/zyrox_text_muted"
+                    android:imeOptions="flagNoExtractUi|actionDone"
+                    android:inputType="text"
+                    android:singleLine="true"
+                    android:paddingHorizontal="12dp"
+                    android:textSize="12sp" />
+
+                <CheckBox
+                    android:id="@+id/vprof_editor_data_checkbox_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="4dp"
+                    android:background="@drawable/bg_zyrox_input"
+                    android:paddingHorizontal="12dp"
+                    android:buttonTint="@color/zyrox_amber"
+                    android:text="@string/instance_shared_data_off"
+                    android:textColor="@color/zyrox_text_secondary"
+                    android:textSize="11.5sp" />
+
+            </LinearLayout>
+        </ScrollView>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/zyrox_divider" />
+
+        <!-- Bottom Sticky Bar inside Right Pane: Red DELETE outline on left, Glowing Amber SAVE on right -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/vprof_editor_delete_button"
+                android:layout_width="130dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/btn_zyrox_danger"
+                android:text="@string/zyrox_delete_instance"
+                android:textColor="@color/zyrox_danger"
+                android:textSize="11.5sp"
+                android:letterSpacing="0.06"
+                android:stateListAnimator="@null"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <com.kdt.mcgui.MineButton
+                android:id="@+id/vprof_editor_save_button"
+                android:layout_width="190dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/btn_zyrox_play"
+                android:text="@string/zyrox_save_instance"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="12sp"
+                android:letterSpacing="0.08"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
