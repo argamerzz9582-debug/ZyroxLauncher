@@ -32,6 +32,7 @@ public class NativesExtractor {
      */
     private static ArrayList<String> createLibraryBlacklist() {
         String[] includedLibraryNames = new File(Tools.NATIVE_LIB_DIR).list();
+        if (includedLibraryNames == null) return new ArrayList<>(0);
         ArrayList<String> blacklist = new ArrayList<>(includedLibraryNames.length);
         for(String libraryName : includedLibraryNames) {
             // allow overriding jnidispatch (as the integrated version may be too old)
@@ -58,6 +59,11 @@ public class NativesExtractor {
     }
 
     private void extract(File source, ExtractFilter extractFilter) throws IOException {
+        FileUtils.ensureDirectory(mDestinationDir);
+        String canonicalBase = mDestinationDir.getCanonicalPath();
+        String canonicalPrefix = canonicalBase.endsWith(File.separator)
+                ? canonicalBase
+                : canonicalBase + File.separator;
         byte[] buffer = new byte[8192];
         try (FileInputStream fileInputStream = new FileInputStream(source);
              ZipInputStream zipInputStream = new ZipInputStream(fileInputStream)) {
@@ -73,7 +79,11 @@ public class NativesExtractor {
                 // getFileName may make the file name null, avoid that case.
                 if(entryName == null || LIBRARY_BLACKLIST.contains(entryName)) continue;
 
-                processEntry(entryCopyStream, entry, new File(mDestinationDir, entryName), buffer);
+                File entryDestination = new File(mDestinationDir, entryName);
+                if (!entryDestination.getCanonicalPath().startsWith(canonicalPrefix)) {
+                    throw new IOException("Blocked native entry outside destination: " + entryName);
+                }
+                processEntry(entryCopyStream, entry, entryDestination, buffer);
             }
         }
     }

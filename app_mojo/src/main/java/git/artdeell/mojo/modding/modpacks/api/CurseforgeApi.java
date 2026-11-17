@@ -312,9 +312,21 @@ public class CurseforgeApi implements ModpackApi{
             JsonObject fileMetadata = getFile(mFile.projectID, mFile.fileID);
             checkRequiredFileFields(fileMetadata);
             String url = getDownloadUrl(fileMetadata);
-            this.url = new URL(url);
-            this.path = new File(mInstanceDestination, "mods/"+ URLDecoder.decode(FileUtils.getFileName(url),"UTF-8"));
-            FileUtils.ensureParentDirectorySilently(this.path);
+            URL parsedUrl = new URL(url);
+            if (!"https".equalsIgnoreCase(parsedUrl.getProtocol())) {
+                throw new IOException("Blocked non-HTTPS CurseForge download URL");
+            }
+            String rawFileName = FileUtils.getFileName(url);
+            String decodedName = rawFileName != null
+                    ? FileUtils.getFileName(URLDecoder.decode(rawFileName, "UTF-8"))
+                    : null;
+            if (decodedName == null) {
+                throw new IOException("Invalid mod file name in CurseForge metadata");
+            }
+            File modsDir = FileUtils.resolveInsideDirectory(mInstanceDestination, "mods");
+            FileUtils.ensureDirectorySilently(modsDir);
+            this.url = parsedUrl;
+            this.path = FileUtils.resolveInsideDirectory(modsDir, decodedName);
             this.sha1Hash = getSha1FromModData(fileMetadata);
             this.size = fileMetadata.get("fileLength").getAsLong();
         }

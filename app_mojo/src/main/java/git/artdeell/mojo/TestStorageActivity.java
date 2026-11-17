@@ -95,7 +95,8 @@ public class TestStorageActivity extends Activity {
         AsyncAssetManager.unpackComponents(this);
         AsyncAssetManager.unpackSingleFiles(this);
 
-        Intent intent =  new Intent(this, LauncherActivity.class);
+        Intent intent = new Intent(this, LauncherActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         finish();
     }

@@ -20,8 +20,15 @@ static volatile jobject logListener = NULL;
 static int latestlog_fd = -1;
 
 
+static bool containsSensitiveToken(const char* buf) {
+    return strstr(buf, "Session ID is") != NULL
+            || strstr(buf, "--accessToken") != NULL
+            || strstr(buf, "access_token") != NULL
+            || strstr(buf, "Authorization: Bearer") != NULL;
+}
+
 static bool recordBuffer(char* buf, ssize_t len) {
-    if(strstr(buf, "Session ID is")) return false;
+    if(containsSensitiveToken(buf)) return false;
     if(latestlog_fd != -1) {
         write(latestlog_fd, buf, len);
         fdatasync(latestlog_fd);
@@ -37,8 +44,9 @@ static void *logger_thread(void* param) {
     ssize_t  rsize;
     char buf[2050];
     while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
-        bool shouldRecordString = recordBuffer(buf, rsize); //record with newline int latestlog
-        if(buf[rsize-1]=='\n') {
+        buf[rsize] = 0x00; // null-terminate before substring scanning
+        bool shouldRecordString = recordBuffer(buf, rsize); //record with newline in latestlog
+        if(rsize > 0 && buf[rsize-1]=='\n') {
             rsize=rsize-1; //truncate
         }
         buf[rsize]=0x00;
@@ -77,13 +85,13 @@ Java_git_artdeell_mojo_Logger_begin(JNIEnv *env, __attribute((unused)) jclass cl
 
     /* open latestlog.txt for writing */
     const char* logFilePath = (*env)->GetStringUTFChars(env, logPath, NULL);
-    latestlog_fd = open(logFilePath, O_WRONLY | O_TRUNC);
+    latestlog_fd = open(logFilePath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    int openErrno = errno;
+    (*env)->ReleaseStringUTFChars(env, logPath, logFilePath);
     if(latestlog_fd == -1) {
-        latestlog_fd = 0;
-        (*env)->ThrowNew(env, ioeClass, strerror(errno));
+        (*env)->ThrowNew(env, ioeClass, strerror(openErrno));
         return;
     }
-    (*env)->ReleaseStringUTFChars(env, logPath, logFilePath);
 
     JavaVM* vm = NULL;
     (*env)->GetJavaVM(env, &vm);

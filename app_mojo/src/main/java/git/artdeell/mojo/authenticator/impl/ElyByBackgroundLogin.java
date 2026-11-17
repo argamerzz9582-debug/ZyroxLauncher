@@ -49,7 +49,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
                 mAccountInfo = acquireAccountData(mOAuthData.accessToken);
                 continuation.call();
             }catch (Exception e){
-                Log.e("MicroAuth", "Exception thrown during authentication", e);
+                Log.e("ElyAuth", "Authentication step failed: " + e.getClass().getSimpleName());
                 Tools.runOnUiThread(()->loginListener.onLoginError(e));
             }
             ProgressLayout.clearProgress(ProgressLayout.AUTHENTICATE);
@@ -88,7 +88,7 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
 
     private void acquireTokens(boolean isRefresh, String code) throws IOException, PresentableException {
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
+        Log.i("ElyAuth", "Exchanging OAuth grant (refresh=" + isRefresh + ")");
 
         String formData = CommonLoginUtils.convertToFormData(
                 "client_id", "mojolauncher2",
@@ -105,6 +105,8 @@ public class ElyByBackgroundLogin implements BackgroundLogin {
         URL url = new URL(accountInfoUrl);
         HttpURLConnection conn = (HttpURLConnection)url.openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + accessToken);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(20000);
         conn.setUseCaches(false);
         conn.connect();
         if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {

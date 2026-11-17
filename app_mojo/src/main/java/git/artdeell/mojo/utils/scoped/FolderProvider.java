@@ -13,7 +13,6 @@ import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Root;
 import android.provider.DocumentsProvider;
-import android.util.Log;
 import android.webkit.MimeTypeMap;
 
 import androidx.annotation.Nullable;
@@ -31,56 +30,66 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * A document provider for the Storage Access Framework which exposes the files in the
- * $HOME/ directory to other apps.
- * <p/>
- * Note that this replaces providing an activity matching the ACTION_GET_CONTENT intent:
- * <p/>
- * "A document provider and ACTION_GET_CONTENT should be considered mutually exclusive. If you
- * support both of them simultaneously, your app will appear twice in the system picker UI,
- * offering two different ways of accessing your stored data. This would be confusing for users."
- * - <a href="http://developer.android.com/guide/topics/providers/document-provider.html#43">...</a>
+ * Storage Access Framework DocumentsProvider exposing only the game home directory
+ * with strict canonical path containment so internal app storage (such as account tokens)
+ * can never be traversed or accessed.
  */
 public class FolderProvider extends DocumentsProvider {
 
-    private static final List<String> BLOCKED_PACKAGES = List.of("com.dnamobile.modlymodmanager");
     private static final String ALL_MIME_TYPES = "*/*";
 
     private File BASE_DIR;
-
     private ContentResolver mContentResolver;
+    private String mStorageProviderAuthority;
 
-    private String mStorageProviderAuthortiy;
-
-    // The default columns to return information about a root if no specific
-    // columns are requested in a query.
     private static final String[] DEFAULT_ROOT_PROJECTION = new String[]{
-        Root.COLUMN_ROOT_ID,
-        Root.COLUMN_MIME_TYPES,
-        Root.COLUMN_FLAGS,
-        Root.COLUMN_ICON,
-        Root.COLUMN_TITLE,
-        Root.COLUMN_SUMMARY,
-        Root.COLUMN_DOCUMENT_ID,
-        Root.COLUMN_AVAILABLE_BYTES
+            Root.COLUMN_ROOT_ID,
+            Root.COLUMN_MIME_TYPES,
+            Root.COLUMN_FLAGS,
+            Root.COLUMN_ICON,
+            Root.COLUMN_TITLE,
+            Root.COLUMN_SUMMARY,
+            Root.COLUMN_DOCUMENT_ID,
+            Root.COLUMN_AVAILABLE_BYTES
     };
 
-    // The default columns to return information about a document if no specific
-    // columns are requested in a query.
     private static final String[] DEFAULT_DOCUMENT_PROJECTION = new String[]{
-        Document.COLUMN_DOCUMENT_ID,
-        Document.COLUMN_MIME_TYPE,
-        Document.COLUMN_DISPLAY_NAME,
-        Document.COLUMN_LAST_MODIFIED,
-        Document.COLUMN_FLAGS,
-        Document.COLUMN_SIZE
+            Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_MIME_TYPE,
+            Document.COLUMN_DISPLAY_NAME,
+            Document.COLUMN_LAST_MODIFIED,
+            Document.COLUMN_FLAGS,
+            Document.COLUMN_SIZE
     };
+
+    private static String sanitizeChildName(String displayName) throws FileNotFoundException {
+        if (displayName == null) throw new FileNotFoundException("Invalid document name");
+        String trimmed = displayName.trim();
+        if (trimmed.isEmpty() || ".".equals(trimmed) || "..".equals(trimmed)
+                || trimmed.indexOf('/') >= 0 || trimmed.indexOf('\\') >= 0 || trimmed.indexOf('\0') >= 0) {
+            throw new FileNotFoundException("Invalid document name");
+        }
+        return trimmed;
+    }
+
+    private File verifyInsideBaseDir(File candidate) throws FileNotFoundException {
+        if (BASE_DIR == null || candidate == null) {
+            throw new FileNotFoundException("Storage root unavailable");
+        }
+        try {
+            return git.artdeell.mojo.utils.FileUtils.ensureInsideDirectory(BASE_DIR, candidate);
+        } catch (IOException e) {
+            throw new SecurityException("Document path is outside game directory");
+        }
+    }
 
     @Override
     public Cursor queryRoots(String[] projection) {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_ROOT_PROJECTION);
+        if (getContext() == null || BASE_DIR == null) return result;
         final String applicationName = getContext().getString(R.string.app_short_name);
 
         String summary = BuildConfig.VERSION_NAME;
@@ -103,11 +112,8 @@ public class FolderProvider extends DocumentsProvider {
     @Override
     public Cursor queryDocument(String documentId, String[] projection) throws FileNotFoundException {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
-        if(!Tools.checkFileValidness(this, null)){
-            // Future-proofing in case if we implement realtime file watching
-            result.setNotificationUri(mContentResolver, createUriForDocId(documentId));
-            includeFile(result, documentId, null);
-        }
+        result.setNotificationUri(mContentResolver, createUriForDocId(documentId));
+        includeFile(result, documentId, null);
         return result;
     }
 
@@ -116,14 +122,13 @@ public class FolderProvider extends DocumentsProvider {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
         final File parent = getFileForDocId(parentDocumentId);
         final File[] children = parent.listFiles();
-        if(!Tools.checkFileValidness(this, null)){
-            if(children == null) throw new FileNotFoundException("Unable to list files in "+parent.getAbsolutePath());
-            for (File file : children) {
+        if (children == null) throw new FileNotFoundException("Unable to list directory");
+        for (File file : children) {
+            if (git.artdeell.mojo.utils.FileUtils.isInsideDirectory(BASE_DIR, file)) {
                 includeFile(result, null, file);
             }
-            // Set the notification URI as that's what the "Files" app will be listening to in case of file deletion
-            result.setNotificationUri(mContentResolver, createUriForDocId(parentDocumentId));
         }
+        result.setNotificationUri(mContentResolver, createUriForDocId(parentDocumentId));
         return result;
     }
 
@@ -143,6 +148,7 @@ public class FolderProvider extends DocumentsProvider {
 
     @Override
     public boolean onCreate() {
+        if (getContext() == null) return false;
         if (Tools.checkStorageRoot(getContext())) {
             Tools.initStorageConstants(getContext());
         } else {
@@ -150,84 +156,85 @@ public class FolderProvider extends DocumentsProvider {
         }
         BASE_DIR = new File(Tools.DIR_GAME_HOME);
         mContentResolver = getContext().getContentResolver();
-        mStorageProviderAuthortiy = getContext().getString(R.string.storageProviderAuthorities);
+        mStorageProviderAuthority = getContext().getString(R.string.storageProviderAuthorities);
         return true;
     }
 
     @Override
     public String createDocument(String parentDocumentId, String mimeType, String displayName) throws FileNotFoundException {
-        File newFile = new File(parentDocumentId, displayName);
+        File parentDir = getFileForDocId(parentDocumentId);
+        String safeName = sanitizeChildName(displayName);
+        File newFile = verifyInsideBaseDir(new File(parentDir, safeName));
         int noConflictId = 2;
-        while (Tools.checkFileValidness(this, newFile)) {
-            newFile = new File(parentDocumentId, displayName + " (" + noConflictId++ + ")");
+        while (newFile.exists()) {
+            newFile = verifyInsideBaseDir(new File(parentDir, safeName + " (" + noConflictId++ + ")"));
         }
-        Tools.checkFileValidness(this, null);
         try {
-            boolean succeeded;
-            if (Document.MIME_TYPE_DIR.equals(mimeType)) {
-                succeeded = newFile.mkdir();
-            } else {
-                succeeded = newFile.createNewFile();
-            }
+            boolean succeeded = Document.MIME_TYPE_DIR.equals(mimeType)
+                    ? newFile.mkdir()
+                    : newFile.createNewFile();
             if (!succeeded) {
-                throw new FileNotFoundException("Failed to create document with id " + newFile.getPath());
+                throw new FileNotFoundException("Failed to create document");
             }
         } catch (IOException e) {
-            throw new FileNotFoundException("Failed to create document with id " + newFile.getPath());
+            throw new FileNotFoundException("Failed to create document");
         }
-        // Notify the file manager that the parent directory has changed
         notifyChange(createUriForDocId(parentDocumentId));
-        return newFile.getPath();
+        return getDocIdForFile(newFile);
     }
 
     @Override
     public String renameDocument(String documentId, String displayName) throws FileNotFoundException {
         File sourceFile = getFileForDocId(documentId);
+        if (sourceFile.equals(BASE_DIR)) throw new FileNotFoundException("Cannot rename root");
         File sourceParent = sourceFile.getParentFile();
-        if(sourceParent == null) throw new FileNotFoundException("Cannot rename root");
-        File targetFile = new File(getDocIdForFile(sourceParent) + "/" + displayName);
-        if(!sourceFile.renameTo(targetFile)){
-            throw new FileNotFoundException("Couldn't rename the document with id" + documentId);
+        if (sourceParent == null) throw new FileNotFoundException("Cannot rename root");
+        String safeName = sanitizeChildName(displayName);
+        File targetFile = verifyInsideBaseDir(new File(sourceParent, safeName));
+        if (!sourceFile.renameTo(targetFile)) {
+            throw new FileNotFoundException("Could not rename document");
         }
         return getDocIdForFile(targetFile);
     }
 
     @Override
     public String moveDocument(String sourceDocumentId, String sourceParentDocumentId, String targetParentDocumentId) throws FileNotFoundException {
-        File sourceFile = getFileForDocId(sourceParentDocumentId + sourceDocumentId);
-        File targetFile = new File(targetParentDocumentId + sourceDocumentId);
-        if(!sourceFile.renameTo(targetFile)){
-            throw new FileNotFoundException("Failed to move the document with id " + sourceFile.getPath());
+        File sourceFile = getFileForDocId(sourceDocumentId);
+        if (sourceFile.equals(BASE_DIR)) throw new FileNotFoundException("Cannot move root");
+        File targetParent = getFileForDocId(targetParentDocumentId);
+        File targetFile = verifyInsideBaseDir(new File(targetParent, sourceFile.getName()));
+        if (!sourceFile.renameTo(targetFile)) {
+            throw new FileNotFoundException("Failed to move document");
         }
         return getDocIdForFile(targetFile);
     }
 
     @Override
     public void removeDocument(String documentId, String parentDocumentId) throws FileNotFoundException {
-        deleteDocument(parentDocumentId + "/" + documentId);
+        deleteDocument(documentId);
     }
 
     @Override
     public void deleteDocument(String documentId) throws FileNotFoundException {
         File file = getFileForDocId(documentId);
-        if(file.isDirectory()){
+        if (file.equals(BASE_DIR)) throw new FileNotFoundException("Cannot delete root");
+        if (file.isDirectory()) {
             try {
                 FileUtils.deleteDirectory(file);
             } catch (IOException e) {
-                throw new FileNotFoundException("Failed to delete document with id " + documentId);
+                throw new FileNotFoundException("Failed to delete directory");
             }
-        }else{
-            if (!file.delete()) {
-                throw new FileNotFoundException("Failed to delete document with id " + documentId);
-            }
+        } else if (!file.delete()) {
+            throw new FileNotFoundException("Failed to delete file");
         }
-        // Notify the file manager that the parent directory has changed
-        notifyChange(createUriForFile(file.getParentFile()));
+        File parent = file.getParentFile();
+        if (parent != null && git.artdeell.mojo.utils.FileUtils.isInsideDirectory(BASE_DIR, parent)) {
+            notifyChange(createUriForFile(parent));
+        }
     }
 
     @Override
     public String getDocumentType(String documentId) throws FileNotFoundException {
-        Log.i("FolderPRovider", "getDocumentType("+documentId+")");
         File file = getFileForDocId(documentId);
         return getMimeType(file);
     }
@@ -235,35 +242,24 @@ public class FolderProvider extends DocumentsProvider {
     @Override
     public Cursor querySearchDocuments(String rootId, String query, String[] projection) throws FileNotFoundException {
         final MatrixCursor result = new MatrixCursor(projection != null ? projection : DEFAULT_DOCUMENT_PROJECTION);
+        if (query == null || query.isEmpty()) return result;
+        final String lowerQuery = query.toLowerCase(Locale.ROOT);
         final File parent = getFileForDocId(rootId);
 
-        // This example implementation searches file names for the query and doesn't rank search
-        // results, so we can stop as soon as we find a sufficient number of matches.  Other
-        // implementations might rank results and use other data about files, rather than the file
-        // name, to produce a match.
         final LinkedList<File> pending = new LinkedList<>();
         pending.add(parent);
 
         final int MAX_SEARCH_RESULTS = 50;
         while (!pending.isEmpty() && result.getCount() < MAX_SEARCH_RESULTS) {
             final File file = pending.removeFirst();
-            // Avoid directories outside the $HOME directory linked with symlinks (to avoid e.g. search
-            // through the whole SD card).
-            boolean isInsideHome;
-            try {
-                isInsideHome = file.getCanonicalPath().startsWith(Tools.DIR_GAME_HOME);
-            } catch (IOException e) {
-                isInsideHome = true;
+            if (!git.artdeell.mojo.utils.FileUtils.isInsideDirectory(BASE_DIR, file)) {
+                continue;
             }
-            if (isInsideHome) {
-                if (file.isDirectory()) {
-                    File[] listing = file.listFiles();
-                    if(listing != null) Collections.addAll(pending, listing);
-                } else {
-                    if (file.getName().toLowerCase().contains(query)) {
-                        includeFile(result, null, file);
-                    }
-                }
+            if (file.isDirectory()) {
+                File[] listing = file.listFiles();
+                if (listing != null) Collections.addAll(pending, listing);
+            } else if (file.getName().toLowerCase(Locale.ROOT).contains(lowerQuery)) {
+                includeFile(result, null, file);
             }
         }
 
@@ -272,25 +268,23 @@ public class FolderProvider extends DocumentsProvider {
 
     @Override
     public boolean isChildDocument(String parentDocumentId, String documentId) {
-        return documentId.startsWith(parentDocumentId);
+        if (parentDocumentId == null || documentId == null) return false;
+        File parent = new File(parentDocumentId);
+        File child = new File(documentId);
+        return git.artdeell.mojo.utils.FileUtils.isInsideDirectory(BASE_DIR, parent)
+                && git.artdeell.mojo.utils.FileUtils.isInsideDirectory(parent, child);
     }
 
-    /**
-     * Get the document id given a file. This document id must be consistent across time as other
-     * applications may save the ID and use it to reference documents later.
-     * <p/>
-     * The reverse of @{link #getFileForDocId}.
-     */
     private static String getDocIdForFile(File file) {
         return file.getAbsolutePath();
     }
 
-    /**
-     * Get the file given a document id (the reverse of {@link #getDocIdForFile(File)}).
-     */
-    private static File getFileForDocId(String docId) throws FileNotFoundException {
-        final File f = new File(docId);
-        if (!f.exists()) throw new FileNotFoundException(f.getAbsolutePath() + " not found");
+    private File getFileForDocId(String docId) throws FileNotFoundException {
+        if (docId == null || docId.isEmpty()) {
+            throw new FileNotFoundException("Empty document id");
+        }
+        final File f = verifyInsideBaseDir(new File(docId));
+        if (!f.exists()) throw new FileNotFoundException("Document not found");
         return f;
     }
 
@@ -301,7 +295,7 @@ public class FolderProvider extends DocumentsProvider {
             final String name = file.getName();
             final int lastDot = name.lastIndexOf('.');
             if (lastDot >= 0) {
-                final String extension = name.substring(lastDot + 1).toLowerCase();
+                final String extension = name.substring(lastDot + 1).toLowerCase(Locale.ROOT);
                 final String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
                 if (mime != null) return mime;
             }
@@ -309,16 +303,10 @@ public class FolderProvider extends DocumentsProvider {
         }
     }
 
-    /**
-     * Add a representation of a file to a cursor.
-     *
-     * @param result the cursor to modify
-     * @param docId  the document ID representing the desired file (may be null if given file)
-     * @param file   the File object representing the desired file (may be null if given docID)
-     */
     private void includeFile(MatrixCursor result, String docId, File file)
-        throws FileNotFoundException {
+            throws FileNotFoundException {
         if (docId == null) {
+            verifyInsideBaseDir(file);
             docId = getDocIdForFile(file);
         } else {
             file = getFileForDocId(docId);
@@ -331,8 +319,8 @@ public class FolderProvider extends DocumentsProvider {
             flags |= Document.FLAG_SUPPORTS_WRITE;
         }
         File parent = file.getParentFile();
-        if(parent != null) { // Only fails in one case: when the parent is /, which you can't delete.
-            if(parent.canWrite()) flags |= Document.FLAG_SUPPORTS_DELETE;
+        if (parent != null && !file.equals(BASE_DIR) && parent.canWrite()) {
+            flags |= Document.FLAG_SUPPORTS_DELETE | Document.FLAG_SUPPORTS_RENAME | Document.FLAG_SUPPORTS_MOVE;
         }
 
         final String displayName = file.getName();
@@ -352,17 +340,18 @@ public class FolderProvider extends DocumentsProvider {
     @Override
     @TargetApi(26)
     public DocumentsContract.Path findDocumentPath(@Nullable String parentDocumentId, String childDocumentId) throws FileNotFoundException {
-        File source = BASE_DIR;
-        if(parentDocumentId != null) source = getFileForDocId(parentDocumentId);
+        File source = (parentDocumentId != null) ? getFileForDocId(parentDocumentId) : BASE_DIR;
         File destination = getFileForDocId(childDocumentId);
+        if (!git.artdeell.mojo.utils.FileUtils.isInsideDirectory(source, destination)) {
+            throw new FileNotFoundException("Document is not inside parent");
+        }
         List<String> pathIds = new ArrayList<>();
-        while(!source.equals(destination) && destination != null) {
+        while (destination != null && !source.equals(destination)) {
             pathIds.add(getDocIdForFile(destination));
             destination = destination.getParentFile();
         }
         pathIds.add(getDocIdForFile(source));
         Collections.reverse(pathIds);
-        Log.i("FolderProvider", pathIds.toString());
         return new DocumentsContract.Path(getDocIdForFile(source), pathIds);
     }
 
@@ -371,7 +360,7 @@ public class FolderProvider extends DocumentsProvider {
     }
 
     private Uri createUriForFile(File file) {
-        return DocumentsContract.buildDocumentUri(mStorageProviderAuthortiy, file.getAbsolutePath());
+        return DocumentsContract.buildDocumentUri(mStorageProviderAuthority, file.getAbsolutePath());
     }
 
     private void notifyChange(Uri uri) {

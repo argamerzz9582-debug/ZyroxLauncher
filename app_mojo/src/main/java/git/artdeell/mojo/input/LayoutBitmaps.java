@@ -14,16 +14,16 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public class LayoutBitmaps {
-    private static final Random mKeyPicker = new Random(System.nanoTime());
+    private static final SecureRandom mKeyPicker = new SecureRandom();
     private final Map<String, Bitmap> mBitmaps;
 
     private LayoutBitmaps() {

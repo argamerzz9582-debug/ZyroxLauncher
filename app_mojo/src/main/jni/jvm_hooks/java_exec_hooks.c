@@ -41,30 +41,43 @@ static void replaceLibPathInEnvBlock(JNIEnv *env, jbyteArray* envBlock, jint* en
  * which is used to handle the "open" command and "ffmpeg" invocations
  */
 static jint hooked_ProcessImpl_forkAndExec(JNIEnv *env, jobject process, jint mode, jbyteArray helperpath, jbyteArray prog, jbyteArray argBlock, jint argc, jbyteArray envBlock, jint envc, jbyteArray dir, jintArray std_fds, jboolean redirectErrorStream) {
+    if (prog == NULL) {
+        return orig_ProcessImpl_forkAndExec(env, process, mode, helperpath, prog, argBlock, argc, envBlock, envc, dir, std_fds, redirectErrorStream);
+    }
     const char *pProg = (char *)((*env)->GetByteArrayElements(env, prog, NULL));
-    const char* pProgBaseName = basename(pProg);
+    if (pProg == NULL) {
+        return orig_ProcessImpl_forkAndExec(env, process, mode, helperpath, prog, argBlock, argc, envBlock, envc, dir, std_fds, redirectErrorStream);
+    }
+    const char* pProgBaseName = basename((char*) pProg);
     const size_t basename_len = strlen(pProgBaseName);
-    char prog_basename[basename_len];
-    memcpy(&prog_basename, pProgBaseName, basename_len + 1);
-    (*env)->ReleaseByteArrayElements(env, prog, (jbyte *)pProg, 0);
+    char prog_basename[basename_len + 1];
+    memcpy(prog_basename, pProgBaseName, basename_len + 1);
+    (*env)->ReleaseByteArrayElements(env, prog, (jbyte *)pProg, JNI_ABORT);
 
     if(strcmp(prog_basename, "xdg-open") == 0) {
-        // When invoking xdg-open, send the open URL into Android
-        jbyte* elements = (*env)->GetByteArrayElements(env, argBlock, NULL);
-        openLink((const char*) elements);
-        (*env)->ReleaseByteArrayElements(env, argBlock, elements, JNI_ABORT);
+        if (argBlock != NULL) {
+            jsize argLen = (*env)->GetArrayLength(env, argBlock);
+            if (argLen > 0) {
+                jbyte* elements = (*env)->GetByteArrayElements(env, argBlock, NULL);
+                if (elements != NULL) {
+                    size_t copyLen = argLen > 4096 ? 4096 : (size_t) argLen;
+                    char safeUrl[4097];
+                    memcpy(safeUrl, elements, copyLen);
+                    safeUrl[copyLen] = '\0';
+                    (*env)->ReleaseByteArrayElements(env, argBlock, elements, JNI_ABORT);
+                    openLink(safeUrl);
+                }
+            }
+        }
         return 0;
     }else if(strcmp(prog_basename, "ffmpeg") == 0) {
-        // When invoking ffmpeg, always replace the program path with the path to ffmpeg from the plugin.
-        // This allows us to replace the executable name, which is needed because android doesn't allow
-        // us to put files that don't start with "lib" and end with ".so" into folders that we can execute
-        // from
-
-        // Also add LD_LIBRARY_PATH and PATH for the lib in order to override the ones from the launcher, since
-        // they may interfere with ffmpeg dependencies.
         const char* ffmpeg_path = getenv("POJAV_FFMPEG_PATH");
         if(ffmpeg_path != NULL) {
-            replaceLibPathInEnvBlock(env, &envBlock, &envc, dirname(ffmpeg_path));
+            char* ffmpeg_copy = strdup(ffmpeg_path);
+            if (ffmpeg_copy != NULL) {
+                replaceLibPathInEnvBlock(env, &envBlock, &envc, dirname(ffmpeg_copy));
+                free(ffmpeg_copy);
+            }
             prog = stringToBytes(env, ffmpeg_path);
         }
     }

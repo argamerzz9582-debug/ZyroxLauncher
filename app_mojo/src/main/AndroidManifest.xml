@@ -9,6 +9,9 @@
     <uses-feature
         android:name="android.hardware.usb.host"
         android:required="false" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission
@@ -21,13 +24,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:name=".MojoApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:allowNativeHeapPointerTagging="false"
         android:appCategory="game"
         android:hasFragileUserData="true"
@@ -38,41 +43,55 @@
         android:resizeableActivity="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/MojoLauncher.AppTheme"
+        android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/netconfig"
         android:enableOnBackInvokedCallback="false"
         tools:ignore="UnusedAttribute">
+
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="ratio_float" />
+        <meta-data
+            android:name="android.webkit.WebView.EnableSafeBrowsing"
+            android:value="true" />
+        <meta-data
+            android:name="android.webkit.WebView.MetricsOptOut"
+            android:value="true" />
+
         <activity
             android:name=".MissingStorageActivity"
             android:exported="false"
             android:screenOrientation="sensorLandscape" />
 
-        <meta-data
-            android:name="android.max_aspect"
-            android:value="ratio_float" />
-
         <activity
             android:name=".TestStorageActivity"
             android:exported="true"
             android:label="@string/app_short_name"
-            android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape">
+            android:launchMode="singleInstance"
+            android:screenOrientation="sensorLandscape"
+            android:taskAffinity="">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <activity
             android:name=".LauncherActivity"
+            android:exported="false"
             android:label="@string/app_short_name"
             android:screenOrientation="sensorLandscape"
-            android:windowSoftInputMode="adjustResize"/>
+            android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".ImportControlActivity"
             android:configChanges="keyboard|keyboardHidden"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleInstance"
             android:screenOrientation="sensorLandscape"
+            android:taskAffinity=""
             android:windowSoftInputMode="stateVisible">
             <intent-filter
                 android:label="@string/import_control_label"
@@ -88,25 +107,35 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
         <activity
             android:name=".FatalErrorActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
+            android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
-        <activity android:name=".ShowErrorActivity"
+
+        <activity
+            android:name=".ShowErrorActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
+            android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Zyrox.DialogActivity" />
+
         <activity
             android:name=".ExitActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
+            android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
+
         <activity
-            android:process=":gui_installer"
             android:name=".awt.AWTActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
+            android:exported="false"
+            android:process=":gui_installer"
             android:screenOrientation="sensorLandscape" />
+
         <activity
             android:name=".CustomControlsActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
@@ -118,9 +147,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
         <activity
             android:name=".game.GameActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
+            android:exported="false"
             android:launchMode="singleTop"
             android:process=":game"
             android:screenOrientation="sensorLandscape" />
@@ -136,21 +167,26 @@
             </intent-filter>
         </provider>
 
-        <service android:name=".services.ProgressService"
-            android:foregroundServiceType="dataSync"/>
-        <service android:name=".services.GameService" android:process=":game"
-            android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="This application is intended to run a 3rd-party piece of software which cannot be managed using the activity's saved instance state. This service is used for background persistence of this piece of software."/>
+        <service
+            android:name=".services.ProgressService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".services.GameService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":game">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Maintains the active user-initiated Minecraft Java runtime session in the foreground while gameplay is running." />
         </service>
     </application>
+
     <queries>
-        <package android:name="git.mojo.ffmpeg"/>
-        <package android:name="git.mojo.angle"/>
-        <package android:name="git.mojo.zink"/>
-        <package android:name="git.mojo.mesa"/>
-        <package android:name="git.artdeell.mojo"/>
-        <package android:name="git.artdeell.mojo.debug"/>
-        <package android:name="git.artdeell.mojo.pub"/>
+        <package android:name="git.mojo.ffmpeg" />
+        <package android:name="git.mojo.angle" />
+        <package android:name="git.mojo.zink" />
+        <package android:name="git.mojo.mesa" />
     </queries>
 </manifest>

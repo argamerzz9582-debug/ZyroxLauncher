@@ -74,6 +74,7 @@ public class Accounts {
 		if(acc.authType == null) {
 			acc.authType = acc.isMicrosoft ? AuthType.MICROSOFT : AuthType.LOCAL;
 		}
+		acc.decryptStoredTokens();
 		return acc;
 	}
 
@@ -82,7 +83,8 @@ public class Accounts {
 	}
 
     public static Account getCurrent() {
-		String selectedAccount = getSelectedAccount();
+		String selectedAccount = FileUtils.getFileName(getSelectedAccount());
+		if (selectedAccount == null) return null;
 		return loadAccount(new File(Tools.DIR_ACCOUNT_NEW, selectedAccount));
     }
 

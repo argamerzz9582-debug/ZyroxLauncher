@@ -7,21 +7,64 @@ public class FileUtils {
     /**
      * Check if a file denoted by a String path exists.
      * @param filePath the path to check
-     * @return whether it exists (same as File.exists()
+     * @return whether it exists (same as File.exists())
      */
-    public static boolean exists(String filePath){
+    public static boolean exists(String filePath) {
         return new File(filePath).exists();
     }
 
     /**
-     * Get the file name from a path/URL string.
+     * Get the bare file name (without path separators) from a path/URL string.
      * @param pathOrUrl the path or the URL of the file
-     * @return the file's name
+     * @return the file's name, or null if empty or invalid
      */
     public static String getFileName(String pathOrUrl) {
-        int lastSlashIndex = pathOrUrl.lastIndexOf('/');
-        if(lastSlashIndex == -1) return pathOrUrl;
-        return pathOrUrl.substring(lastSlashIndex);
+        if (pathOrUrl == null || pathOrUrl.isEmpty()) return null;
+        String normalized = pathOrUrl.replace('\\', '/');
+        int lastSlashIndex = normalized.lastIndexOf('/');
+        String name = (lastSlashIndex == -1) ? normalized : normalized.substring(lastSlashIndex + 1);
+        if (name.isEmpty() || ".".equals(name) || "..".equals(name)) return null;
+        return name;
+    }
+
+    /**
+     * Resolve a relative path under {@code baseDir} and enforce canonical containment
+     * to prevent ZipSlip / TarSlip / path traversal (CWE-22).
+     */
+    public static File resolveInsideDirectory(File baseDir, String relativePath) throws IOException {
+        if (relativePath == null || relativePath.indexOf('\0') >= 0) {
+            throw new IOException("Invalid path entry");
+        }
+        File candidate = new File(baseDir, relativePath);
+        return ensureInsideDirectory(baseDir, candidate);
+    }
+
+    /**
+     * Ensure that {@code candidate}'s canonical path resides within (or equals) {@code baseDir}.
+     */
+    public static File ensureInsideDirectory(File baseDir, File candidate) throws IOException {
+        String canonicalBase = baseDir.getCanonicalPath();
+        String canonicalTarget = candidate.getCanonicalPath();
+        String basePrefix = canonicalBase.endsWith(File.separator)
+                ? canonicalBase
+                : canonicalBase + File.separator;
+        if (!canonicalTarget.equals(canonicalBase) && !canonicalTarget.startsWith(basePrefix)) {
+            throw new IOException("Blocked path traversal outside target directory: " + candidate.getName());
+        }
+        return candidate;
+    }
+
+    /**
+     * Non-throwing check whether {@code candidate}'s canonical path resides within {@code baseDir}.
+     */
+    public static boolean isInsideDirectory(File baseDir, File candidate) {
+        if (baseDir == null || candidate == null) return false;
+        try {
+            ensureInsideDirectory(baseDir, candidate);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /**
@@ -31,7 +74,7 @@ public class FileUtils {
      */
     public static String removeExtension(String pathOrUrl) {
         int lastDotIndex = pathOrUrl.lastIndexOf('.');
-        if(lastDotIndex == -1) return pathOrUrl;
+        if (lastDotIndex == -1) return pathOrUrl;
         return pathOrUrl.substring(0, lastDotIndex);
     }
 
@@ -41,20 +84,19 @@ public class FileUtils {
      * @return if the check has succeeded
      */
     public static boolean ensureDirectorySilently(File targetFile) {
-        if(targetFile.isFile()) return false;
-        if(targetFile.exists()) return targetFile.canWrite();
+        if (targetFile.isFile()) return false;
+        if (targetFile.exists()) return targetFile.canWrite();
         else return targetFile.mkdirs();
-
     }
 
     /**
      * Ensure that the parent directory of a file exists and is writable
      * @param targetFile the File whose parent should be checked
-     * @return if the check as succeeded
+     * @return if the check has succeeded
      */
     public static boolean ensureParentDirectorySilently(File targetFile) {
         File parentFile = targetFile.getParentFile();
-        if(parentFile == null) return false;
+        if (parentFile == null) return false;
         return ensureDirectorySilently(parentFile);
     }
 
@@ -64,12 +106,11 @@ public class FileUtils {
      * @throws IOException when the checks fail
      */
     public static void ensureDirectory(File targetFile) throws IOException {
-        if(targetFile.isFile()) throw new IOException("Target directory is a file");
-        if(targetFile.exists()) {
-            if(!targetFile.canWrite()) throw new IOException("Target directory is not writable");
-        }else if(!targetFile.mkdirs()) {
-            // check again just in case (???)
-            if(!targetFile.isDirectory()) throw new IOException("Unable to create target directory");
+        if (targetFile.isFile()) throw new IOException("Target directory is a file");
+        if (targetFile.exists()) {
+            if (!targetFile.canWrite()) throw new IOException("Target directory is not writable");
+        } else if (!targetFile.mkdirs()) {
+            if (!targetFile.isDirectory()) throw new IOException("Unable to create target directory");
         }
     }
 
@@ -78,13 +119,17 @@ public class FileUtils {
      * @param targetFile the File whose parent should be checked
      * @throws IOException when the checks fail
      */
-    public static void ensureParentDirectory(File targetFile) throws IOException{
+    public static void ensureParentDirectory(File targetFile) throws IOException {
         File parentFile = targetFile.getParentFile();
-        if(parentFile == null) throw new IOException("targetFile does not have a parent");
+        if (parentFile == null) throw new IOException("targetFile does not have a parent");
         ensureDirectory(parentFile);
     }
 
-    public static String escapeFileName(String name){
-        return name.trim().replaceAll("[\\\\/:*?\"<>| \\t\\n]", "_");
+    public static String escapeFileName(String name) {
+        String sanitized = name.trim()
+                .replace("\0", "")
+                .replace("..", "_")
+                .replaceAll("[\\\\/:*?\"<>| \\t\\n]", "_");
+        return sanitized.isEmpty() ? "unnamed" : sanitized;
     }
 }
