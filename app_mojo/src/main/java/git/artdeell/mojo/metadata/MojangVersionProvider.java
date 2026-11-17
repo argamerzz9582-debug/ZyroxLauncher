@@ -79,13 +79,26 @@ public class MojangVersionProvider {
         }
 
         try {
-            return mCache.sync(
+            LocalMetadataCache.SyncResult<JVersionList> result = mCache.sync(
                     CACHE_KEY,
                     primaryUrl,
                     forceRefresh,
                     LocalMetadataCache.DEFAULT_REVALIDATE_COOLDOWN_MS,
                     MojangVersionProvider::parseAndValidateManifest
             );
+            // If a third-party mirror failed and fell back to stale cache, try official Mojang
+            // so a broken mirror never blocks newly released Minecraft versions while online.
+            if (result.source == LocalMetadataCache.SyncSource.OFFLINE_CACHE_FALLBACK
+                    && !OFFICIAL_MANIFEST_V2_URL.equals(primaryUrl)) {
+                return mCache.sync(
+                        CACHE_KEY,
+                        OFFICIAL_MANIFEST_V2_URL,
+                        true,
+                        LocalMetadataCache.DEFAULT_REVALIDATE_COOLDOWN_MS,
+                        MojangVersionProvider::parseAndValidateManifest
+                );
+            }
+            return result;
         } catch (IOException | DownloadUtils.ParseException primaryError) {
             // If a third-party mirror was active and failed with no cache, fall back to official Mojang.
             if (!OFFICIAL_MANIFEST_V2_URL.equals(primaryUrl)) {
