@@ -115,7 +115,25 @@ public class JSONUtils {
     public static <T> T readFromFile(File file, Class<T> clazs) throws IOException {
         try (FileInputStream fis = new FileInputStream(file);
              InputStreamReader fileReader = new InputStreamReader(fis, StandardCharsets.UTF_8)) {
-            return Tools.GLOBAL_GSON.fromJson(fileReader, clazs);
+            T parsed = Tools.GLOBAL_GSON.fromJson(fileReader, clazs);
+            if (parsed != null) return parsed;
+        } catch (com.google.gson.JsonParseException primaryErr) {
+            File bak = new File(file.getParentFile(), file.getName() + ".bak");
+            if (bak.isFile() && bak.length() > 0L) {
+                try (FileInputStream bFis = new FileInputStream(bak);
+                     InputStreamReader bReader = new InputStreamReader(bFis, StandardCharsets.UTF_8)) {
+                    T recovered = Tools.GLOBAL_GSON.fromJson(bReader, clazs);
+                    if (recovered != null) {
+                        File corrupt = new File(file.getParentFile(), file.getName() + ".corrupt");
+                        if (!corrupt.exists()) copyFileQuietly(file, corrupt);
+                        copyFileQuietly(bak, file);
+                        return recovered;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            throw primaryErr;
         }
+        return null;
     }
 }
