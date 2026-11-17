@@ -2,50 +2,111 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_enabled="false">
         <shape android:shape="rectangle">
-            <solid android:color="#80292524" />
+            <solid android:color="#261C1612" />
             <stroke
                 android:width="1dp"
-                android:color="#4078716C" />
-            <corners android:radius="6dp" />
+                android:color="#29FFF9F2" />
+            <corners android:radius="12dp" />
         </shape>
     </item>
     <item android:state_pressed="true">
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="270"
-                android:startColor="#FB923C"
-                android:endColor="#EA580C"
-                android:type="linear" />
-            <stroke
-                android:width="2dp"
-                android:color="#FFF7ED" />
-            <corners android:radius="6dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#94FFA64D"
+                        android:centerColor="#7DF97316"
+                        android:endColor="#6BEA580C" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <item android:bottom="20dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#38FFF9F2"
+                        android:endColor="#00FFFFFF" />
+                    <corners
+                        android:topLeftRadius="12dp"
+                        android:topRightRadius="12dp"
+                        android:bottomLeftRadius="4dp"
+                        android:bottomRightRadius="4dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke
+                        android:width="1.5dp"
+                        android:color="#EBFFF4E4" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
     <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="270"
-                android:startColor="#FB923C"
-                android:endColor="#C2410C"
-                android:type="linear" />
-            <stroke
-                android:width="2dp"
-                android:color="#FFF7ED" />
-            <corners android:radius="6dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#82FF9E44"
+                        android:endColor="#61EA580C" />
+                    <stroke
+                        android:width="1.5dp"
+                        android:color="#E0FFE8CC" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+    <!-- Default: Translucent Luminous Amber-Crystal Glass CTA (live shader glows right through) -->
     <item>
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="270"
-                android:startColor="#F97316"
-                android:endColor="#C2410C"
-                android:type="linear" />
-            <stroke
-                android:width="2dp"
-                android:color="#FDBA74" />
-            <corners android:radius="6dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#66FF9838"
+                        android:centerColor="#52F97316"
+                        android:endColor="#45D94E0A" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <!-- Top optical crystal glass specular sheen -->
+            <item
+                android:left="1dp"
+                android:right="1dp"
+                android:top="1dp"
+                android:bottom="22dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#29FFF9F2"
+                        android:endColor="#00FFFFFF" />
+                    <corners
+                        android:topLeftRadius="11dp"
+                        android:topRightRadius="11dp"
+                        android:bottomLeftRadius="4dp"
+                        android:bottomRightRadius="4dp" />
+                </shape>
+            </item>
+            <!-- Crisp 1.25dp luminous champagne-amber glass rim -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke
+                        android:width="1.25dp"
+                        android:color="#C2FFC888" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>

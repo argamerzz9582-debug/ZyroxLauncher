@@ -6,7 +6,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#660D0B0A">
+    android:background="#2E0D0A08">
 
     <!-- Top Search + Platform Toggle + Horizontal Chip Filter Bar -->
     <LinearLayout

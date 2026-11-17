@@ -1,13 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Ultra-transparent crystal glass veil (lets live shader & embers shine right through) -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_border_mid" />
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#1E0E0A07"
+                android:centerColor="#290C0906"
+                android:endColor="#380B0805" />
         </shape>
     </item>
-    <item android:left="2dp">
+    <!-- Subtle top-to-bottom warm champagne glass refraction -->
+    <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_dock" />
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#12FFF4E6"
+                android:centerColor="#04FFFFFF"
+                android:endColor="#1A090705" />
+        </shape>
+    </item>
+    <!-- Razor-sharp 1dp luminous champagne-amber left glass hairline -->
+    <item
+        android:width="1dp"
+        android:gravity="start|fill_vertical">
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#33FFC482"
+                android:centerColor="#6EFFB870"
+                android:endColor="#33FFC482" />
         </shape>
     </item>
 </layer-list>

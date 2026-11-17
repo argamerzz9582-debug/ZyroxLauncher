@@ -106,6 +106,79 @@ public class MainMenuFragment extends Fragment {
         });
 
         updateEngineStatus();
+        setupFullScreenGlassPolish(view);
+    }
+
+    private void setupFullScreenGlassPolish(@NonNull View root) {
+        View rightDock = root.findViewById(R.id.zyrox_left_dock);
+        View heroBrand = root.findViewById(R.id.zyrox_hero_brand);
+        View updatesCard = root.findViewById(R.id.zyrox_updates_card);
+
+        // Smooth luxury entrance glide on Home Hub reveal
+        if (heroBrand != null) {
+            heroBrand.setAlpha(0f);
+            heroBrand.setTranslationY(-8f);
+            heroBrand.animate().alpha(1f).translationY(0f).setDuration(260L).start();
+        }
+        if (updatesCard != null) {
+            updatesCard.setAlpha(0f);
+            updatesCard.setTranslationY(10f);
+            updatesCard.animate().alpha(1f).translationY(0f).setStartDelay(45L).setDuration(260L).start();
+        }
+        if (rightDock != null) {
+            rightDock.setAlpha(0f);
+            rightDock.setTranslationX(12f);
+            rightDock.animate().alpha(1f).translationX(0f).setDuration(240L).start();
+        }
+
+        root.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            // Post layout param changes outside the layout pass to stay 100% jank-free
+            if (l != ol || r != or || t != ot || b != ob) {
+                v.post(this::refreshCutoutSafeZones);
+            }
+        });
+        root.post(this::refreshCutoutSafeZones);
+    }
+
+    public void refreshCutoutSafeZones() {
+        View root = getView();
+        if (root == null || !isAdded() || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) return;
+        android.view.WindowInsets rootInsets = requireActivity().getWindow().getDecorView().getRootWindowInsets();
+        if (rootInsets == null) return;
+        android.view.DisplayCutout cutout = rootInsets.getDisplayCutout();
+        int safeLeft = cutout != null ? cutout.getSafeInsetLeft() : 0;
+        int safeRight = cutout != null ? cutout.getSafeInsetRight() : 0;
+        float density = getResources().getDisplayMetrics().density;
+        int baseDockW = Math.round(286f * density);
+        int pad14 = Math.round(14f * density);
+        int pad18 = Math.round(18f * density);
+        int pad6 = Math.round(6f * density);
+
+        View rightDock = root.findViewById(R.id.zyrox_left_dock);
+        if (rightDock != null) {
+            android.view.ViewGroup.LayoutParams lp = rightDock.getLayoutParams();
+            int targetW = baseDockW + safeRight;
+            int targetPadRight = pad14 + safeRight;
+            if (lp.width != targetW) {
+                lp.width = targetW;
+                rightDock.setLayoutParams(lp);
+            }
+            if (rightDock.getPaddingRight() != targetPadRight) {
+                rightDock.setPadding(pad14, rightDock.getPaddingTop(), targetPadRight, rightDock.getPaddingBottom());
+            }
+        }
+
+        View updatesCard = root.findViewById(R.id.zyrox_updates_card);
+        if (updatesCard != null && updatesCard.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+            android.view.ViewGroup.MarginLayoutParams lp =
+                    (android.view.ViewGroup.MarginLayoutParams) updatesCard.getLayoutParams();
+            int targetLeftMargin = Math.max(pad18, safeLeft + pad6);
+            if (lp.leftMargin != targetLeftMargin || lp.getMarginStart() != targetLeftMargin) {
+                lp.leftMargin = targetLeftMargin;
+                lp.setMarginStart(targetLeftMargin);
+                updatesCard.setLayoutParams(lp);
+            }
+        }
     }
 
     private void updateEngineStatus() {

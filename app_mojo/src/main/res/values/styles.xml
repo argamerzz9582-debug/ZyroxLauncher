@@ -16,13 +16,14 @@
         <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
         <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
         <item name="android:textColorHint">@color/zyrox_text_muted</item>
-        <item name="android:statusBarColor">@color/zyrox_bg_base</item>
-        <item name="android:navigationBarColor">@color/zyrox_bg_base</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowFullscreen">true</item>
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
         <item name="alertDialogTheme">@style/Zyrox.AlertDialog</item>
         <item name="android:alertDialogTheme">@style/Zyrox.AlertDialog</item>
         <item name="android:textSize">13sp</item>
-        <item name="dialogCornerRadius">8dp</item>
+        <item name="dialogCornerRadius">13dp</item>
         <item name="android:seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="android:switchStyle">@style/MojoLauncher.Switch</item>
@@ -71,7 +72,8 @@
 
     <style name="MojoLauncher.Button" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/btn_zyrox_secondary</item>
-        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:textColor">@color/zyrox_amber_stroke</item>
+        <item name="android:stateListAnimator">@null</item>
         <item name="android:fontFamily">@font/minecraft_pixel</item>
         <item name="fontFamily">@font/minecraft_pixel</item>
         <item name="android:textSize">12sp</item>
@@ -153,8 +155,9 @@
     </style>
 
     <style name="LauncherMenuButton" parent="Widget.AppCompat.Button">
-        <item name="android:background">@drawable/bg_zyrox_nav_item</item>
-        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:background">@drawable/bg_zyrox_action_tile</item>
+        <item name="android:textColor">@color/zyrox_text_primary</item>
+        <item name="android:stateListAnimator">@null</item>
         <item name="android:fontFamily">@font/minecraft_pixel</item>
         <item name="fontFamily">@font/minecraft_pixel</item>
     </style>

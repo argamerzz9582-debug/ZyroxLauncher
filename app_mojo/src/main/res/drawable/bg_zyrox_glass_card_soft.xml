@@ -1,30 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true">
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_card_hover" />
-            <stroke
-                android:width="1dp"
-                android:color="@color/zyrox_glass_border_strong" />
-            <corners android:radius="8dp" />
-        </shape>
-    </item>
-    <item android:state_selected="true">
-        <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_card_hover" />
-            <stroke
-                android:width="1.5dp"
-                android:color="@color/zyrox_amber" />
-            <corners android:radius="8dp" />
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#2B18110D"
+                android:endColor="#210D0A07" />
+            <corners android:radius="13dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_card" />
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#14FFF9F2"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#00FFFFFF" />
             <stroke
                 android:width="1dp"
-                android:color="@color/zyrox_glass_border" />
-            <corners android:radius="8dp" />
+                android:color="#40FFC07A" />
+            <corners android:radius="13dp" />
         </shape>
     </item>
-</selector>
+</layer-list>

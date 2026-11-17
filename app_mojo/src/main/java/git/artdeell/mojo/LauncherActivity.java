@@ -1,7 +1,5 @@
 package git.artdeell.mojo;
 
-import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
-
 import android.Manifest;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -250,12 +248,12 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected boolean shouldIgnoreNotch() {
-        return getResources().getConfiguration().orientation == ORIENTATION_PORTRAIT;
+        return true;
     }
 
     @Override
     public boolean setFullscreen() {
-        return false;
+        return true;
     }
 
     @Override
@@ -289,6 +287,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
+        setupEdgeToEdgeCutoutGuides();
         mRequestPermissionLauncher = this.registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
                 isAllowed -> {
@@ -344,6 +343,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         if (mShaderBackground != null) {
             mShaderBackground.onResume();
         }
+        applyEdgeToEdgeCutoutGuides();
     }
 
     @Override
@@ -355,10 +355,38 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         ContextExecutor.clearActivity();
     }
 
+    private final android.hardware.display.DisplayManager.DisplayListener mDisplayRotationListener =
+            new android.hardware.display.DisplayManager.DisplayListener() {
+                @Override
+                public void onDisplayAdded(int displayId) {}
+
+                @Override
+                public void onDisplayRemoved(int displayId) {}
+
+                @Override
+                public void onDisplayChanged(int displayId) {
+                    View decor = getWindow() != null ? getWindow().getDecorView() : null;
+                    if (decor != null) {
+                        decor.post(() -> {
+                            applyEdgeToEdgeCutoutGuides();
+                            Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
+                            if (current instanceof MainMenuFragment) {
+                                ((MainMenuFragment) current).refreshCutoutSafeZones();
+                            }
+                        });
+                    }
+                }
+            };
+
     @Override
     protected void onStart() {
         super.onStart();
         getSupportFragmentManager().registerFragmentLifecycleCallbacks(mFragmentCallbackListener, false);
+        android.hardware.display.DisplayManager dm =
+                (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        if (dm != null) {
+            dm.registerDisplayListener(mDisplayRotationListener, null);
+        }
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
         if (current != null) {
             updateGlobalShellForFragment(current);
@@ -367,6 +395,11 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected void onStop() {
+        android.hardware.display.DisplayManager dm =
+                (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        if (dm != null) {
+            dm.unregisterDisplayListener(mDisplayRotationListener);
+        }
         getSupportFragmentManager().unregisterFragmentLifecycleCallbacks(mFragmentCallbackListener);
         super.onStop();
     }
@@ -443,6 +476,53 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         LauncherPreferences.DEFAULT_PREF.edit()
                 .putBoolean(LauncherPreferences.PREF_KEY_SKIP_NOTIFICATION_CHECK, true)
                 .apply();
+    }
+
+    /**
+     * Keeps the shader background and glass chrome 100% edge-to-edge across the entire physical
+     * display while gently clearing interactive edge controls from punch-hole camera cutouts
+     * across both normal and 180-degree sensorLandscape orientations.
+     */
+    private void setupEdgeToEdgeCutoutGuides() {
+        View rootShell = findViewById(R.id.zyrox_root_shell);
+        if (rootShell == null) return;
+        rootShell.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (l != ol || r != or || t != ot || b != ob) {
+                v.post(this::applyEdgeToEdgeCutoutGuides);
+            }
+        });
+        rootShell.post(this::applyEdgeToEdgeCutoutGuides);
+    }
+
+    private void applyEdgeToEdgeCutoutGuides() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+        android.view.WindowInsets rootInsets = getWindow().getDecorView().getRootWindowInsets();
+        if (rootInsets == null) return;
+        android.view.DisplayCutout cutout = rootInsets.getDisplayCutout();
+        int safeLeft = cutout != null ? cutout.getSafeInsetLeft() : 0;
+        int safeRight = cutout != null ? cutout.getSafeInsetRight() : 0;
+        float density = getResources().getDisplayMetrics().density;
+        int pad14 = Math.round(14f * density);
+        int pad6 = Math.round(6f * density);
+
+        if (mGlobalHeader != null) {
+            int targetLeft = Math.max(pad14, safeLeft + pad6);
+            int targetRight = Math.max(pad14, safeRight + pad6);
+            if (mGlobalHeader.getPaddingLeft() != targetLeft || mGlobalHeader.getPaddingRight() != targetRight) {
+                mGlobalHeader.setPadding(targetLeft, mGlobalHeader.getPaddingTop(), targetRight, mGlobalHeader.getPaddingBottom());
+            }
+        }
+
+        if (mAccountDockCard != null && mAccountDockCard.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
+            android.view.ViewGroup.MarginLayoutParams lp =
+                    (android.view.ViewGroup.MarginLayoutParams) mAccountDockCard.getLayoutParams();
+            int targetRightMargin = pad14 + safeRight;
+            if (lp.rightMargin != targetRightMargin || lp.getMarginEnd() != targetRightMargin) {
+                lp.rightMargin = targetRightMargin;
+                lp.setMarginEnd(targetRightMargin);
+                mAccountDockCard.setLayoutParams(lp);
+            }
+        }
     }
 
     private void bindViews() {

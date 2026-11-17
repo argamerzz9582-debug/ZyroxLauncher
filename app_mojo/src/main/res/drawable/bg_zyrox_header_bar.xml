@@ -2,12 +2,23 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_border_mid" />
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#45100C09"
+                android:endColor="#2E0E0A08" />
         </shape>
     </item>
-    <item android:bottom="1dp">
+    <item
+        android:height="1dp"
+        android:gravity="bottom|fill_horizontal">
         <shape android:shape="rectangle">
-            <solid android:color="@color/zyrox_glass_primary" />
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#2EFFC07A"
+                android:centerColor="#66FFB870"
+                android:endColor="#2EFFC07A" />
         </shape>
     </item>
 </layer-list>
