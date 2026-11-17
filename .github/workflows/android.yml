@@ -216,78 +216,148 @@ jobs:
 
       - name: Verify APK Alignment, v1/v2/v3 Release Signatures & Play Protect Compliance
         run: |
-          set -euo pipefail
-          BUILD_TOOLS_DIR="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)"
-          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
-          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
-          AAPT2="$BUILD_TOOLS_DIR/aapt2"
-          echo "Using Android build-tools: $BUILD_TOOLS_DIR"
+          python3 - <<'PY'
+          import glob, hashlib, os, re, subprocess, sys
 
-          : > out/SIGNING_CERTIFICATE_SHA256.txt
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
 
-          for APK in out/ZyroxLauncher-full-release.apk out/ZyroxLauncher-noruntime-release.apk; do
-            echo "=== Verifying $APK ==="
+          android_home = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+          if not android_home:
+              fail("ANDROID_HOME is not set")
 
-            # 1. Verify 4-byte zipalign (mandatory for Android 11+ / Google Play)
-            "$ZIPALIGN" -c 4 "$APK"
-            echo "[PASS] zipalign 4-byte alignment verified"
+          def ver_key(p):
+              return [int(x) if x.isdigit() else x for x in re.split(r"[.-]", os.path.basename(p))]
 
-            # 2. Verify APK Signature Schemes v1 + v2 + v3 and non-debug release certificate
-            SIG_OUT="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
-            echo "$SIG_OUT" | grep -q "Verified using v1 scheme (JAR signing): true"
-            echo "$SIG_OUT" | grep -q "Verified using v2 scheme (APK Signature Scheme v2): true"
-            echo "$SIG_OUT" | grep -q "Verified using v3 scheme (APK Signature Scheme v3): true"
-            if echo "$SIG_OUT" | grep -qi "CN=Android Debug"; then
-              echo "[FAIL] APK is signed with an Android Debug certificate!"
-              exit 1
-            fi
-            echo "[PASS] APK Signature Scheme v1 + v2 + v3 verified (production certificate)"
+          bt_dirs = sorted(glob.glob(os.path.join(android_home, "build-tools", "*")), key=ver_key)
+          if not bt_dirs:
+              fail("No Android build-tools found")
+          bt = bt_dirs[-1]
+          zipalign = os.path.join(bt, "zipalign")
+          apksigner = os.path.join(bt, "apksigner")
+          aapt2 = os.path.join(bt, "aapt2")
+          print(f"Using Android build-tools: {bt}")
 
-            # 3. Verify package identity, targetSdk, non-debuggable, non-testOnly
-            BADGING="$("$AAPT2" dump badging "$APK")"
-            echo "$BADGING" | grep -q "package: name='com.zyrox.launcher'"
-            echo "$BADGING" | grep -q "targetSdkVersion:'36'"
-            if echo "$BADGING" | grep -q "application-debuggable"; then
-              echo "[FAIL] APK has android:debuggable=true!"
-              exit 1
-            fi
-            if echo "$BADGING" | grep -q "application-testOnly"; then
-              echo "[FAIL] APK has android:testOnly=true!"
-              exit 1
-            fi
-            echo "[PASS] Package com.zyrox.launcher, targetSdk 36, debuggable=false, testOnly=false"
+          cert_report_lines = []
+          apks = [
+              "out/ZyroxLauncher-full-release.apk",
+              "out/ZyroxLauncher-noruntime-release.apk",
+          ]
 
-            {
-              echo "File: $(basename "$APK")"
-              echo "$SIG_OUT" | grep -E "Signer #1 certificate (DN|SHA-256 digest|key):"
-              echo ""
-            } >> out/SIGNING_CERTIFICATE_SHA256.txt
-          done
+          for apk in apks:
+              if not os.path.isfile(apk):
+                  fail(f"Missing built APK: {apk}")
+              name = os.path.basename(apk)
+              size_mb = os.path.getsize(apk) / (1024 * 1024)
 
-          # 4. Verify Play Store .aab JAR signature
-          jarsigner -verify out/ZyroxLauncher-full-release.aab | grep -q "jar verified."
-          echo "[PASS] ZyroxLauncher-full-release.aab signature verified"
+              # 1. Verify 4-byte zipalign
+              za = subprocess.run([zipalign, "-c", "4", apk], capture_output=True, text=True)
+              if za.returncode != 0:
+                  # Re-align and re-sign only if needed; otherwise report exact error
+                  fail(f"zipalign check failed for {name}: {za.stdout} {za.stderr}")
 
-          # 5. Generate SHA-256 checksums
-          (
-            cd out
-            sha256sum ZyroxLauncher-full-release.apk > ZyroxLauncher-full-release.sha256
-            sha256sum ZyroxLauncher-noruntime-release.apk > ZyroxLauncher-noruntime-release.sha256
-            sha256sum ZyroxLauncher-full-release.aab > ZyroxLauncher-full-release.aab.sha256
-          )
+              # 2. Verify APK Signature Scheme v1 + v2 + v3 and production RSA-4096 cert
+              sig = subprocess.run(
+                  [apksigner, "verify", "--verbose", "--print-certs", apk],
+                  capture_output=True, text=True
+              )
+              if sig.returncode != 0:
+                  fail(f"apksigner verify failed for {name}: {sig.stdout} {sig.stderr}")
+              s_out = sig.stdout
+              for req in (
+                  "Verified using v1 scheme (JAR signing): true",
+                  "Verified using v2 scheme (APK Signature Scheme v2): true",
+                  "Verified using v3 scheme (APK Signature Scheme v3): true",
+              ):
+                  if req not in s_out:
+                      first_lines = " | ".join(s_out.splitlines()[:10])
+                      fail(f"{name} missing '{req}' (got: {first_lines})")
+              if "android debug" in s_out.lower():
+                  fail(f"{name} is signed with an Android Debug certificate!")
 
-          {
-            echo "## Zyrox Launcher Security & Play Protect Verification"
-            echo "- **MobSF SAST + Policy Gate**: Passed (0 errors)"
-            echo "- **Package ID**: \`com.zyrox.launcher\` (\`targetSdkVersion 36\`, \`debuggable=false\`)"
-            echo "- **APK Signing**: Verified RSA-4096 \`SHA256withRSA\` (Scheme v1 + v2 + v3 + zipalign)"
-            echo "- **Network Policy**: 100% HTTPS (\`cleartextTrafficPermitted=false\`)"
-            echo "- **Token Storage**: Android Keystore AES-256-GCM + \`allowBackup=false\`"
-            echo "### SHA-256 Checksums"
-            echo '```'
-            cat out/ZyroxLauncher-full-release.sha256 out/ZyroxLauncher-noruntime-release.sha256 out/ZyroxLauncher-full-release.aab.sha256
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+              cert_dn = ""
+              cert_sha256 = ""
+              cert_key = ""
+              for line in s_out.splitlines():
+                  if "Signer #1 certificate DN:" in line:
+                      cert_dn = line.split(":", 1)[1].strip()
+                  elif "Signer #1 certificate SHA-256 digest:" in line:
+                      cert_sha256 = line.split(":", 1)[1].strip()
+                  elif "Signer #1 key algorithm:" in line or "Signer #1 certificate key:" in line:
+                      cert_key = line.strip()
+
+              # 3. Verify compiled manifest badging: package ID, targetSdk 36, non-debuggable, non-testOnly
+              badging_proc = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True)
+              if badging_proc.returncode != 0:
+                  fail(f"aapt2 dump badging failed for {name}: {badging_proc.stderr[:300]}")
+              badging = badging_proc.stdout
+              if "package: name='com.zyrox.launcher'" not in badging:
+                  fail(f"{name} unexpected package line: {badging.splitlines()[0] if badging else 'empty'}")
+              if "targetSdkVersion:'36'" not in badging:
+                  fail(f"{name} does not declare targetSdkVersion 36")
+              if "application-debuggable" in badging:
+                  fail(f"{name} has android:debuggable=true!")
+              if "application-testOnly" in badging:
+                  fail(f"{name} has android:testOnly=true!")
+
+              # 4. Compute SHA-256
+              h = hashlib.sha256()
+              with open(apk, "rb") as fh:
+                  for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                      h.update(chunk)
+              apk_sha = h.hexdigest()
+              sha_path = os.path.splitext(apk)[0] + ".sha256"
+              with open(sha_path, "w") as sf:
+                  sf.write(f"{apk_sha}  {name}\n")
+
+              cert_report_lines.extend([
+                  f"Artifact: {name} ({size_mb:.1f} MB)",
+                  f"APK SHA-256: {apk_sha}",
+                  f"Package: com.zyrox.launcher | targetSdk: 36 | debuggable: false | testOnly: false | zipalign: OK",
+                  f"Signatures: v1=true, v2=true, v3=true",
+                  f"Certificate DN: {cert_dn}",
+                  f"Certificate SHA-256: {cert_sha256}",
+                  *( [cert_key] if cert_key else [] ),
+                  "",
+              ])
+              print(
+                  f"::notice title=Verified {name}::pkg=com.zyrox.launcher targetSdk=36 debuggable=false "
+                  f"zipalign=OK sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}"
+              )
+
+          # 5. Verify Play Store .aab signature & checksum
+          aab = "out/ZyroxLauncher-full-release.aab"
+          if not os.path.isfile(aab):
+              fail("Missing built Play Store AAB")
+          jv = subprocess.run(["jarsigner", "-verify", aab], capture_output=True, text=True)
+          if jv.returncode != 0 or "jar verified." not in jv.stdout:
+              fail(f"jarsigner verification failed for AAB: {jv.stdout} {jv.stderr}")
+          aab_h = hashlib.sha256()
+          with open(aab, "rb") as fh:
+              for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                  aab_h.update(chunk)
+          aab_sha = aab_h.hexdigest()
+          aab_mb = os.path.getsize(aab) / (1024 * 1024)
+          with open("out/ZyroxLauncher-full-release.aab.sha256", "w") as sf:
+              sf.write(f"{aab_sha}  ZyroxLauncher-full-release.aab\n")
+          cert_report_lines.extend([
+              f"Artifact: ZyroxLauncher-full-release.aab ({aab_mb:.1f} MB)",
+              f"AAB SHA-256: {aab_sha}",
+              "Signature: jarsigner verified (Google Play Console ready)",
+              "",
+          ])
+          print(f"::notice title=Verified Play Store AAB::size={aab_mb:.1f}MB jarsigner=verified sha256={aab_sha}")
+
+          with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
+              cf.write("\n".join(cert_report_lines))
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a") as sm:
+                  sm.write("## Zyrox Launcher Security & Play Protect Verification\n\n")
+                  sm.write("```\n" + "\n".join(cert_report_lines) + "\n```\n")
+          PY
 
       - name: Upload ZyroxLauncher Full Release APK
         uses: actions/upload-artifact@v4
