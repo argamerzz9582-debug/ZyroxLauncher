@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -21,7 +20,6 @@ import com.kdt.mcgui.ProgressLayout;
 import com.kdt.mcgui.mcVersionSpinner;
 
 import java.io.File;
-import java.util.Locale;
 
 import git.artdeell.mojo.CustomControlsActivity;
 import git.artdeell.mojo.LauncherActivity;
@@ -32,7 +30,6 @@ import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.Instances;
-import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.prefs.screens.LauncherPreferenceFragment;
 import git.artdeell.mojo.utils.FileUtils;
 
@@ -40,7 +37,6 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
-    private TextView mEngineStatusText;
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data) -> {
@@ -68,7 +64,6 @@ public class MainMenuFragment extends Fragment {
         Button mModpacksButton = view.findViewById(R.id.modpacks_button);
         Button mInstancesButton = view.findViewById(R.id.instances_button);
         Button mHomeSettingsButton = view.findViewById(R.id.home_settings_button);
-        mEngineStatusText = view.findViewById(R.id.tv_zyrox_engine_status);
 
         mPlayButton.setOnClickListener(v -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
@@ -105,25 +100,18 @@ public class MainMenuFragment extends Fragment {
             return true;
         });
 
-        updateEngineStatus();
         setupFullScreenGlassPolish(view);
     }
 
     private void setupFullScreenGlassPolish(@NonNull View root) {
         View rightDock = root.findViewById(R.id.zyrox_left_dock);
         View heroBrand = root.findViewById(R.id.zyrox_hero_brand);
-        View updatesCard = root.findViewById(R.id.zyrox_updates_card);
 
         // Smooth luxury entrance glide on Home Hub reveal
         if (heroBrand != null) {
             heroBrand.setAlpha(0f);
             heroBrand.setTranslationY(-8f);
             heroBrand.animate().alpha(1f).translationY(0f).setDuration(260L).start();
-        }
-        if (updatesCard != null) {
-            updatesCard.setAlpha(0f);
-            updatesCard.setTranslationY(10f);
-            updatesCard.animate().alpha(1f).translationY(0f).setStartDelay(45L).setDuration(260L).start();
         }
         if (rightDock != null) {
             rightDock.setAlpha(0f);
@@ -146,13 +134,10 @@ public class MainMenuFragment extends Fragment {
         android.view.WindowInsets rootInsets = requireActivity().getWindow().getDecorView().getRootWindowInsets();
         if (rootInsets == null) return;
         android.view.DisplayCutout cutout = rootInsets.getDisplayCutout();
-        int safeLeft = cutout != null ? cutout.getSafeInsetLeft() : 0;
         int safeRight = cutout != null ? cutout.getSafeInsetRight() : 0;
         float density = getResources().getDisplayMetrics().density;
         int baseDockW = Math.round(286f * density);
         int pad14 = Math.round(14f * density);
-        int pad18 = Math.round(18f * density);
-        int pad6 = Math.round(6f * density);
 
         View rightDock = root.findViewById(R.id.zyrox_left_dock);
         if (rightDock != null) {
@@ -167,34 +152,6 @@ public class MainMenuFragment extends Fragment {
                 rightDock.setPadding(pad14, rightDock.getPaddingTop(), targetPadRight, rightDock.getPaddingBottom());
             }
         }
-
-        View updatesCard = root.findViewById(R.id.zyrox_updates_card);
-        if (updatesCard != null && updatesCard.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
-            android.view.ViewGroup.MarginLayoutParams lp =
-                    (android.view.ViewGroup.MarginLayoutParams) updatesCard.getLayoutParams();
-            int targetLeftMargin = Math.max(pad18, safeLeft + pad6);
-            if (lp.leftMargin != targetLeftMargin || lp.getMarginStart() != targetLeftMargin) {
-                lp.leftMargin = targetLeftMargin;
-                lp.setMarginStart(targetLeftMargin);
-                updatesCard.setLayoutParams(lp);
-            }
-        }
-    }
-
-    private void updateEngineStatus() {
-        if (mEngineStatusText == null) return;
-        String renderer = LauncherPreferences.PREF_RENDERER;
-        String rendererShort = "GL4ES";
-        if (renderer != null) {
-            String r = renderer.toLowerCase(Locale.ROOT);
-            if (r.contains("zink")) rendererShort = "ZINK VULKAN";
-            else if (r.contains("ltw")) rendererShort = "LTW GLES3";
-            else if (r.contains("freedreno") || r.contains("kgsl")) rendererShort = "TURNIP KGSL";
-            else if (r.contains("mesa")) rendererShort = "MESA DRM";
-            else rendererShort = "HOLY GL4ES";
-        }
-        int ram = LauncherPreferences.PREF_RAM_ALLOCATION > 0 ? LauncherPreferences.PREF_RAM_ALLOCATION : 2048;
-        mEngineStatusText.setText(getString(R.string.zyrox_updates_status_fmt, ram, rendererShort));
     }
 
     private void openGameDirectory(Context context) {
@@ -215,7 +172,6 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
-        updateEngineStatus();
     }
 
     private void runInstallerWithConfirmation() {

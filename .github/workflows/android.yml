@@ -25,7 +25,7 @@ jobs:
       - name: Security & Play Protect SAST Gate (MobSF + Policy Audit)
         run: |
           python3 -m pip install --quiet --upgrade pip mobsfscan
-          mobsfscan app_mojo --json -o /tmp/mobsf-report.json || true
+          mobsfscan app_mojo/src/main --json -o /tmp/mobsf-report.json || true
           python3 - <<'PY'
           import json, os, re, sys, xml.etree.ElementTree as ET
 
@@ -77,11 +77,12 @@ jobs:
           if 'cleartextTrafficPermitted="true"' in netcfg or 'cleartextTrafficPermitted="false"' not in netcfg:
               failures.append("netconfig.xml must enforce cleartextTrafficPermitted=\"false\"")
 
-          # 5. Play Protect anti-PHA & credential-leak guardrails
+          # 5. Play Protect anti-PHA, credential-leak & UI regression guardrails
           banned = [
               ("obfuscated_hash", r"\bREQW_HASH\b"),
               ("deadlock_trap", r"\bwaitOnObj\b"),
               ("package_collision", r"git\.artdeell\.mjlaunch"),
+              ("removed_updates_card", r"\bzyrox_updates_card\b"),
               ("token_log", r"Log\.[idwev]\([^;]*(authCode|Xbl Token|Xbl Xsts|MC token|access_token|refresh_token)"),
           ]
           for root, _, files in os.walk("app_mojo/src/main"):
@@ -199,17 +200,50 @@ jobs:
       - name: Create out directory
         run: mkdir -p out
 
-      - name: Build ZyroxLauncher Full Release APK (Signed)
+      - name: Run Automated Metadata, Loader & Cache Unit Tests
         run: |
-          gradle :app_mojo:assembleFullRelease
-          mv app_mojo/build/outputs/apk/full/release/app_mojo-full-release.apk out/ZyroxLauncher-full-release.apk
+          set -o pipefail
+          if ! gradle :app_mojo:testFullReleaseUnitTest --stacktrace 2>&1 | tee /tmp/gradle-test.log; then
+            python3 - <<'PY'
+          lines = open("/tmp/gradle-test.log", errors="ignore").read().splitlines()
+          err = [l for l in lines if ("error:" in l or "FAILED" in l or "Exception" in l or "Caused by:" in l or "AssertionError" in l or "at git.artdeell" in l)]
+          snippet = " || ".join((err[-25:] if err else lines[-25:]))[:3500]
+          print(f"::error title=UnitTestFailure::{snippet}")
+          PY
+            exit 1
+          fi
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          total = failed = errors = 0
+          suites = []
+          for xf in sorted(glob.glob("app_mojo/build/test-results/testFullReleaseUnitTest/TEST-*.xml")):
+              r = ET.parse(xf).getroot()
+              t = int(r.get("tests", 0)); f = int(r.get("failures", 0)); e = int(r.get("errors", 0))
+              total += t; failed += f; errors += e
+              suites.append(f"{r.get('name').split('.')[-1]}({t})")
+          print(f"::notice title=UnitTestsPassed::{total} tests passed, {failed} failures, {errors} errors across {', '.join(suites)}")
+          PY
 
-      - name: Build ZyroxLauncher No-Runtime Release APK (Signed)
+      - name: Run Android Lint Static Verification
         run: |
-          gradle :app_mojo:assembleNoruntimeRelease
-          mv app_mojo/build/outputs/apk/noruntime/release/app_mojo-noruntime-release.apk out/ZyroxLauncher-noruntime-release.apk
+          set -o pipefail
+          if ! gradle :app_mojo:lintFullRelease 2>&1 | tee /tmp/gradle-lint.log; then
+            TAIL="$(tail -n 25 /tmp/gradle-lint.log | tr '\n' ' ' | cut -c1-3000)"
+            echo "::error title=LintFailure::$TAIL"
+            exit 1
+          fi
 
-      - name: Build ZyroxLauncher Play Store Release Bundle (.aab)
+      - name: Build Signed Release APK (Zyrox Launcher.apk)
+        run: |
+          set -o pipefail
+          if ! gradle :app_mojo:assembleFullRelease 2>&1 | tee /tmp/gradle-apk.log; then
+            TAIL="$(grep -E 'error:|FAILED|Exception|Caused by:' /tmp/gradle-apk.log | tail -n 25 | tr '\n' ' ' | cut -c1-3000)"
+            echo "::error title=ApkBuildFailure::${TAIL:-$(tail -n 20 /tmp/gradle-apk.log | tr '\n' ' ')}"
+            exit 1
+          fi
+          cp app_mojo/build/outputs/apk/full/release/app_mojo-full-release.apk out/Zyrox.Launcher.apk
+
+      - name: Build Play Store Release Bundle (.aab)
         run: |
           gradle :app_mojo:bundleFullRelease
           mv app_mojo/build/outputs/bundle/fullRelease/app_mojo-full-release.aab out/ZyroxLauncher-full-release.aab
@@ -239,138 +273,105 @@ jobs:
           aapt2 = os.path.join(bt, "aapt2")
           print(f"Using Android build-tools: {bt}")
 
-          cert_report_lines = []
-          apks = [
-              "out/ZyroxLauncher-full-release.apk",
-              "out/ZyroxLauncher-noruntime-release.apk",
-          ]
+          apk = "out/Zyrox.Launcher.apk"
+          if not os.path.isfile(apk):
+              fail(f"Missing built APK: {apk}")
+          size_mb = os.path.getsize(apk) / (1024 * 1024)
 
-          for apk in apks:
-              if not os.path.isfile(apk):
-                  fail(f"Missing built APK: {apk}")
-              name = os.path.basename(apk)
-              size_mb = os.path.getsize(apk) / (1024 * 1024)
+          # 1. Verify 4-byte zipalign
+          za = subprocess.run([zipalign, "-c", "4", apk], capture_output=True, text=True)
+          if za.returncode != 0:
+              fail(f"zipalign check failed: {za.stdout} {za.stderr}")
 
-              # 1. Verify 4-byte zipalign
-              za = subprocess.run([zipalign, "-c", "4", apk], capture_output=True, text=True)
-              if za.returncode != 0:
-                  # Re-align and re-sign only if needed; otherwise report exact error
-                  fail(f"zipalign check failed for {name}: {za.stdout} {za.stderr}")
+          # 2. Verify APK Signature Scheme v1 + v2 + v3 and production RSA-4096 cert
+          sig = subprocess.run(
+              [apksigner, "verify", "--verbose", "--print-certs", apk],
+              capture_output=True, text=True
+          )
+          if sig.returncode != 0:
+              fail(f"apksigner verify failed: {sig.stdout} {sig.stderr}")
+          s_out = sig.stdout
+          for req in (
+              "Verified using v1 scheme (JAR signing): true",
+              "Verified using v2 scheme (APK Signature Scheme v2): true",
+              "Verified using v3 scheme (APK Signature Scheme v3): true",
+          ):
+              if req not in s_out:
+                  first_lines = " | ".join(s_out.splitlines()[:10])
+                  fail(f"APK missing '{req}' (got: {first_lines})")
+          if "android debug" in s_out.lower():
+              fail("APK is signed with an Android Debug certificate!")
 
-              # 2. Verify APK Signature Scheme v1 + v2 + v3 and production RSA-4096 cert
-              sig = subprocess.run(
-                  [apksigner, "verify", "--verbose", "--print-certs", apk],
-                  capture_output=True, text=True
-              )
-              if sig.returncode != 0:
-                  fail(f"apksigner verify failed for {name}: {sig.stdout} {sig.stderr}")
-              s_out = sig.stdout
-              for req in (
-                  "Verified using v1 scheme (JAR signing): true",
-                  "Verified using v2 scheme (APK Signature Scheme v2): true",
-                  "Verified using v3 scheme (APK Signature Scheme v3): true",
-              ):
-                  if req not in s_out:
-                      first_lines = " | ".join(s_out.splitlines()[:10])
-                      fail(f"{name} missing '{req}' (got: {first_lines})")
-              if "android debug" in s_out.lower():
-                  fail(f"{name} is signed with an Android Debug certificate!")
+          cert_dn = ""
+          cert_sha256 = ""
+          cert_key = ""
+          for line in s_out.splitlines():
+              low = line.lower()
+              if "certificate dn:" in low and not cert_dn:
+                  cert_dn = line.split(":", 1)[1].strip()
+              elif "certificate sha-256 digest:" in low and not cert_sha256:
+                  cert_sha256 = line.split(":", 1)[1].strip()
+              elif ("key algorithm:" in low or "certificate key:" in low) and not cert_key:
+                  cert_key = line.strip()
 
-              cert_dn = ""
-              cert_sha256 = ""
-              cert_key = ""
-              for line in s_out.splitlines():
-                  low = line.lower()
-                  if "certificate dn:" in low and not cert_dn:
-                      cert_dn = line.split(":", 1)[1].strip()
-                  elif "certificate sha-256 digest:" in low and not cert_sha256:
-                      cert_sha256 = line.split(":", 1)[1].strip()
-                  elif ("key algorithm:" in low or "certificate key:" in low) and not cert_key:
-                      cert_key = line.strip()
+          # 3. Verify compiled manifest badging: package ID, versionName 1.0.3, targetSdk 36, non-debuggable, non-testOnly
+          badging_proc = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True)
+          if badging_proc.returncode != 0:
+              fail(f"aapt2 dump badging failed: {badging_proc.stderr[:300]}")
+          badging = badging_proc.stdout
+          pkg_line = badging.splitlines()[0] if badging else "empty"
+          if "package: name='com.zyrox.launcher'" not in badging:
+              fail(f"Unexpected package line: {pkg_line}")
+          if "versionName='1.0.3'" not in badging:
+              fail(f"Expected versionName='1.0.3', got: {pkg_line}")
+          if "targetSdkVersion:'36'" not in badging:
+              fail("APK does not declare targetSdkVersion 36")
+          if "application-debuggable" in badging:
+              fail("APK has android:debuggable=true!")
+          if "application-testOnly" in badging:
+              fail("APK has android:testOnly=true!")
 
-              # 3. Verify compiled manifest badging: package ID, targetSdk 36, non-debuggable, non-testOnly
-              badging_proc = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True)
-              if badging_proc.returncode != 0:
-                  fail(f"aapt2 dump badging failed for {name}: {badging_proc.stderr[:300]}")
-              badging = badging_proc.stdout
-              if "package: name='com.zyrox.launcher'" not in badging:
-                  fail(f"{name} unexpected package line: {badging.splitlines()[0] if badging else 'empty'}")
-              if "targetSdkVersion:'36'" not in badging:
-                  fail(f"{name} does not declare targetSdkVersion 36")
-              if "application-debuggable" in badging:
-                  fail(f"{name} has android:debuggable=true!")
-              if "application-testOnly" in badging:
-                  fail(f"{name} has android:testOnly=true!")
+          # 4. Compute APK SHA-256 for build summary (never uploaded as a release asset)
+          h = hashlib.sha256()
+          with open(apk, "rb") as fh:
+              for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                  h.update(chunk)
+          apk_sha = h.hexdigest()
 
-              # 4. Compute SHA-256
-              h = hashlib.sha256()
-              with open(apk, "rb") as fh:
-                  for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-                      h.update(chunk)
-              apk_sha = h.hexdigest()
-              sha_path = os.path.splitext(apk)[0] + ".sha256"
-              with open(sha_path, "w") as sf:
-                  sf.write(f"{apk_sha}  {name}\n")
-
-              cert_report_lines.extend([
-                  f"Artifact: {name} ({size_mb:.1f} MB)",
-                  f"APK SHA-256: {apk_sha}",
-                  f"Package: com.zyrox.launcher | targetSdk: 36 | debuggable: false | testOnly: false | zipalign: OK",
-                  f"Signatures: v1=true, v2=true, v3=true",
-                  f"Certificate DN: {cert_dn}",
-                  f"Certificate SHA-256: {cert_sha256}",
-                  *( [cert_key] if cert_key else [] ),
-                  "",
-              ])
-              print(
-                  f"::notice title=Verified {name}::pkg=com.zyrox.launcher targetSdk=36 debuggable=false "
-                  f"zipalign=OK sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}"
-              )
-
-          # 5. Verify Play Store .aab signature & checksum
+          # 5. Verify Play Store .aab signature
           aab = "out/ZyroxLauncher-full-release.aab"
           if not os.path.isfile(aab):
               fail("Missing built Play Store AAB")
           jv = subprocess.run(["jarsigner", "-verify", aab], capture_output=True, text=True)
           if jv.returncode != 0 or "jar verified." not in jv.stdout:
               fail(f"jarsigner verification failed for AAB: {jv.stdout} {jv.stderr}")
-          aab_h = hashlib.sha256()
-          with open(aab, "rb") as fh:
-              for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-                  aab_h.update(chunk)
-          aab_sha = aab_h.hexdigest()
-          aab_mb = os.path.getsize(aab) / (1024 * 1024)
-          with open("out/ZyroxLauncher-full-release.aab.sha256", "w") as sf:
-              sf.write(f"{aab_sha}  ZyroxLauncher-full-release.aab\n")
-          cert_report_lines.extend([
-              f"Artifact: ZyroxLauncher-full-release.aab ({aab_mb:.1f} MB)",
-              f"AAB SHA-256: {aab_sha}",
-              "Signature: jarsigner verified (Google Play Console ready)",
-              "",
-          ])
-          print(f"::notice title=Verified Play Store AAB::size={aab_mb:.1f}MB jarsigner=verified sha256={aab_sha}")
 
-          with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
-              cf.write("\n".join(cert_report_lines))
+          cert_report_lines = [
+              f"Release Asset: Zyrox Launcher.apk (Zyrox.Launcher.apk, {size_mb:.1f} MB)",
+              f"Package Line: {pkg_line}",
+              f"APK SHA-256: {apk_sha}",
+              f"Compliance: targetSdk=36 | debuggable=false | testOnly=false | zipalign=OK | sig=v1+v2+v3",
+              f"Certificate DN: {cert_dn}",
+              f"Certificate SHA-256: {cert_sha256}",
+              *( [cert_key] if cert_key else [] ),
+          ]
+          print(
+              f"::notice title=Verified Zyrox Launcher.apk::pkg=com.zyrox.launcher ver=1.0.3 targetSdk=36 "
+              f"zipalign=OK sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}"
+          )
 
           summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary_path:
               with open(summary_path, "a") as sm:
-                  sm.write("## Zyrox Launcher Security & Play Protect Verification\n\n")
+                  sm.write("## Zyrox Launcher v1.0.3 Release Verification\n\n")
                   sm.write("```\n" + "\n".join(cert_report_lines) + "\n```\n")
           PY
 
-      - name: Upload ZyroxLauncher Full Release APK
+      - name: Upload Zyrox Launcher Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZyroxLauncher-full-release
-          path: out/ZyroxLauncher-full-release.apk
-
-      - name: Upload ZyroxLauncher No-Runtime Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ZyroxLauncher-noruntime-release
-          path: out/ZyroxLauncher-noruntime-release.apk
+          name: Zyrox-Launcher-apk
+          path: out/Zyrox.Launcher.apk
 
       - name: Upload ZyroxLauncher Play Store Bundle (.aab)
         uses: actions/upload-artifact@v4
@@ -378,44 +379,43 @@ jobs:
           name: ZyroxLauncher-full-release-aab
           path: out/ZyroxLauncher-full-release.aab
 
-      - name: Remove legacy debug APK assets from Release
+      - name: Publish Signed Zyrox Launcher v1.0.3 GitHub Release (Single APK Asset)
         if: github.ref_name == 'v3_openjdk'
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for OLD in ZyroxLauncher-full-debug.apk ZyroxLauncher-noruntime-debug.apk ZyroxLauncher-full-debug.sha256 ZyroxLauncher-noruntime-debug.sha256; do
-            gh release delete-asset v1.0.0-zyrox "$OLD" --yes || true
-          done
+          set -euo pipefail
+          TAG="v1.0.3"
+          TITLE="Zyrox Launcher v1.0.3"
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          cat > "$NOTES_FILE" <<EOF
+          ## Zyrox Launcher v1.0.3
 
-      - name: Publish Signed Zyrox Launcher Production Release
-        if: github.ref_name == 'v3_openjdk'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Zyrox Launcher v1.0.2 (Fullscreen Crystal Glass Release)
-          tag_name: v1.0.2
-          make_latest: true
-          body: |
-            ## Zyrox Launcher v1.0.2 — Edge-to-Edge Fullscreen & Crystal Glass UI Release
+          ### Highlights
+          - **Cleaner Home Screen**: Removed the home screen Updates card for a streamlined landscape experience while preserving all account, instance, navigation, and launch controls.
+          - **Animated Minecraft Sunset Loading Backdrop**: Added a lightweight hardware-accelerated blocky Minecraft mountain, pine ridge, cloud, and golden-sunset loading scene strictly behind touch controls with real launch-stage status, background pause/resume, and smooth transition into the game window.
+          - **Automatic Official Minecraft Version Discovery**: Dynamic syncing against official Mojang \`version_manifest_v2.json\` across releases, snapshots, old beta/alpha, and year-based \`26.x+\` versions, with atomic local caching, \`ETag\`/\`Last-Modified\` conditional refresh, live version selector refresh, full offline fallback, dynamic Java 8/17/21/25+ runtime detection, and forward-compatible LWJGL Android handling.
+          - **Official Mod Loader Discovery & Compatibility**: Unified official metadata integration for **Fabric**, **Legacy Fabric**, **Quilt**, **Forge** (with recommended promotions & XXE-safe Maven parsing), and **NeoForge** (\`1.20.x\`–\`1.21.x\` and year-based \`26.x+\` + snapshots) with exact version compatibility checks and profile verification.
+          - **Hardened Modrinth & CurseForge Integration**: Official API rate-limit/retry handling, primary artifact selection, client-side \`.mrpack\` environment filtering, CurseForge \`edge.forgecdn.net\` fallback, and strict Forge/NeoForge/Fabric/Quilt manifest compatibility verification.
 
-            ### What's New in v1.0.2
-            - **100% True Edge-to-Edge Fullscreen**: Zero black bars on top status bar or left/right camera display cutouts across Android 9–16 (`targetSdk 36`), with dynamic 180° landscape punch-hole safe spacing
-            - **Full-Screen Live Shader Animation**: VSYNC-smooth golden-hour Minecraft shader scene, overscan custom `.mp4` loop support, volumetric sunbeams, and multi-depth bokeh/fireflies spanning 100% of the screen
-            - **Ultra-Transparent Crystal Glass UI**: Translucent optical-glass right control panel, luminous translucent amber-glass `PLAY` button, crystal account/instance/updates cards, and symmetrical 2x3 action tile grid showing all features at once
-            - **Seamless In-Place Update**: Signed with the same persistent RSA-4096 (`v1 + v2 + v3`) publisher certificate as `v1.0.1` — install directly without losing saved accounts or instances
+          ### Installation
+          Download and install **[Zyrox Launcher.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.3/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher certificate for seamless in-place upgrade over earlier releases).
+          EOF
 
-            ### Direct APK Downloads
-            - **[Download ZyroxLauncher-full-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.2/ZyroxLauncher-full-release.apk)** — Full install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
-            - **[Download ZyroxLauncher-noruntime-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.2/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
-
-            ### Security & Verification Summary
-            - **Package ID**: `com.zyrox.launcher` (`targetSdk 36`, `debuggable=false`, `testOnly=false`)
-            - **APK Signing**: Production RSA-4096 (`SHA256withRSA`) with APK Signature Scheme **v1 + v2 + v3** & 4-byte `zipalign`
-            - **Security Gates**: MobSF SAST clean (0 errors), 100% TLS/HTTPS network policy, Android Keystore AES-256-GCM token vault, hardened OAuth WebView with Safe Browsing, and ZipSlip/TarSlip canonical path containment
-            - **Commit**: `${{ github.sha }}`
-          files: |
-            out/ZyroxLauncher-full-release.apk
-            out/ZyroxLauncher-noruntime-release.apk
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Remove any previously uploaded assets so strictly ONE APK asset exists alongside source archives
+            for ASSET in $(gh release view "$TAG" --json assets --jq '.assets[].name'); do
+              gh release delete-asset "$TAG" "$ASSET" --yes
+            done
+            gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE" --latest
+            gh release upload "$TAG" "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" --clobber
+          else
+            gh release create "$TAG" "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file "$NOTES_FILE" \
+              --latest
+          fi
 
       - name: Upload to Google Play Console (Internal Track)
         if: github.ref_name == 'v3_openjdk' && env.ZYROX_PLAY_SA_PRESENT == 'true'

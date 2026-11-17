@@ -11,15 +11,15 @@
 
 ## Download Signed Release APK
 
-Get the latest security-hardened, RSA-4096 v1/v2/v3 signed production builds directly from the **[GitHub Releases Section](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest)**:
+Get the latest security-hardened, RSA-4096 `v1 + v2 + v3` signed production release directly from **[GitHub Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest)**:
 
-- **[ZyroxLauncher-full-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-full-release.apk)** — Complete install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
-- **[ZyroxLauncher-noruntime-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
+- **[Zyrox Launcher.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/Zyrox.Launcher.apk)** — Complete install-and-play signed Android APK with bundled OpenJDK runtime
 - **[All Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases)**
 
 ## Highlights
-- Runs Minecraft: Java Edition across classic, modern release, and snapshot versions on Android with Forge, Fabric, NeoForge, Quilt, Modrinth (`.mrpack`), and CurseForge modpack support.
-- Landscape-first dark obsidian glass & warm amber UI with customizable touch/gamepad controls and multi-runtime OpenJDK management.
+- Automatic official Minecraft: Java Edition version discovery (`version_manifest_v2.json`) across releases, snapshots, old beta/alpha, and year-based `26.x+` releases with atomic local caching, conditional `ETag` refresh, and offline support.
+- Official mod loader and modpack discovery with compatibility verification across **Fabric**, **Legacy Fabric**, **Quilt**, **Forge**, **NeoForge**, **Modrinth** (`.mrpack`), and **CurseForge**.
+- Landscape-first dark obsidian glass & warm amber UI, animated blocky Minecraft sunset mountain loading backdrop behind customizable touch/gamepad controls, and multi-runtime OpenJDK (Java 8/17/21/25+) support.
 - Hardened for Android & Google Play Protect (`com.zyrox.launcher`, `targetSdk 36`, `debuggable=false`, 100% TLS/HTTPS network policy, Android Keystore AES-256-GCM account token encryption, hardened OAuth WebView, canonical ZipSlip/TarSlip containment, and automated MobSF SAST + `apksigner` verification in CI). See [SECURITY.md](./SECURITY.md) and [PRIVACY_POLICY.md](./PRIVACY_POLICY.md).
 
 ## Building from Source

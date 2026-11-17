@@ -41,6 +41,69 @@
 
 			</git.artdeell.mojo.game.GameView>
 
+			<!-- Seamless Animated Minecraft Sunset Mountain Loading Backdrop (strictly behind all touch controls) -->
+			<FrameLayout
+				android:id="@+id/main_loading_screen"
+				android:layout_width="match_parent"
+				android:layout_height="match_parent"
+				android:clickable="false"
+				android:focusable="false"
+				android:elevation="0dp"
+				android:visibility="visible">
+
+				<git.artdeell.mojo.ui.MinecraftLoadingLandscapeView
+					android:id="@+id/main_loading_landscape"
+					android:layout_width="match_parent"
+					android:layout_height="match_parent"
+					android:clickable="false"
+					android:focusable="false" />
+
+				<LinearLayout
+					android:layout_width="wrap_content"
+					android:layout_height="wrap_content"
+					android:layout_marginBottom="16dp"
+					android:layout_gravity="center"
+					android:gravity="center"
+					android:clickable="false"
+					android:focusable="false"
+					android:paddingHorizontal="20dp"
+					android:paddingVertical="12dp"
+					android:orientation="vertical">
+
+					<ProgressBar
+						android:id="@+id/main_loading_screen_progress"
+						android:layout_width="26dp"
+						android:layout_height="26dp"
+						android:indeterminate="true"
+						android:indeterminateTint="@color/zyrox_amber_stroke" />
+
+					<TextView
+						android:id="@+id/main_loading_screen_text"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="8dp"
+						android:text="@string/zyrox_loading_preparing"
+						android:textColor="@color/zyrox_text_primary"
+						android:shadowColor="#E6090705"
+						android:shadowDx="0"
+						android:shadowDy="2"
+						android:shadowRadius="6"
+						android:textSize="16sp" />
+
+					<TextView
+						android:id="@+id/main_loading_screen_warning"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:layout_marginTop="3dp"
+						android:text="@string/loading_screen_warning"
+						android:textColor="#D9E7DFD5"
+						android:shadowColor="#E6090705"
+						android:shadowDx="0"
+						android:shadowDy="1"
+						android:shadowRadius="5"
+						android:textSize="12sp" />
+				</LinearLayout>
+			</FrameLayout>
 
 			<git.artdeell.mojo.input.keyboard.TouchCharInput
 				android:id="@+id/mainTouchCharInput"
@@ -65,46 +128,6 @@
 				android:layout_height="0px"/>
 
 		</git.artdeell.mojo.input.ControlLayout>
-
-		<FrameLayout
-			android:id="@+id/main_loading_screen"
-			android:layout_width="match_parent"
-			android:layout_height="match_parent"
-			android:background="#BB000000"
-			android:visibility="visible"
-			>
-
-			<LinearLayout
-				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:layout_marginBottom="16dp"
-				android:layout_gravity="center"
-				android:gravity="center"
-				android:orientation="vertical">
-
-				<ProgressBar
-					android:id="@+id/main_loading_screen_progress"
-					android:layout_width="24dp"
-					android:layout_height="24dp"
-					android:indeterminate="true" />
-
-				<TextView
-					android:id="@+id/main_loading_screen_text"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:text="@string/loading_screen_title"
-					android:textColor="@android:color/white"
-					android:textSize="16sp" />
-
-				<TextView
-					android:id="@+id/main_loading_screen_warning"
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:text="@string/loading_screen_warning"
-					android:textColor="@android:color/darker_gray"
-					android:textSize="12sp" />
-			</LinearLayout>
-		</FrameLayout>
 
 		<com.kdt.LoggerView
 			android:id="@+id/mainLoggerView"

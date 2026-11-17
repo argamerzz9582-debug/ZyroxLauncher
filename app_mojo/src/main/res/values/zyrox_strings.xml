@@ -3,7 +3,7 @@
     <!-- Global Zyrox Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0.2</string>
+    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0.3</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
@@ -16,13 +16,18 @@
     <string name="zyrox_nav_logs">LOGS</string>
     <string name="zyrox_nav_files">FILES</string>
 
-    <!-- Home Updates Card -->
-    <string name="zyrox_updates_title">ZYROX UPDATES</string>
-    <string name="zyrox_updates_badge">v1.0.2</string>
-    <string name="zyrox_updates_line1">• HolyGL4ES, LTW &amp; Zink Vulkan ready</string>
-    <string name="zyrox_updates_line2">• Modrinth &amp; CurseForge store live</string>
-    <string name="zyrox_updates_line3">• Multi-JRE 8 / 17 / 21 turbo runner</string>
-    <string name="zyrox_updates_status_fmt">RAM %1$d MB  •  %2$s</string>
+    <!-- Game Launch Loading Lifecycle -->
+    <string name="zyrox_loading_preparing">Preparing Minecraft…</string>
+    <string name="zyrox_loading_resources">Loading game resources…</string>
+    <string name="zyrox_loading_starting">Starting game…</string>
+
+    <!-- Version Metadata Sync -->
+    <string name="zyrox_refresh_versions">Refresh</string>
+    <string name="zyrox_refreshing_versions">Refreshing version catalog…</string>
+    <string name="zyrox_versions_up_to_date">Version catalog is up to date</string>
+    <string name="zyrox_versions_updated">Version catalog updated</string>
+    <string name="zyrox_versions_offline_cached">Offline — showing cached versions</string>
+    <string name="zyrox_versions_refresh_failed">Could not sync version catalog. Check your connection.</string>
 
     <!-- Page Titles -->
     <string name="zyrox_title_instance_studio">INSTANCE STUDIO</string>

@@ -23,5 +23,9 @@
  }
 # Option screens
  -keep class git.artdeell.mojo.prefs.screens** {*;}
+# Metadata cache Gson envelope models
+ -keep class git.artdeell.mojo.metadata.LocalMetadataCache$CacheMeta {*;}
+ -keep class git.artdeell.mojo.modding.fabric.FabricVersion {*;}
+ -keep class git.artdeell.mojo.modding.modpacks.models.** {*;}
 
 

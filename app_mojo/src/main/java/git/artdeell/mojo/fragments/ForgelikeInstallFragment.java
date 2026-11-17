@@ -14,10 +14,14 @@ import git.artdeell.mojo.modding.ModloaderListenerProxy;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public abstract class ForgelikeInstallFragment extends ModVersionListFragment<List<String>> {
     private final ForgelikeUtils mUtils;
+    private volatile Map<String, String> mRecommendedByMc = Collections.emptyMap();
+
     public ForgelikeInstallFragment(ForgelikeUtils utils, String mFragmentTag) {
         super(mFragmentTag);
         this.mUtils = utils;
@@ -25,7 +29,14 @@ public abstract class ForgelikeInstallFragment extends ModVersionListFragment<Li
 
     @Override
     public List<String> loadVersionList() throws IOException {
-        return mUtils.downloadVersions();
+        return loadVersionList(false);
+    }
+
+    @Override
+    public List<String> loadVersionList(boolean forceRefresh) throws IOException {
+        List<String> versions = mUtils.downloadVersions(forceRefresh);
+        mRecommendedByMc = mUtils.downloadRecommendedVersions(forceRefresh);
+        return versions;
     }
 
     @Override
@@ -35,7 +46,7 @@ public abstract class ForgelikeInstallFragment extends ModVersionListFragment<Li
 
     @Override
     public ExpandableListAdapter createAdapter(List<String> versionList, LayoutInflater layoutInflater) {
-        return new ForgelikeVersionListAdapter(versionList, layoutInflater, mUtils);
+        return new ForgelikeVersionListAdapter(versionList, layoutInflater, mUtils, mRecommendedByMc);
     }
 
     @Override

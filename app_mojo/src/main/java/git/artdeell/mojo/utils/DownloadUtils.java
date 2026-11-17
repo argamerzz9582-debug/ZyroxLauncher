@@ -11,6 +11,8 @@ import java.nio.charset.*;
 
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.downloader.VerificationException;
+import git.artdeell.mojo.metadata.LocalMetadataCache;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
 
 import org.apache.commons.io.*;
 
@@ -86,40 +88,10 @@ public class DownloadUtils {
     }
 
     public static <T> T downloadStringCached(String url, String cacheName, ParseCallback<T> parseCallback) throws IOException, ParseException{
-        File cacheRoot = new File(Tools.DIR_CACHE, "string_cache");
-        FileUtils.ensureDirectorySilently(cacheRoot);
-        File cacheDestination = FileUtils.resolveInsideDirectory(cacheRoot, cacheName);
-        if(cacheDestination.isFile() &&
-                cacheDestination.canRead() &&
-                System.currentTimeMillis() < (cacheDestination.lastModified() + 86400000)) {
-            try {
-                String cachedString = Tools.read(new FileInputStream(cacheDestination));
-                return parseCallback.process(cachedString);
-            }catch(IOException e) {
-                Log.i("DownloadUtils", "Failed to read the cached file", e);
-            }catch (ParseException e) {
-                Log.i("DownloadUtils", "Failed to parse the cached file", e);
-            }
-        }
-        String urlContent = DownloadUtils.downloadString(url);
-        // if we download the file and fail parsing it, we will yeet outta there
-        // and not cache the unparseable sting. We will return this after trying to save the downloaded
-        // string into cache
-        T parseResult = parseCallback.process(urlContent);
-
-        boolean tryWriteCache;
-        if(cacheDestination.exists()) {
-            tryWriteCache = cacheDestination.canWrite();
-        } else {
-            tryWriteCache = FileUtils.ensureParentDirectorySilently(cacheDestination);
-        }
-
-        if(tryWriteCache) try {
-            Tools.write(cacheDestination, urlContent);
-        }catch(IOException e) {
-            Log.i("DownloadUtils", "Failed to cache the string", e);
-        }
-        return parseResult;
+        return VersionMetadataRepository.getInstance()
+                .getCache()
+                .sync(cacheName, url, false, LocalMetadataCache.DEFAULT_REVALIDATE_COOLDOWN_MS, parseCallback::process)
+                .data;
     }
 
     private static boolean verifyFile(File file, String sha1) throws IOException {

@@ -90,7 +90,11 @@ public class Platform {
         // We probably already initialized at this point. Don't try to initialize again
         Platform.setPlatformLibrary(impl);
         Log.i("Platform", "Init backend : " + impl.backendName());
-        ContextExecutor.executeActivity(activity -> ((GameActivity) activity).hideLoadingScreen());
+        ContextExecutor.executeActivity(activity -> {
+            if (activity instanceof GameActivity) {
+                ((GameActivity) activity).hideLoadingScreen();
+            }
+        });
         resetCursorPosition();
     }
 

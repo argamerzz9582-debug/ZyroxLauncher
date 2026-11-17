@@ -5,6 +5,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import git.artdeell.mojo.MojoApplication;
+import git.artdeell.mojo.metadata.CurseForgeProvider;
 import git.artdeell.mojo.modding.modpacks.api.modloader.LoaderInstaller;
 import git.artdeell.mojo.modding.modpacks.models.Constants;
 import git.artdeell.mojo.modding.modpacks.models.ModDetail;
@@ -36,7 +37,7 @@ public class CommonApi implements ModpackApi {
 
     public CommonApi(String curseforgeApiKey) {
         mModrinthApi = new ModrinthApi();
-        if ("DUMMY".equals(curseforgeApiKey)) {
+        if (!CurseForgeProvider.isApiKeyConfigured(curseforgeApiKey)) {
             mCurseforgeApi = null;
             mModpackApis = new ModpackApi[]{mModrinthApi};
         } else {
@@ -120,13 +121,20 @@ public class CommonApi implements ModpackApi {
 
     @Override
     public ModDetail getModDetails(ModItem item) {
-        Log.i("CommonApi", "Invoking getModDetails on item.apiSource="+item.apiSource +" item.title="+item.title);
-        return getModpackApi(item.apiSource).getModDetails(item);
+        if (item == null) return null;
+        Log.i("CommonApi", "Invoking getModDetails on item.apiSource=" + item.apiSource + " item.title=" + item.title);
+        ModpackApi api = getModpackApi(item.apiSource);
+        return api != null ? api.getModDetails(item) : null;
     }
 
     @Override
     public LoaderInstaller installModpack(ModDetail modDetail, int selectedVersion) throws IOException {
-        return getModpackApi(modDetail.apiSource).installModpack(modDetail, selectedVersion);
+        if (modDetail == null) throw new IOException("Modpack metadata is unavailable");
+        ModpackApi api = getModpackApi(modDetail.apiSource);
+        if (api == null) {
+            throw new IOException("CurseForge API key is not configured for this build");
+        }
+        return api.installModpack(modDetail, selectedVersion);
     }
 
     public LoaderInstaller installLocalModpack(String modpackName, File modpackFile, String icon) throws IOException {
@@ -135,8 +143,10 @@ public class CommonApi implements ModpackApi {
             case PACK_MODRINTH:
                 return mModrinthApi.installLocalModpack(modpackName, modpackFile, icon);
             case PACK_CURSEFORGE:
-                if (mCurseforgeApi == null) return null;
-                else return mCurseforgeApi.installLocalModpack(modpackName, modpackFile, icon);
+                if (mCurseforgeApi == null) {
+                    throw new IOException("CurseForge API key is not configured for CurseForge modpack downloads");
+                }
+                return mCurseforgeApi.installLocalModpack(modpackName, modpackFile, icon);
             case PACK_UNDEFINED:
                 modpackFile.delete();
                 return null;
@@ -145,13 +155,12 @@ public class CommonApi implements ModpackApi {
         }
     }
 
-    private @NonNull ModpackApi getModpackApi(int apiSource) {
+    private ModpackApi getModpackApi(int apiSource) {
         switch (apiSource) {
             case Constants.SOURCE_MODRINTH:
                 return mModrinthApi;
             case Constants.SOURCE_CURSEFORGE:
-                if (mCurseforgeApi == null) return null;
-                else return mCurseforgeApi;
+                return mCurseforgeApi;
             default:
                 throw new UnsupportedOperationException("Unknown API source: " + apiSource);
         }
