@@ -74,7 +74,7 @@ jobs:
           wf = open(".github/workflows/android.yml").read()
           for bad_wf, desc in (
               ("-gen" + "keypair", "ephemeral CI keystore generation"),
-              ("pull_request_target", "unsafe pull_request_target trigger"),
+              ("pull_request" + "_target", "unsafe PR target trigger"),
           ):
               if bad_wf in wf:
                   failures.append(f"Workflow supply-chain violation ({desc}): {bad_wf}")
