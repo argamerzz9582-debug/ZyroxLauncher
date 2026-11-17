@@ -48,7 +48,7 @@ public class Instances {
                     instance.mInstanceRoot = instanceRoot;
                     return instance;
                 }
-            } catch (IOException | JsonParseException | RuntimeException e) {
+            } catch (IOException | RuntimeException e) {
                 Log.w("Instances", "Corrupted metadata in " + instanceRoot.getName() + ", attempting .bak recovery");
             }
         }
@@ -76,7 +76,7 @@ public class Instances {
                     Log.i("Instances", "Recovered instance metadata from .bak: " + instanceRoot.getName());
                     return recovered;
                 }
-            } catch (IOException | JsonParseException | RuntimeException e) {
+            } catch (IOException | RuntimeException e) {
                 Log.w("Instances", "Backup metadata also unreadable for " + instanceRoot.getName());
             }
         }

@@ -120,7 +120,7 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
 
     @Override
     public void setBackground() {
-        int rawStroke = getProperties().strokeWidth;
+        float rawStroke = getProperties().strokeWidth;
         float scale = getControlLayoutParent() != null ? (getControlLayoutParent().getLayoutScale() / 100f) : 1f;
         int borderPx = rawStroke > 0
                 ? (int) Tools.dpToPx(rawStroke * scale)

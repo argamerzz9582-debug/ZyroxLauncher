@@ -834,7 +834,7 @@ public final class Tools {
     public static void shareLog(Context context){
         File sourceLog = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
         if (!sourceLog.isFile() || sourceLog.length() == 0L) {
-            Toast.makeText(context, R.string.zyrox_log_empty, Toast.LENGTH_SHORT).show();
+            android.widget.Toast.makeText(context, R.string.zyrox_log_empty, android.widget.Toast.LENGTH_SHORT).show();
             return;
         }
         try {
@@ -843,7 +843,7 @@ public final class Tools {
             git.artdeell.mojo.security.LogRedactor.writeRedactedLogFile(sourceLog, redactedLog, 8L * 1024L * 1024L);
             openPath(context, redactedLog, true);
         } catch (IOException e) {
-            Toast.makeText(context, e.getMessage(), Toast.LENGTH_LONG).show();
+            android.widget.Toast.makeText(context, e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
         }
     }
 

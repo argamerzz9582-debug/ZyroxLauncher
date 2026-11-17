@@ -263,4 +263,18 @@ public class LauncherPreferences {
         }
         return false;
     }
+
+    public static boolean isReducedMotionEnabled(@androidx.annotation.Nullable Context ctx) {
+        if (isReducedMotionEnabled()) return true;
+        if (ctx != null) {
+            try {
+                float scale = android.provider.Settings.Global.getFloat(
+                        ctx.getContentResolver(),
+                        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f);
+                return scale <= 0.01f;
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
+    }
 }
