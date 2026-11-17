@@ -4,7 +4,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -434,7 +433,7 @@ public class LocalMetadataCache {
         try {
             String raw = readUtf8File(metaFile);
             return GSON.fromJson(raw, CacheMeta.class);
-        } catch (IOException | JsonSyntaxException | RuntimeException ignored) {
+        } catch (IOException | RuntimeException ignored) {
             return null;
         }
     }
