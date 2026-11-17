@@ -11,8 +11,6 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.bumptech.glide.Glide;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -397,9 +395,9 @@ public final class GameOptimizer {
      * when entering {@code GameActivity} (respecting Android Battery Saver).
      */
     public static int applyInGameSystemBoost(@NonNull Activity activity, @Nullable String rawMode) {
-        // 1. Free launcher Glide image memory cache so maximum RAM stays available for Minecraft
+        // 1. Trigger Android ComponentCallbacks2 memory trim so maximum RAM stays available for Minecraft
         try {
-            Glide.get(activity.getApplicationContext()).clearMemory();
+            activity.getApplication().onTrimMemory(android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN);
         } catch (Throwable ignored) {
         }
 

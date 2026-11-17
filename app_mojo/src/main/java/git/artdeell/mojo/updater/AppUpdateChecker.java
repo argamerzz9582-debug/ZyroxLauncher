@@ -183,12 +183,27 @@ public final class AppUpdateChecker {
         new AlertDialog.Builder(ctx)
                 .setTitle(info.title.isEmpty() ? ("Update Available • " + info.tagName) : info.title)
                 .setMessage(msg.toString())
-                .setPositiveButton("Download APK", (d, w) -> Tools.openURL(ctx, targetUrl))
-                .setNeutralButton("Release Notes", (d, w) -> Tools.openURL(ctx, info.htmlUrl))
+                .setPositiveButton("Download APK", (d, w) -> openHttpsUrl(ctx, targetUrl))
+                .setNeutralButton("Release Notes", (d, w) -> openHttpsUrl(ctx, info.htmlUrl))
                 .setNegativeButton("Later", (d, w) -> ctx.getApplicationContext()
                         .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                         .edit().putString(KEY_DISMISSED_TAG, info.tagName).apply())
                 .show();
+    }
+
+    private static void openHttpsUrl(@NonNull Context ctx, @NonNull String url) {
+        if (!url.toLowerCase(Locale.ROOT).startsWith("https://")) return;
+        try {
+            if (ctx instanceof android.app.Activity) {
+                Tools.openURL((android.app.Activity) ctx, url);
+            } else {
+                android.content.Intent intent = new android.content.Intent(
+                        android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(intent);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     @NonNull

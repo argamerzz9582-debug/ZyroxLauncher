@@ -178,10 +178,6 @@ public class ServerManagerFragment extends Fragment {
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
 
-            LinearLayout row = new LinearLayout(ctx);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-
             android.widget.ImageView iconView = new android.widget.ImageView(ctx);
             int iconSz = ZyroxStudioUi.dp(ctx, 40);
             iconView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
