@@ -49,6 +49,7 @@ public class WorldManagerFragment extends Fragment {
     private Instance mInstance;
     private TextView mHeaderSummary;
     private LinearLayout mListContainer;
+    private final java.util.ArrayList<Bitmap> mActiveIcons = new java.util.ArrayList<>();
     @Nullable private WorldManager.WorldEntry mPendingExportWorld;
 
     private final ActivityResultLauncher<String[]> mImportWorldLauncher =
@@ -133,16 +134,67 @@ public class WorldManagerFragment extends Fragment {
         MojoApplication.sExecutorService.execute(() -> {
             List<WorldManager.WorldEntry> worlds = WorldManager.listWorlds(gameDir);
             int backupCount = WorldManager.listBackups(backupDir).size();
+            final java.util.ArrayList<Bitmap> decodedIcons = new java.util.ArrayList<>(worlds.size());
+            for (WorldManager.WorldEntry w : worlds) {
+                decodedIcons.add(decodeBoundedWorldIcon(w.iconFile, 96));
+            }
             Tools.runOnUiThread(() -> {
-                if (!isAdded()) return;
-                renderWorlds(worlds, backupCount);
+                if (!isAdded()) {
+                    for (Bitmap b : decodedIcons) {
+                        if (b != null && !b.isRecycled()) b.recycle();
+                    }
+                    return;
+                }
+                renderWorlds(worlds, decodedIcons, backupCount);
             });
         });
     }
 
-    private void renderWorlds(@NonNull List<WorldManager.WorldEntry> worlds, int backupCount) {
+    @Override
+    public void onDestroyView() {
+        recycleWorldIcons();
+        super.onDestroyView();
+    }
+
+    private void recycleWorldIcons() {
+        if (mListContainer != null) {
+            mListContainer.removeAllViews();
+        }
+        for (Bitmap bmp : mActiveIcons) {
+            if (bmp != null && !bmp.isRecycled()) {
+                bmp.recycle();
+            }
+        }
+        mActiveIcons.clear();
+    }
+
+    @Nullable
+    private static Bitmap decodeBoundedWorldIcon(@Nullable File iconFile, int maxPx) {
+        if (iconFile == null || !iconFile.isFile()) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(iconFile.getAbsolutePath(), bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            int sample = 1;
+            while ((bounds.outWidth / sample) > maxPx * 2 || (bounds.outHeight / sample) > maxPx * 2) {
+                sample <<= 1;
+            }
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = sample;
+            opts.inPreferredConfig = Bitmap.Config.RGB_565;
+            return BitmapFactory.decodeFile(iconFile.getAbsolutePath(), opts);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private void renderWorlds(@NonNull List<WorldManager.WorldEntry> worlds,
+                              @NonNull List<Bitmap> icons,
+                              int backupCount) {
         Context ctx = requireContext();
-        mListContainer.removeAllViews();
+        recycleWorldIcons();
+        mActiveIcons.addAll(icons);
         String sharedWarn = mInstance.sharedData ? " • Shared directory" : " • Isolated instance";
         mHeaderSummary.setText(instanceDisplayLabel() + " • " + worlds.size() + " world(s) • "
                 + backupCount + " backup(s)" + sharedWarn);
@@ -158,7 +210,9 @@ public class WorldManagerFragment extends Fragment {
         }
 
         DateFormat df = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT);
-        for (WorldManager.WorldEntry w : worlds) {
+        for (int idx = 0; idx < worlds.size(); idx++) {
+            WorldManager.WorldEntry w = worlds.get(idx);
+            Bitmap bmp = idx < icons.size() ? icons.get(idx) : null;
             LinearLayout card = ZyroxStudioUi.createItemCard(ctx);
             LinearLayout row = new LinearLayout(ctx);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -168,9 +222,8 @@ public class WorldManagerFragment extends Fragment {
             int iconPx = ZyroxStudioUi.dp(ctx, 42);
             icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
             icon.setBackgroundResource(R.drawable.bg_zyrox_badge);
-            if (w.iconFile != null && w.iconFile.isFile()) {
-                Bitmap bmp = BitmapFactory.decodeFile(w.iconFile.getAbsolutePath());
-                if (bmp != null) icon.setImageBitmap(bmp);
+            if (bmp != null && !bmp.isRecycled()) {
+                icon.setImageBitmap(bmp);
             } else {
                 icon.setImageResource(R.drawable.ic_px_instances);
                 int pad = ZyroxStudioUi.dp(ctx, 9);
@@ -221,6 +274,7 @@ public class WorldManagerFragment extends Fragment {
     }
 
     private void createBackup(@NonNull WorldManager.WorldEntry world) {
+        if (mInstance == null || !isAdded()) return;
         Toast.makeText(requireContext(), "Creating verified SHA-256 backup of \"" + world.displayName + "\"...",
                 Toast.LENGTH_SHORT).show();
         final File backupDir = WorldManager.getWorldBackupsDirectory(new File(Tools.DIR_GAME_HOME), instanceBackupKey());

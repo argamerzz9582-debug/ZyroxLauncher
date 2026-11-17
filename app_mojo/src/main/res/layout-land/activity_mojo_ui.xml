@@ -20,7 +20,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Global Translucent Crystal-Glass Sub-Page Header Bar -->
+    <!-- Global Translucent Crystal-Glass Sub-Page Header Bar (hidden on Home Hub, shown on sub-pages) -->
     <LinearLayout
         android:id="@+id/zyrox_global_header"
         android:layout_width="0dp"
@@ -46,7 +46,7 @@
             android:textColor="@color/zyrox_text_primary"
             android:textSize="11sp"
             android:letterSpacing="0.06"
-            android:shadowColor="#BF090705"
+            android:shadowColor="@color/zyrox_lg_shadow"
             android:shadowDx="0"
             android:shadowDy="1"
             android:shadowRadius="4"
@@ -70,7 +70,7 @@
             android:textColor="@color/zyrox_text_primary"
             android:textSize="13.5sp"
             android:letterSpacing="0.08"
-            android:shadowColor="#BF090705"
+            android:shadowColor="@color/zyrox_lg_shadow"
             android:shadowDx="0"
             android:shadowDy="1"
             android:shadowRadius="4"
@@ -79,6 +79,7 @@
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel" />
 
+        <!-- Live inline task indicator inside Global Header -->
         <TextView
             android:id="@+id/tv_zyrox_header_tasks"
             android:layout_width="wrap_content"
@@ -91,7 +92,9 @@
             android:textSize="9sp"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:text="1 TASK"
+            tools:visibility="visible" />
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btn_zyrox_top_action"
@@ -105,7 +108,7 @@
             android:textColor="@color/zyrox_text_primary"
             android:textSize="10sp"
             android:letterSpacing="0.06"
-            android:shadowColor="#BF120804"
+            android:shadowColor="@color/zyrox_lg_shadow"
             android:shadowDx="0"
             android:shadowDy="1"
             android:shadowRadius="4"
@@ -113,7 +116,8 @@
             android:elevation="0dp"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <ImageButton
             android:id="@+id/setting_button"
@@ -127,6 +131,7 @@
             android:contentDescription="@string/zyrox_home" />
     </LinearLayout>
 
+    <!-- Slim Amber Indeterminate Activity Progress Strip below Global Header -->
     <ProgressBar
         android:id="@+id/zyrox_header_progress"
         style="@style/Widget.AppCompat.ProgressBar.Horizontal"
@@ -139,6 +144,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Main Dynamic Screen Container (100% edge-to-edge on Home Hub) -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/container_fragment"
         android:name="git.artdeell.mojo.fragments.MainMenuFragment"
@@ -149,7 +155,8 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Persistent Ultra-Transparent Crystal Account Pill docked inside Home Hub Right Panel -->
+    <!-- Persistent Ultra-Transparent Crystal Account Pill docked inside Home Hub Right Panel
+         (zero elevation shadow box; stays mounted so auth ExtraListeners persist across screens) -->
     <LinearLayout
         android:id="@+id/zyrox_account_dock_card"
         android:layout_width="258dp"
@@ -182,6 +189,7 @@
             android:contentDescription="@string/main_add_account" />
     </LinearLayout>
 
+    <!-- Global Expandable Live Task & Download Progress Bar -->
     <com.kdt.mcgui.ProgressLayout
         android:id="@+id/progress_layout"
         android:layout_width="0dp"

@@ -1,33 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Sheer Liquid Glass Global Header Bar -->
+<!-- Zyrox Sakura Twilight Smoked-Crystal Global Sub-Page Header Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="270"
-                android:startColor="#48090E18"
-                android:endColor="#28090E18" />
+                android:startColor="#64160D20"
+                android:endColor="#42150C1E" />
         </shape>
     </item>
-    <item android:height="14dp" android:gravity="top|fill_horizontal">
+    <item android:height="14dp" android:gravity="top">
         <shape android:shape="rectangle">
-            <gradient
-                android:angle="270"
-                android:startColor="#16FFFFFF"
-                android:endColor="#00FFFFFF" />
+            <gradient android:angle="270" android:startColor="#1CFFF2F8" android:endColor="#00FFFFFF" />
         </shape>
     </item>
-    <item
-        android:height="1dp"
-        android:gravity="bottom|fill_horizontal">
+    <item android:height="1.1dp" android:gravity="bottom">
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="0"
-                android:startColor="#20FFFFFF"
-                android:centerColor="#8AF4FAFF"
-                android:endColor="#20FFFFFF" />
+                android:startColor="#28FCE6F2"
+                android:centerColor="#A4FFE4F2"
+                android:endColor="#28FCE6F2" />
         </shape>
     </item>
 </layer-list>

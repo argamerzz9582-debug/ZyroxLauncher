@@ -372,20 +372,21 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- Subtle Luminous Footer Engine Watermark -->
+        <!-- Subtle Luminous Sakura Footer Watermark -->
         <TextView
             android:id="@+id/tv_zyrox_watermark"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text="@string/zyrox_engine_watermark"
-            android:textColor="@color/zyrox_text_muted"
-            android:textSize="8sp"
-            android:letterSpacing="0.14"
-            android:shadowColor="#B3090705"
+            android:textColor="@color/zyrox_amber"
+            android:alpha="0.82"
+            android:textSize="7.5sp"
+            android:letterSpacing="0.15"
+            android:shadowColor="@color/zyrox_lg_shadow"
             android:shadowDx="0"
             android:shadowDy="1"
-            android:shadowRadius="3"
+            android:shadowRadius="3.5"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -394,17 +395,26 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 2. CENTER HERO BRAND ZONE (floating cleanly across full-screen open shader sky; updates card intentionally removed) -->
+    <!-- 2. CENTER HERO SAKURA CRYSTAL BRAND CREST (floating cleanly over full-screen cherry-blossom scene) -->
     <LinearLayout
         android:id="@+id/zyrox_hero_brand"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="26dp"
+        android:layout_marginTop="20dp"
         android:orientation="vertical"
         android:gravity="center_horizontal"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/zyrox_left_dock">
+
+        <ImageView
+            android:id="@+id/iv_zyrox_hero_emblem"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginBottom="3dp"
+            android:src="@drawable/ic_zyrox_sakura_emblem"
+            android:alpha="0.94"
+            android:importantForAccessibility="no" />
 
         <TextView
             android:id="@+id/tv_zyrox_hero_title"
@@ -413,12 +423,12 @@
             android:text="@string/zyrox_brand_title"
             android:textColor="@color/zyrox_lg_text"
             android:textSize="46sp"
-            android:letterSpacing="0.12"
+            android:letterSpacing="0.13"
             android:includeFontPadding="false"
-            android:shadowColor="#BF101824"
+            android:shadowColor="#CC140A1E"
             android:shadowDx="0"
             android:shadowDy="3"
-            android:shadowRadius="18"
+            android:shadowRadius="20"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel" />
 
@@ -426,22 +436,22 @@
             android:id="@+id/tv_zyrox_hero_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:text="@string/zyrox_brand_subtitle"
-            android:textColor="@color/zyrox_lg_text_muted"
-            android:textSize="12sp"
-            android:letterSpacing="0.34"
-            android:shadowColor="#CC090C12"
+            android:textColor="@color/zyrox_amber"
+            android:textSize="10.5sp"
+            android:letterSpacing="0.28"
+            android:shadowColor="#D812081B"
             android:shadowDx="0"
-            android:shadowDy="2"
-            android:shadowRadius="8"
-            android:fontFamily="@font/minecraft_pixel"
-            app:fontFamily="@font/minecraft_pixel" />
+            android:shadowDy="1.5"
+            android:shadowRadius="9"
+            android:fontFamily="@font/noto_sans_bold"
+            app:fontFamily="@font/noto_sans_bold" />
 
         <View
-            android:layout_width="148dp"
-            android:layout_height="1.5dp"
-            android:layout_marginTop="8dp"
+            android:layout_width="164dp"
+            android:layout_height="1.6dp"
+            android:layout_marginTop="7dp"
             android:background="@drawable/bg_zyrox_hero_divider" />
     </LinearLayout>
 

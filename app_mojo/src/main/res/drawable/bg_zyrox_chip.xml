@@ -1,31 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Capsule Chip -->
+<!-- Zyrox Sakura Blossom Capsule Filter Chip -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#48E4F4FF" android:endColor="#32C8E4FF" />
-            <stroke android:width="1.2dp" android:color="#F8FFFFFF" />
-            <corners android:radius="999dp" />
-        </shape>
-    </item>
-    <item android:state_checked="true">
-        <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#3EE2F2FF" android:endColor="#28C2E2FF" />
-            <stroke android:width="1.2dp" android:color="#F0FFFFFF" />
+            <gradient android:angle="270" android:startColor="#52FFE4F2" android:endColor="#38F4A2CA" />
+            <stroke android:width="1.2dp" android:color="#FAFFF7FB" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#3EE2F2FF" android:endColor="#28C2E2FF" />
-            <stroke android:width="1.2dp" android:color="#F0FFFFFF" />
+            <gradient android:angle="270" android:startColor="#4AFFE0F0" android:endColor="#30F298C3" />
+            <stroke android:width="1.15dp" android:color="#F4FFF5FA" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#1CF6FBFF" android:endColor="#10DCEBF8" />
-            <stroke android:width="0.95dp" android:color="#96F4FAFF" />
+            <gradient android:angle="270" android:startColor="#20FFF2F8" android:endColor="#12FAD4E8" />
+            <stroke android:width="0.9dp" android:color="#6CFCE8F3" />
             <corners android:radius="999dp" />
         </shape>
     </item>

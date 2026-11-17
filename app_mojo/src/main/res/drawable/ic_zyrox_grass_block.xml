@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Isometric Minecraft 1.20+ Cherry Blossom Block (Sakura Instance Emblem) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Isometric Minecraft Grass Block -->
-    <path android:fillColor="#65A30D" android:pathData="M12,2 L21,7 L12,12 L3,7 Z" />
-    <path android:fillColor="#84CC16" android:pathData="M12,3.2 L19,7 L12,10.8 L5,7 Z" />
-    <!-- Left dirt face + grass overhang -->
-    <path android:fillColor="#784212" android:pathData="M3,7 L12,12 L12,22 L3,17 Z" />
-    <path android:fillColor="#4D7C0F" android:pathData="M3,7 L12,12 L12,15 L9,13.4 L9,14.5 L6,12.8 L6,11.8 L3,10 Z" />
-    <!-- Right shaded dirt face + grass overhang -->
-    <path android:fillColor="#57300D" android:pathData="M12,12 L21,7 L21,17 L12,22 Z" />
-    <path android:fillColor="#3F6212" android:pathData="M12,12 L21,7 L21,10 L18,11.7 L18,13 L15,14.6 L15,13.5 L12,15 Z" />
+    <!-- Sunlit sakura blossom canopy top -->
+    <path android:fillColor="#F48FB8" android:pathData="M12,2 L21,7 L12,12 L3,7 Z" />
+    <path android:fillColor="#FBCFE8" android:pathData="M12,3.2 L19,7 L12,10.8 L5,7 Z" />
+    <!-- Crisp pixel cherry petals across top -->
+    <path android:fillColor="#FFF7FB" android:pathData="M11,5.2 L13,6.2 L11,7.2 L9,6.2 Z M14,7.2 L15.6,8 L14,8.8 L12.4,8 Z" />
+    <!-- Left cherry-bark wood face + draping sakura blossom overhang -->
+    <path android:fillColor="#593545" android:pathData="M3,7 L12,12 L12,22 L3,17 Z" />
+    <path android:fillColor="#EC74A6" android:pathData="M3,7 L12,12 L12,15.2 L9,13.5 L9,14.7 L6,13 L6,11.9 L3,10.2 Z" />
+    <!-- Right shaded cherry-bark face + draping sakura blossom overhang -->
+    <path android:fillColor="#3E2231" android:pathData="M12,12 L21,7 L21,17 L12,22 Z" />
+    <path android:fillColor="#D4568A" android:pathData="M12,12 L21,7 L21,10.2 L18,11.9 L18,13.2 L15,14.8 L15,13.6 L12,15.2 Z" />
+    <!-- Crystal rim glint -->
+    <path android:fillColor="#55FFFFFF" android:pathData="M12,2 L21,7 L20.2,7.4 L12,2.9 L3.8,7.4 L3,7 Z" />
 </vector>

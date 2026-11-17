@@ -75,6 +75,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
     private ProgressLayout mProgressLayout;
+    private com.kdt.mcgui.AccountSpinner mAccountSpinner;
     private ZyroxShaderBackgroundView mShaderBackground;
     private View mGlobalHeader;
     private View mAccountDockCard;
@@ -88,7 +89,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
     private ProgressServiceKeeper mProgressServiceKeeper;
     private NotificationManager mNotificationManager;
     private int mActiveTaskCount = 0;
-    private static ActivityResultLauncher<String> mRequestPermissionLauncher;
+    private ActivityResultLauncher<String> mRequestPermissionLauncher;
 
     /* Updates Zyrox Global Shell Header Bar & Home Left-Dock Account Card per active screen */
     private final FragmentManager.FragmentLifecycleCallbacks mFragmentCallbackListener = new FragmentManager.FragmentLifecycleCallbacks() {
@@ -387,6 +388,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_VERSION_LIST);
         mProgressLayout.observe(ProgressLayout.INSTANCE_INSTALL);
         mProgressLayout.observe(ProgressLayout.DATA_MIGRATION);
+        mProgressLayout.observe(ProgressLayout.DRIVER_INSTALL);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_COMPONENTS);
+        mProgressLayout.observe(ProgressLayout.EXTRACT_SINGLE_FILES);
     }
 
     @Override
@@ -422,6 +426,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                     View decor = getWindow() != null ? getWindow().getDecorView() : null;
                     if (decor != null) {
                         decor.post(() -> {
+                            if (isFinishing() || isDestroyed()) return;
                             applyEdgeToEdgeCutoutGuides();
                             Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
                             if (current instanceof MainMenuFragment) {
@@ -465,6 +470,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
     protected void onDestroy() {
         if (mShaderBackground != null) {
             mShaderBackground.onDestroy();
+        }
+        if (mAccountSpinner != null) {
+            mAccountSpinner.cleanUpListeners();
         }
         super.onDestroy();
         mProgressLayout.cleanUpObservers();
@@ -589,6 +597,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         mFragmentView = findViewById(R.id.container_fragment);
         mSettingsButton = findViewById(R.id.setting_button);
         mProgressLayout = findViewById(R.id.progress_layout);
+        mAccountSpinner = findViewById(R.id.account_spinner);
         mShaderBackground = findViewById(R.id.zyrox_shader_background);
         mGlobalHeader = findViewById(R.id.zyrox_global_header);
         mAccountDockCard = findViewById(R.id.zyrox_account_dock_card);

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Action Tile & Squircle Button (~90–95% Transparent Crystal) -->
+<!-- Zyrox Sakura Crystal Liquid Glass Home Studio Action Tile -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:state_pressed="true">
@@ -8,16 +8,16 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#46E4F3FF"
-                        android:centerColor="#26C4E2FF"
-                        android:endColor="#38D4ECFF" />
-                    <stroke android:width="1.25dp" android:color="#F4FFFFFF" />
-                    <corners android:radius="12.5dp" />
+                        android:startColor="#4EFFE4F2"
+                        android:centerColor="#30F49FC8"
+                        android:endColor="#42F9C0DD" />
+                    <stroke android:width="1.3dp" android:color="#F8FFF7FB" />
+                    <corners android:radius="13dp" />
                 </shape>
             </item>
-            <item android:left="9dp" android:top="3dp" android:right="9dp" android:height="1.5dp" android:gravity="top">
+            <item android:left="10dp" android:top="3dp" android:right="10dp" android:height="1.5dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#C0FFFFFF" android:endColor="#00FFFFFF" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#C8FFFFFF" android:endColor="#00FFFFFF" />
                     <corners android:radius="1dp" />
                 </shape>
             </item>
@@ -26,49 +26,38 @@
 
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#30F0F8FF" android:endColor="#20D4EAFF" />
-            <stroke android:width="1.6dp" android:color="#FFFFFFFF" />
-            <corners android:radius="12.5dp" />
+            <gradient android:angle="270" android:startColor="#3CFFEAF4" android:endColor="#28F8C4DF" />
+            <stroke android:width="1.5dp" android:color="#FFFFFAFD" />
+            <corners android:radius="13dp" />
         </shape>
     </item>
 
-    <!-- Default: Ultra-Sheer Liquid Glass Tile (Background Shines Vividly Right Through) -->
     <item>
         <layer-list>
+            <!-- Subtle plum glass base for crisp contrast over sunlit cherry blossoms -->
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.85dp" android:color="#26060B14" />
+                    <solid android:color="#28150C1E" />
+                    <stroke android:width="0.8dp" android:color="#34120918" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
-            <item android:left="0.8dp" android:top="0.8dp" android:right="0.8dp" android:bottom="0.8dp">
+            <!-- Iridescent sakura-pearl refractive sheen + bright bevel -->
+            <item android:left="0.7dp" android:top="0.7dp" android:right="0.7dp" android:bottom="0.7dp">
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#22F8FCFF"
-                        android:centerColor="#0CEAF4FF"
-                        android:endColor="#18DCEBF8" />
-                    <stroke android:width="1.1dp" android:color="#BCFFFFFF" />
-                    <corners android:radius="12.2dp" />
+                        android:startColor="#28FFF4FA"
+                        android:centerColor="#10FCE4F1"
+                        android:endColor="#1CF9D0E6" />
+                    <stroke android:width="1.05dp" android:color="#B4FFF0F8" />
+                    <corners android:radius="12.3dp" />
                 </shape>
             </item>
-            <item android:left="2.8dp" android:top="2.8dp" android:right="2.8dp" android:bottom="2.8dp">
+            <!-- Top liquid specular filament -->
+            <item android:left="11dp" android:top="2.8dp" android:right="11dp" android:height="1.3dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.65dp" android:color="#34F4FAFF" />
-                    <corners android:radius="10dp" />
-                </shape>
-            </item>
-            <item android:left="9dp" android:top="2.8dp" android:right="9dp" android:height="1.3dp" android:gravity="top">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#8AFFFFFF" android:endColor="#00FFFFFF" />
-                    <corners android:radius="1dp" />
-                </shape>
-            </item>
-            <item android:left="16dp" android:bottom="2.8dp" android:right="16dp" android:height="1.1dp" android:gravity="bottom">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00E4F6FF" android:centerColor="#46E8F8FF" android:endColor="#00E4F6FF" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#84FFFFFF" android:endColor="#00FFFFFF" />
                     <corners android:radius="1dp" />
                 </shape>
             </item>

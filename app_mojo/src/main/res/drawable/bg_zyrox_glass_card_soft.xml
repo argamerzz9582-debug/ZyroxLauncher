@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Feather-Sheer Liquid Glass Soft Sub-Card -->
+<!-- Zyrox Sakura Soft Inset Glass Card -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#2C0D1422"
-                android:endColor="#20090E18" />
+                android:startColor="#421A1025"
+                android:endColor="#32140B1D" />
             <corners android:radius="14dp" />
         </shape>
     </item>
@@ -14,10 +14,10 @@
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#16F8FCFF"
-                android:centerColor="#04FFFFFF"
-                android:endColor="#0CDCEBF8" />
-            <stroke android:width="0.95dp" android:color="#6AF2F8FF" />
+                android:startColor="#18FFF2F8"
+                android:centerColor="#05FFFFFF"
+                android:endColor="#0EFAD4E8" />
+            <stroke android:width="0.95dp" android:color="#78FCE8F3" />
             <corners android:radius="14dp" />
         </shape>
     </item>

@@ -1,23 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Floating Utility Capsule -->
+<!-- Zyrox Sakura Floating Capsule Pill (HUD Editor Toolbar & Quick Overlays) -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#2C0B111C" android:endColor="#20080D16" />
-            <corners android:radius="16dp" />
+            <gradient android:angle="270" android:startColor="#6C1A1025" android:endColor="#58140B1D" />
+            <corners android:radius="999dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#1EF8FCFF" android:centerColor="#08EAF4FF" android:endColor="#14DCEBF8" />
-            <stroke android:width="1.1dp" android:color="#A8F4FAFF" />
-            <corners android:radius="16dp" />
-        </shape>
-    </item>
-    <item android:left="14dp" android:top="2.2dp" android:right="14dp" android:height="1.3dp" android:gravity="top">
-        <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#82FFFFFF" android:endColor="#00FFFFFF" />
-            <corners android:radius="1dp" />
+            <gradient android:angle="270" android:startColor="#22FFF2F8" android:centerColor="#08FCE6F2" android:endColor="#16FAD4E8" />
+            <stroke android:width="1.1dp" android:color="#B8FFEAF5" />
+            <corners android:radius="999dp" />
         </shape>
     </item>
 </layer-list>

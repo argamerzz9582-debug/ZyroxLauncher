@@ -21,8 +21,8 @@ public class MineEditText extends androidx.appcompat.widget.AppCompatEditText {
 
 	public void init() {
 		setBackground(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_input, getContext().getTheme()));
-		setTextColor(Color.parseColor("#FFF7ED"));
-		setHintTextColor(Color.parseColor("#78716C"));
+		setTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.zyrox_text_primary));
+		setHintTextColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.zyrox_text_muted));
 		int padH = Math.round(12f * getResources().getDisplayMetrics().density);
 		int padV = Math.round(8f * getResources().getDisplayMetrics().density);
 		setPadding(padH, padV, padH, padV);

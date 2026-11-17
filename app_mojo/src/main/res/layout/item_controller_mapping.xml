@@ -28,7 +28,8 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:srcCompat="@drawable/button_a"
-            tools:ignore="ContentDescription" />
+            tools:ignore="ContentDescription" 
+            android:importantForAccessibility="no"/>
 
         <TextView
             android:id="@+id/controller_mapper_keycode_label"

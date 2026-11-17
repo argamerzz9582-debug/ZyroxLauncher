@@ -36,7 +36,15 @@ public class DownloadCenterFragment extends Fragment implements DownloadQueueMan
     private TextView mSystemHeader;
     private Button mBtnPauseResume;
     private LinearLayout mListContainer;
-    private long mLastUiUpdateMs = 0L;
+    private final android.os.Handler mUiHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.concurrent.atomic.AtomicBoolean mUpdateScheduled =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    private volatile long mLastUiUpdateMs = 0L;
+    private final Runnable mCoalescedRender = () -> {
+        mUpdateScheduled.set(false);
+        mLastUiUpdateMs = android.os.SystemClock.uptimeMillis();
+        if (isAdded()) renderQueue();
+    };
 
     @Nullable
     @Override
@@ -104,17 +112,17 @@ public class DownloadCenterFragment extends Fragment implements DownloadQueueMan
     @Override
     public void onStop() {
         DownloadQueueManager.getInstance().removeListener(this);
+        mUiHandler.removeCallbacks(mCoalescedRender);
+        mUpdateScheduled.set(false);
         super.onStop();
     }
 
     @Override
     public void onQueueUpdated() {
-        long now = System.currentTimeMillis();
-        if (now - mLastUiUpdateMs < 220L) return;
-        mLastUiUpdateMs = now;
-        Tools.runOnUiThread(() -> {
-            if (isAdded()) renderQueue();
-        });
+        if (!mUpdateScheduled.compareAndSet(false, true)) return;
+        long elapsed = android.os.SystemClock.uptimeMillis() - mLastUiUpdateMs;
+        long delayMs = elapsed >= 200L ? 0L : (200L - elapsed);
+        mUiHandler.postDelayed(mCoalescedRender, delayMs);
     }
 
     private void renderQueue() {
@@ -122,7 +130,7 @@ public class DownloadCenterFragment extends Fragment implements DownloadQueueMan
         if (ctx == null) return;
         DownloadQueueManager mgr = DownloadQueueManager.getInstance();
         mBtnPauseResume.setText(mgr.isPaused() ? "Resume Queue" : "Pause Queue");
-        mBtnPauseResume.setEnabled(mgr.getActiveCount() > 0);
+        mBtnPauseResume.setEnabled(mgr.isPaused() || mgr.getActiveCount() > 0);
 
         NetworkPolicyHelper.ConnectionType net = NetworkPolicyHelper.detectConnection(ctx);
         long freeBytes = NetworkPolicyHelper.queryFreeDiskBytes(new File(Tools.DIR_GAME_HOME));

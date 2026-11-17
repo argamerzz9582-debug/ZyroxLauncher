@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Luminous Sakura Rose-Pearl Horizon Divider -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <gradient
         android:angle="0"
-        android:startColor="#00FFFFFF"
-        android:centerColor="#B8F6FBFF"
-        android:endColor="#00FFFFFF" />
+        android:startColor="#00FBD4E8"
+        android:centerColor="#DCFCE0F0"
+        android:endColor="#00FBD4E8" />
     <corners android:radius="2dp" />
 </shape>

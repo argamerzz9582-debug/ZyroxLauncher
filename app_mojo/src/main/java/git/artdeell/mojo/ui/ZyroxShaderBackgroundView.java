@@ -58,7 +58,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     }
 
     private void init(@NonNull Context context) {
-        setBackgroundColor(Color.parseColor("#0B0910"));
+        setBackgroundColor(Color.parseColor("#130C1A"));
         setClipChildren(true);
         setClipToPadding(false);
         setPadding(0, 0, 0, 0);

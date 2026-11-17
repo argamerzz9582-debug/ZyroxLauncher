@@ -38,13 +38,13 @@ public class ZyroxGridOverlayView extends View {
         float density = context.getResources().getDisplayMetrics().density;
         mStepPx = Math.max(16f, 24f * density);
 
-        mMinorPaint.setColor(0x10F4FAFF);
+        mMinorPaint.setColor(0x14FCEAF4);
         mMinorPaint.setStrokeWidth(1f);
 
-        mMajorPaint.setColor(0x26D8EEFF);
+        mMajorPaint.setColor(0x2CF9CEE5);
         mMajorPaint.setStrokeWidth(Math.max(1f, 1.05f * density));
 
-        mCenterPaint.setColor(0x62F0F8FF);
+        mCenterPaint.setColor(0x6CFFE2F1);
         mCenterPaint.setStrokeWidth(Math.max(1.2f, 1.35f * density));
         mCenterPaint.setPathEffect(new DashPathEffect(new float[]{6f * density, 4f * density}, 0f));
 

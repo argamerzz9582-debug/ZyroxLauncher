@@ -1,77 +1,81 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Zyrox Global Design Tokens — Ultra-Clear Optical Liquid Glass System -->
-    <color name="zyrox_bg_base">#080B11</color>
-    <color name="zyrox_bg_overlay">#66080B11</color>
-    <color name="zyrox_overlay_dim">#22070A10</color>
-    <color name="zyrox_vignette_outer">#4C06090F</color>
-    <color name="zyrox_vignette_mid">#18070A10</color>
-    <color name="zyrox_vignette_inner">#00070A10</color>
+    <!-- Zyrox Global Design Tokens — Sakura Bloom × Ultra-Clear Optical Liquid Glass System -->
+    <color name="zyrox_bg_base">#130C1A</color>
+    <color name="zyrox_bg_overlay">#6C140C1C</color>
+    <color name="zyrox_overlay_dim">#28120A1A</color>
+    <color name="zyrox_vignette_outer">#52110918</color>
+    <color name="zyrox_vignette_mid">#1A120A19</color>
+    <color name="zyrox_vignette_inner">#00120A19</color>
 
-    <!-- Ultra-Sheer Optical Crystal Glass Surfaces -->
-    <color name="zyrox_glass_dock">#200A0F18</color>
-    <color name="zyrox_glass_primary">#340C121D</color>
-    <color name="zyrox_glass_elevated">#8C0B111C</color>
-    <color name="zyrox_glass_card">#22F0F7FF</color>
-    <color name="zyrox_glass_card_hover">#3CD8ECFF</color>
-    <color name="zyrox_glass_input">#1CF0F7FF</color>
-    <color name="zyrox_glass_subpanel">#1C0A0F18</color>
-    <color name="zyrox_glass_specular">#30FFFFFF</color>
-    <color name="zyrox_glass_border">#4CF0F7FF</color>
-    <color name="zyrox_glass_border_mid">#8AF4FAFF</color>
-    <color name="zyrox_glass_border_strong">#DCF8FCFF</color>
-    <color name="zyrox_divider">#34ECF4FC</color>
+    <!-- Ultra-Sheer Sakura Twilight Crystal Glass Surfaces -->
+    <color name="zyrox_glass_dock">#2C160E20</color>
+    <color name="zyrox_glass_primary">#401A1126</color>
+    <color name="zyrox_glass_elevated">#94191024</color>
+    <color name="zyrox_glass_card">#24FFF0F7</color>
+    <color name="zyrox_glass_card_hover">#40FAD4E8</color>
+    <color name="zyrox_glass_input">#20FFF2F8</color>
+    <color name="zyrox_glass_subpanel">#26160E20</color>
+    <color name="zyrox_glass_specular">#34FFF7FB</color>
+    <color name="zyrox_glass_border">#56FCE8F3</color>
+    <color name="zyrox_glass_border_mid">#96FFF0F8</color>
+    <color name="zyrox_glass_border_strong">#E4FFF7FB</color>
+    <color name="zyrox_divider">#3CFCE6F2</color>
 
-    <!-- Signature Ultra-Clear Water-Droplet Liquid Glass Button Tokens -->
-    <color name="zyrox_lg_text">#FAFCFF</color>
-    <color name="zyrox_lg_text_muted">#E0E9F4</color>
-    <color name="zyrox_lg_rim">#D8FFFFFF</color>
-    <color name="zyrox_lg_inner_rim">#48F6FBFF</color>
-    <color name="zyrox_lg_fill">#1AF2F8FF</color>
-    <color name="zyrox_lg_pressed">#3EE0F1FF</color>
-    <color name="zyrox_lg_ice_accent">#D4E8FC</color>
-    <color name="zyrox_lg_shadow">#7C060B14</color>
+    <!-- Signature Ultra-Clear Sakura Rose-Quartz Liquid Glass Button Tokens -->
+    <color name="zyrox_lg_text">#FFFAFD</color>
+    <color name="zyrox_lg_text_muted">#F8E6F1</color>
+    <color name="zyrox_lg_rim">#E0FFF7FB</color>
+    <color name="zyrox_lg_inner_rim">#52FFEBF5</color>
+    <color name="zyrox_lg_fill">#1EFFF2F8</color>
+    <color name="zyrox_lg_pressed">#44FAD2E7</color>
+    <color name="zyrox_lg_ice_accent">#F9CEE4</color>
+    <color name="zyrox_lg_shadow">#96120918</color>
 
-    <!-- Preserved Accent & Semantic Tokens (Crystal Frost Palette) -->
-    <color name="zyrox_amber">#F2F8FF</color>
-    <color name="zyrox_amber_bright">#D6EAFF</color>
-    <color name="zyrox_amber_hover">#FFFFFF</color>
-    <color name="zyrox_amber_deep">#9CB8D4</color>
-    <color name="zyrox_amber_stroke">#FAFCFF</color>
-    <color name="zyrox_amber_glow">#4CCCE4FC</color>
-    <color name="zyrox_amber_tint">#28D2E8FC</color>
-    <color name="zyrox_amber_badge_bg">#24D8ECFF</color>
+    <!-- Signature Sakura Blossom & Wisteria Accent Tokens (preserving token names across layouts) -->
+    <color name="zyrox_sakura">#FAD4E8</color>
+    <color name="zyrox_sakura_bright">#F5A6CD</color>
+    <color name="zyrox_sakura_rose">#EB7FB4</color>
+    <color name="zyrox_sakura_mist">#EBDCF8</color>
+    <color name="zyrox_amber">#FBD8EB</color>
+    <color name="zyrox_amber_bright">#F5A8CE</color>
+    <color name="zyrox_amber_hover">#FFFAFD</color>
+    <color name="zyrox_amber_deep">#D982AE</color>
+    <color name="zyrox_amber_stroke">#FFF7FB</color>
+    <color name="zyrox_amber_glow">#56F7B8D8</color>
+    <color name="zyrox_amber_tint">#2EF8C4DF</color>
+    <color name="zyrox_amber_badge_bg">#2AF9CAE2</color>
 
-    <!-- High-Clarity Crystal Text Hierarchy -->
-    <color name="zyrox_text_primary">#FAFCFF</color>
-    <color name="zyrox_text_secondary">#EBF2FA</color>
-    <color name="zyrox_text_subtle">#CED9E6</color>
-    <color name="zyrox_text_muted">#A4B4C6</color>
+    <!-- High-Clarity Sakura Pearl Text Hierarchy -->
+    <color name="zyrox_text_primary">#FFFAFD</color>
+    <color name="zyrox_text_secondary">#F7E8F2</color>
+    <color name="zyrox_text_subtle">#E4CFDE</color>
+    <color name="zyrox_text_muted">#C4A8BE</color>
 
     <!-- Terminal & Semantic Status -->
-    <color name="zyrox_terminal_bg">#070A10</color>
-    <color name="zyrox_terminal_glass">#A8070A10</color>
-    <color name="zyrox_danger">#FCA5A5</color>
-    <color name="zyrox_danger_tint">#24EF4444</color>
-    <color name="zyrox_danger_pressed">#42EF4444</color>
+    <color name="zyrox_terminal_bg">#0F0916</color>
+    <color name="zyrox_terminal_glass">#B20F0916</color>
+    <color name="zyrox_danger">#FDA4AF</color>
+    <color name="zyrox_danger_tint">#26F43F5E</color>
+    <color name="zyrox_danger_pressed">#44F43F5E</color>
     <color name="zyrox_success">#86EFAC</color>
-    <color name="zyrox_success_tint">#2422C55E</color>
+    <color name="zyrox_success_tint">#2622C55E</color>
     <color name="zyrox_warning">#FDE68A</color>
-    <color name="zyrox_info">#BAE6FD</color>
+    <color name="zyrox_info">#F9C6E0</color>
 
-    <!-- Legacy MojoLauncher Color Mappings (Ultra-Clear Liquid Glass) -->
-    <color name="control_button_color">#14F0F7FF</color>
-    <color name="control_button_pressed_color">#3CE2F2FF</color>
+    <!-- Legacy Component Color Mappings (Sakura Crystal Liquid Glass) -->
+    <color name="control_button_color">#14FFF2F8</color>
+    <color name="control_button_pressed_color">#3EFAD4E8</color>
 
-    <color name="minebutton_color">#FAFCFF</color>
-    <color name="minebutton_secondary">#24EAF4FF</color>
-    <color name="background_app">#080B11</color>
+    <color name="minebutton_color">#FFFAFD</color>
+    <color name="minebutton_secondary">#28FCE4F1</color>
+    <color name="background_app">#130C1A</color>
     <color name="divider">@color/zyrox_divider</color>
-    <color name="background_overlay">#700A0F18</color>
+    <color name="background_overlay">#78150D1E</color>
     <color name="background_status_bar">#00000000</color>
-    <color name="background_bottom_bar">#4C0A0F18</color>
-    <color name="icon_outline_color">#FAFCFF</color>
+    <color name="background_bottom_bar">#54150D1E</color>
+    <color name="icon_outline_color">#FFFAFD</color>
 
-    <color name="primary_text">#FAFCFF</color>
-    <color name="secondary_text">#EBF2FA</color>
+    <color name="primary_text">#FFFAFD</color>
+    <color name="secondary_text">#F7E8F2</color>
 </resources>

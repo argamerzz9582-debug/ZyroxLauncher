@@ -342,7 +342,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         launcherGLView = findViewById(R.id.main_game_render_view);
         drawerLayout = findViewById(R.id.main_drawer_options);
         if (drawerLayout != null) {
-            drawerLayout.setScrimColor(0x2E04070D);
+            drawerLayout.setScrimColor(0x34120919);
         }
         navDrawer = findViewById(R.id.main_navigation_view);
         loggerView = findViewById(R.id.mainLoggerView);

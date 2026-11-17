@@ -2,8 +2,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- Global Zyrox 2.0 Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
-    <string name="zyrox_brand_subtitle">LAUNCHER 2.0</string>
-    <string name="zyrox_engine_watermark">ZYROX ENGINE v2.0.1</string>
+    <string name="zyrox_brand_subtitle">SAKURA  •  LAUNCHER</string>
+    <string name="zyrox_engine_watermark">ZYROX SAKURA v2.1.0</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
@@ -99,8 +99,8 @@
     <string name="zyrox_cat_misc">MISCELLANEOUS</string>
     <string name="zyrox_cat_experimental">EXPERIMENTAL</string>
     <string name="zyrox_cat_security">SECURITY &amp; GPU</string>
-    <string name="zyrox_pref_animated_bg_title">Animated shader background</string>
-    <string name="zyrox_pref_animated_bg_summary">Enable live Minecraft shader backdrop motion or custom zyrox_bg.mp4 loop.</string>
+    <string name="zyrox_pref_animated_bg_title">Animated Sakura backdrop</string>
+    <string name="zyrox_pref_animated_bg_summary">Play the seamless Cherry Blossom lakeside scene or your custom zyrox_bg.mp4 loop.</string>
     <string name="zyrox_pref_reduced_motion_title">Reduced motion</string>
     <string name="zyrox_pref_reduced_motion_summary">Disable launcher transition animations, parallax movement, and button spring motion.</string>
     <string name="zyrox_pref_low_effects_title">Low visual effects mode</string>
@@ -111,9 +111,9 @@
     <string name="zyrox_pref_warn_mobile_summary">Notify before running large version, asset, or modpack downloads over cellular data.</string>
     <string name="zyrox_toggle_perf_hud">Toggle Performance HUD</string>
     <string name="zyrox_pref_select_bg_video_title">Custom background video (.mp4)</string>
-    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or reset to built-in scene.</string>
-    <string name="zyrox_pref_reset_bg_video_title">Reset shader wallpaper</string>
-    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox golden-hour Minecraft shader canvas.</string>
+    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or reset to Sakura scene.</string>
+    <string name="zyrox_pref_reset_bg_video_title">Reset Sakura backdrop</string>
+    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Cherry Blossom lakeside animated scene.</string>
     <string name="zyrox_ram_status_fmt">Allocated: %1$d MB  •  Free: %2$d MB / %3$d MB Total</string>
 
     <!-- Account & Skin Vault -->

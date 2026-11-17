@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Sakura Rose-Pearl SeekBar Thumb -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="oval">
-            <size android:width="18dp" android:height="18dp" />
-            <solid android:color="#FFFAFCFF" />
-            <stroke android:width="2.2dp" android:color="#C9D7E4" />
+            <size android:width="20dp" android:height="20dp" />
+            <gradient android:angle="270" android:startColor="#FFFFFAFD" android:endColor="#FFF7BBD9" />
+            <stroke android:width="1.5dp" android:color="#FFFFFFFF" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
-            <size android:width="16dp" android:height="16dp" />
-            <solid android:color="#E6EEF8" />
-            <stroke android:width="1.8dp" android:color="#FFFAFCFF" />
+            <size android:width="18dp" android:height="18dp" />
+            <gradient android:angle="270" android:startColor="#FFFFFAFD" android:endColor="#FFFAD8EA" />
+            <stroke android:width="1.1dp" android:color="#FFF5A8CE" />
         </shape>
     </item>
 </selector>

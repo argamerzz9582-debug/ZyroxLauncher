@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Zyrox Launcher Master Theme (dark obsidian glass + warm amber steampunk) -->
+    <!-- Zyrox Launcher Master Theme — Sakura Bloom × Crystal Liquid Glass -->
     <style name="MojoLauncher" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
@@ -10,8 +10,8 @@
         <item name="colorBackgroundFloating">@color/zyrox_glass_elevated</item>
         <item name="colorPrimary">@color/zyrox_amber_bright</item>
         <item name="colorPrimaryDark">@color/zyrox_bg_base</item>
-        <item name="colorAccent">@color/zyrox_amber</item>
-        <item name="colorControlActivated">@color/zyrox_amber</item>
+        <item name="colorAccent">@color/zyrox_amber_bright</item>
+        <item name="colorControlActivated">@color/zyrox_amber_bright</item>
         <item name="colorControlHighlight">@color/zyrox_amber_tint</item>
         <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
         <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
@@ -22,6 +22,8 @@
         <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
         <item name="alertDialogTheme">@style/Zyrox.AlertDialog</item>
         <item name="android:alertDialogTheme">@style/Zyrox.AlertDialog</item>
+        <item name="android:popupMenuStyle">@style/Zyrox.PopupMenu</item>
+        <item name="popupMenuStyle">@style/Zyrox.PopupMenu</item>
         <item name="android:textSize">13sp</item>
         <item name="dialogCornerRadius">18dp</item>
         <item name="android:seekBarStyle">@style/MojoLauncher.SeekBar</item>
@@ -34,8 +36,12 @@
 
     <style name="MojoLauncher.AppTheme" parent="MojoLauncher" />
 
+    <style name="Zyrox.PopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_zyrox_glass_modal</item>
+    </style>
+
     <style name="Zyrox.AlertDialog" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="colorAccent">@color/zyrox_amber</item>
+        <item name="colorAccent">@color/zyrox_amber_bright</item>
         <item name="colorPrimary">@color/zyrox_amber_bright</item>
         <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
         <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
@@ -46,7 +52,7 @@
 
     <style name="Zyrox.DialogActivity" parent="Theme.AppCompat.Dialog">
         <item name="windowNoTitle">true</item>
-        <item name="colorAccent">@color/zyrox_amber</item>
+        <item name="colorAccent">@color/zyrox_amber_bright</item>
         <item name="colorPrimary">@color/zyrox_amber_bright</item>
         <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
         <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
@@ -66,7 +72,7 @@
     <style name="MojoLauncher.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
         <item name="track">@drawable/bg_zyrox_switch_track</item>
         <item name="android:thumb">@drawable/bg_zyrox_switch_thumb</item>
-        <item name="switchMinWidth">42dp</item>
+        <item name="switchMinWidth">44dp</item>
         <item name="showText">false</item>
     </style>
 
@@ -76,11 +82,11 @@
         <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
         <item name="android:shadowDx">0</item>
         <item name="android:shadowDy">1</item>
-        <item name="android:shadowRadius">3</item>
+        <item name="android:shadowRadius">3.5</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:fontFamily">@font/noto_sans_bold</item>
         <item name="fontFamily">@font/noto_sans_bold</item>
-        <item name="android:letterSpacing">0.03</item>
+        <item name="android:letterSpacing">0.035</item>
         <item name="android:textSize">11.5sp</item>
         <item name="android:textAllCaps">true</item>
     </style>
@@ -92,27 +98,31 @@
 
     <!-- Zyrox Typography & Component Styles -->
     <style name="Zyrox.SectionLabel" parent="Widget.AppCompat.TextView">
-        <item name="android:textColor">@color/zyrox_lg_text_muted</item>
-        <item name="android:textSize">10sp</item>
-        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:textSize">9.5sp</item>
+        <item name="android:letterSpacing">0.10</item>
         <item name="android:textAllCaps">true</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">3</item>
         <item name="android:fontFamily">@font/noto_sans_bold</item>
         <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="Zyrox.NavItem" parent="Widget.AppCompat.Button">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">34dp</item>
+        <item name="android:layout_height">35dp</item>
         <item name="android:background">@drawable/bg_zyrox_nav_item</item>
         <item name="android:gravity">start|center_vertical</item>
         <item name="android:paddingStart">10dp</item>
         <item name="android:paddingEnd">10dp</item>
-        <item name="android:drawablePadding">10dp</item>
+        <item name="android:drawablePadding">9dp</item>
         <item name="android:textColor">@color/zyrox_lg_text</item>
         <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
         <item name="android:shadowDx">0</item>
         <item name="android:shadowDy">1</item>
-        <item name="android:shadowRadius">3</item>
+        <item name="android:shadowRadius">3.5</item>
         <item name="android:textSize">10.5sp</item>
         <item name="android:letterSpacing">0.04</item>
         <item name="android:textAllCaps">true</item>
@@ -131,13 +141,17 @@
         <item name="android:layout_marginEnd">6dp</item>
         <item name="android:background">@drawable/bg_zyrox_chip</item>
         <item name="android:textColor">@color/zyrox_chip_text</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2.5</item>
         <item name="android:textSize">10sp</item>
         <item name="android:letterSpacing">0.05</item>
         <item name="android:singleLine">true</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="Zyrox.HudPillAction" parent="Widget.AppCompat.TextView">
@@ -148,13 +162,17 @@
         <item name="android:paddingEnd">10dp</item>
         <item name="android:background">@drawable/bg_zyrox_nav_item</item>
         <item name="android:textColor">@color/zyrox_text_primary</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">2.5</item>
         <item name="android:textSize">10sp</item>
         <item name="android:letterSpacing">0.05</item>
         <item name="android:singleLine">true</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="LauncherFragment_Divider">
@@ -166,9 +184,13 @@
     <style name="LauncherMenuButton" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/bg_zyrox_action_tile</item>
         <item name="android:textColor">@color/zyrox_text_primary</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">3</item>
         <item name="android:stateListAnimator">@null</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="LauncherMenuButton.Universal" parent="LauncherMenuButton">

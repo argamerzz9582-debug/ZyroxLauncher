@@ -21,7 +21,8 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        tools:src="@drawable/ic_mojo_full" />
+        tools:src="@drawable/ic_mojo_full" 
+            android:importantForAccessibility="no"/>
 
     <!-- Right: Compact Glowing Amber INSTALL Button -->
     <androidx.appcompat.widget.AppCompatButton
@@ -87,7 +88,8 @@
                 android:layout_width="12dp"
                 android:layout_height="12dp"
                 android:scaleType="fitCenter"
-                tools:src="@drawable/ic_modrinth" />
+                tools:src="@drawable/ic_modrinth" 
+            android:importantForAccessibility="no"/>
 
             <TextView
                 android:id="@+id/mod_downloads_badge"

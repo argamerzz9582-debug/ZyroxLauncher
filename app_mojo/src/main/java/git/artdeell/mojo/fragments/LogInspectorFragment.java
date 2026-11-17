@@ -112,7 +112,13 @@ public class LogInspectorFragment extends Fragment {
                 mLogContentView.setText(highlighted);
                 applyBadge(hasCrash);
                 bindGuardBanner(diagnosis);
-                mTerminalScroll.post(() -> mTerminalScroll.fullScroll(View.FOCUS_DOWN));
+                if (mTerminalScroll != null) {
+                    mTerminalScroll.post(() -> {
+                        if (isAdded() && mTerminalScroll != null) {
+                            mTerminalScroll.fullScroll(View.FOCUS_DOWN);
+                        }
+                    });
+                }
             });
         });
     }

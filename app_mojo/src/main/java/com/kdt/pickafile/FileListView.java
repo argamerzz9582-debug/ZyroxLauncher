@@ -111,6 +111,7 @@ public class FileListView extends LinearLayout
     }
 
     public void listFileAt(final File path) {
+        if (path == null) return;
         try{
             if(path.exists()){
                 if(path.isDirectory()){
