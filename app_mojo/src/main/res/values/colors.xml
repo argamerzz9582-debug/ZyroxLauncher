@@ -1,64 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Zyrox Global Design Tokens -->
-    <color name="zyrox_bg_base">#0D0B0A</color>
-    <color name="zyrox_bg_overlay">#CC0D0B0A</color>
-    <color name="zyrox_overlay_dim">#8C0A0807</color>
-    <color name="zyrox_vignette_outer">#B30A0807</color>
-    <color name="zyrox_vignette_mid">#730A0807</color>
-    <color name="zyrox_vignette_inner">#330A0807</color>
+    <!-- Zyrox Global Design Tokens — Ultra-Transparent Luminous Crystal Glass -->
+    <color name="zyrox_bg_base">#0D0A08</color>
+    <color name="zyrox_bg_overlay">#800D0A08</color>
+    <color name="zyrox_overlay_dim">#330A0807</color>
+    <color name="zyrox_vignette_outer">#6B090706</color>
+    <color name="zyrox_vignette_mid">#240A0807</color>
+    <color name="zyrox_vignette_inner">#050A0807</color>
 
-    <!-- Frosted Obsidian Glass Surfaces -->
-    <color name="zyrox_glass_dock">#D90E0B0A</color>
-    <color name="zyrox_glass_primary">#D9120E0C</color>
-    <color name="zyrox_glass_elevated">#EB14100E</color>
-    <color name="zyrox_glass_card">#99171210</color>
-    <color name="zyrox_glass_card_hover">#BF1E1714</color>
-    <color name="zyrox_glass_input">#B3171210</color>
-    <color name="zyrox_glass_subpanel">#800D0B0A</color>
-    <color name="zyrox_glass_border">#33FF8C42</color>
-    <color name="zyrox_glass_border_mid">#59FF8C42</color>
-    <color name="zyrox_glass_border_strong">#99FF8C42</color>
-    <color name="zyrox_divider">#26FF8C42</color>
+    <!-- Optical Crystal Glass Surfaces (True Live-Shader Transparency) -->
+    <color name="zyrox_glass_dock">#280D0A08</color>
+    <color name="zyrox_glass_primary">#48120D0A</color>
+    <color name="zyrox_glass_elevated">#D6140F0C</color>
+    <color name="zyrox_glass_card">#2B140F0C</color>
+    <color name="zyrox_glass_card_hover">#52221710</color>
+    <color name="zyrox_glass_input">#2E120D0A</color>
+    <color name="zyrox_glass_subpanel">#240D0A08</color>
+    <color name="zyrox_glass_specular">#18FFF9F2</color>
+    <color name="zyrox_glass_border">#3BFFB874</color>
+    <color name="zyrox_glass_border_mid">#61FFB874</color>
+    <color name="zyrox_glass_border_strong">#B8FFC482</color>
+    <color name="zyrox_divider">#2BFFB874</color>
 
-    <!-- Warm Amber / Steampunk Orange Accents -->
-    <color name="zyrox_amber">#FF8C42</color>
+    <!-- Warm Golden-Amber & Champagne Accents -->
+    <color name="zyrox_amber">#FFA154</color>
     <color name="zyrox_amber_bright">#F97316</color>
-    <color name="zyrox_amber_hover">#FB923C</color>
+    <color name="zyrox_amber_hover">#FFB36B</color>
     <color name="zyrox_amber_deep">#C2410C</color>
-    <color name="zyrox_amber_stroke">#FDBA74</color>
-    <color name="zyrox_amber_glow">#55F97316</color>
-    <color name="zyrox_amber_tint">#29FF8C42</color>
-    <color name="zyrox_amber_badge_bg">#2EFF8C42</color>
+    <color name="zyrox_amber_stroke">#FFD29D</color>
+    <color name="zyrox_amber_glow">#55FF9234</color>
+    <color name="zyrox_amber_tint">#30FF9442</color>
+    <color name="zyrox_amber_badge_bg">#26FF9442</color>
 
-    <!-- Text Hierarchy -->
-    <color name="zyrox_text_primary">#FFF7ED</color>
-    <color name="zyrox_text_secondary">#D6D3D1</color>
-    <color name="zyrox_text_subtle">#A8A29E</color>
-    <color name="zyrox_text_muted">#78716C</color>
+    <!-- High-Clarity Crystal Text Hierarchy (crisp over translucent live backgrounds) -->
+    <color name="zyrox_text_primary">#FFF9F2</color>
+    <color name="zyrox_text_secondary">#F0E9E2</color>
+    <color name="zyrox_text_subtle">#D4CBC2</color>
+    <color name="zyrox_text_muted">#ADA298</color>
 
     <!-- Terminal & Status -->
     <color name="zyrox_terminal_bg">#090706</color>
-    <color name="zyrox_terminal_glass">#EB090706</color>
-    <color name="zyrox_danger">#EF4444</color>
-    <color name="zyrox_danger_tint">#24EF4444</color>
-    <color name="zyrox_danger_pressed">#47EF4444</color>
-    <color name="zyrox_success">#22C55E</color>
+    <color name="zyrox_terminal_glass">#C7090706</color>
+    <color name="zyrox_danger">#F87171</color>
+    <color name="zyrox_danger_tint">#26EF4444</color>
+    <color name="zyrox_danger_pressed">#4AEF4444</color>
+    <color name="zyrox_success">#4ADE80</color>
     <color name="zyrox_success_tint">#2622C55E</color>
 
-    <!-- Legacy MojoLauncher Color Mappings (themed to Zyrox) -->
-    <color name="control_button_color">#73120E0C</color>
-    <color name="control_button_pressed_color">#8CF97316</color>
+    <!-- Legacy MojoLauncher Color Mappings (themed to Zyrox Crystal Glass) -->
+    <color name="control_button_color">#4D120D0A</color>
+    <color name="control_button_pressed_color">#80F97316</color>
 
-    <color name="minebutton_color">#FF8C42</color>
-    <color name="minebutton_secondary">#2C221D</color>
-    <color name="background_app">#0D0B0A</color>
+    <color name="minebutton_color">#FFA154</color>
+    <color name="minebutton_secondary">#33221A15</color>
+    <color name="background_app">#0D0A08</color>
     <color name="divider">@color/zyrox_divider</color>
-    <color name="background_overlay">#D9120E0C</color>
-    <color name="background_status_bar">#0D0B0A</color>
-    <color name="background_bottom_bar">#EB120E0C</color>
-    <color name="icon_outline_color">#FFF7ED</color>
+    <color name="background_overlay">#8C120D0A</color>
+    <color name="background_status_bar">#00000000</color>
+    <color name="background_bottom_bar">#66120D0A</color>
+    <color name="icon_outline_color">#FFF9F2</color>
 
-    <color name="primary_text">#FFF7ED</color>
-    <color name="secondary_text">#D6D3D1</color>
+    <color name="primary_text">#FFF9F2</color>
+    <color name="secondary_text">#F0E9E2</color>
 </resources>

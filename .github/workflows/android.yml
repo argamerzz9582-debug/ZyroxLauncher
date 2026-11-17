@@ -392,16 +392,22 @@ jobs:
         if: github.ref_name == 'v3_openjdk'
         uses: softprops/action-gh-release@v2
         with:
-          name: Zyrox Launcher v1.0.1 (Signed Production Release)
-          tag_name: v1.0.1
+          name: Zyrox Launcher v1.0.2 (Fullscreen Crystal Glass Release)
+          tag_name: v1.0.2
           make_latest: true
           body: |
-            ## Zyrox Launcher v1.0.1 — Signed & Security-Hardened Release
+            ## Zyrox Launcher v1.0.2 — Edge-to-Edge Fullscreen & Crystal Glass UI Release
+
+            ### What's New in v1.0.2
+            - **100% True Edge-to-Edge Fullscreen**: Zero black bars on top status bar or left/right camera display cutouts across Android 9–16 (`targetSdk 36`), with dynamic 180° landscape punch-hole safe spacing
+            - **Full-Screen Live Shader Animation**: VSYNC-smooth golden-hour Minecraft shader scene, overscan custom `.mp4` loop support, volumetric sunbeams, and multi-depth bokeh/fireflies spanning 100% of the screen
+            - **Ultra-Transparent Crystal Glass UI**: Translucent optical-glass right control panel, luminous translucent amber-glass `PLAY` button, crystal account/instance/updates cards, and symmetrical 2x3 action tile grid showing all features at once
+            - **Seamless In-Place Update**: Signed with the same persistent RSA-4096 publisher certificate as `v1.0.1` — install directly without losing saved accounts or instances
 
             ### Direct APK Downloads
-            - **[Download ZyroxLauncher-full-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.1/ZyroxLauncher-full-release.apk)** — Full install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
-            - **[Download ZyroxLauncher-noruntime-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.1/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
-            - **[Download ZyroxLauncher-full-release.aab](https://github.com/${{ github.repository }}/releases/download/v1.0.1/ZyroxLauncher-full-release.aab)** — Signed Android App Bundle for Google Play Console
+            - **[Download ZyroxLauncher-full-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.2/ZyroxLauncher-full-release.apk)** — Full install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
+            - **[Download ZyroxLauncher-noruntime-release.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.2/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
+            - **[Download ZyroxLauncher-full-release.aab](https://github.com/${{ github.repository }}/releases/download/v1.0.2/ZyroxLauncher-full-release.aab)** — Signed Android App Bundle for Google Play Console
 
             ### Security & Verification Summary
             - **Package ID**: `com.zyrox.launcher` (`targetSdk 36`, `debuggable=false`, `testOnly=false`)

@@ -129,6 +129,8 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
         setBackground(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_input, getContext().getTheme()));
         setPopupBackgroundDrawable(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_glass_modal, getContext().getTheme()));
+        mLoginBarPaint.setAntiAlias(true);
+        mLoginBarPaint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
         mLoginBarPaint.setColor(getResources().getColor(R.color.zyrox_amber));
         mLoginBarPaint.setStrokeWidth(Math.max(2f, 2f * getResources().getDisplayMetrics().density));
         mLoginStepAnimator.addUpdateListener(this);
@@ -194,9 +196,15 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
-        float bottom = getHeight() - mLoginBarPaint.getStrokeWidth()/2;
-        float lineFillPercent = (mLoginStep / mMaxSteps);
-        canvas.drawLine(0, bottom, lineFillPercent * getWidth(), bottom, mLoginBarPaint);
+        // Only render sleek inset progress line while actively authenticating (keeps crystal glass rim clean at rest)
+        if (mMaxSteps > 0 && mLoginStep > 0f && mLoginStep < mMaxSteps) {
+            float density = getResources().getDisplayMetrics().density;
+            float inset = 12f * density;
+            float usableWidth = Math.max(0f, getWidth() - inset * 2f);
+            float bottom = getHeight() - mLoginBarPaint.getStrokeWidth();
+            float lineFillPercent = Math.max(0f, Math.min(1f, mLoginStep / mMaxSteps));
+            canvas.drawLine(inset, bottom, inset + lineFillPercent * usableWidth, bottom, mLoginBarPaint);
+        }
     }
 
     @Override

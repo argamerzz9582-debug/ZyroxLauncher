@@ -3,14 +3,14 @@
     <!-- Global Zyrox Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0</string>
+    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0.2</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
     <!-- Navigation Stack (Home Hub) -->
-    <string name="zyrox_nav_modpacks">MODPACKS &amp; MODS</string>
+    <string name="zyrox_nav_modpacks">MODPACKS</string>
     <string name="zyrox_nav_instances">INSTANCES</string>
-    <string name="zyrox_nav_install_jar">INSTALL .JAR</string>
+    <string name="zyrox_nav_install_jar">INSTALL JAR</string>
     <string name="zyrox_nav_controls">CONTROLS</string>
     <string name="zyrox_nav_settings">SETTINGS</string>
     <string name="zyrox_nav_logs">LOGS</string>
@@ -18,7 +18,7 @@
 
     <!-- Home Updates Card -->
     <string name="zyrox_updates_title">ZYROX UPDATES</string>
-    <string name="zyrox_updates_badge">v1.0</string>
+    <string name="zyrox_updates_badge">v1.0.2</string>
     <string name="zyrox_updates_line1">• HolyGL4ES, LTW &amp; Zink Vulkan ready</string>
     <string name="zyrox_updates_line2">• Modrinth &amp; CurseForge store live</string>
     <string name="zyrox_updates_line3">• Multi-JRE 8 / 17 / 21 turbo runner</string>

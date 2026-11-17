@@ -52,6 +52,14 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && setFullscreen()) {
+            Tools.hideSystemBars(this);
+        }
+    }
+
+    @Override
     public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
         super.onMultiWindowModeChanged(isInMultiWindowMode);
         onMultiWindowModeChangedInner();

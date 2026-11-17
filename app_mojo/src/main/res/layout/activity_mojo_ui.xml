@@ -6,9 +6,11 @@
     android:id="@+id/zyrox_root_shell"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:background="@color/zyrox_bg_base">
 
-    <!-- Global Animated Minecraft Shader / Looping Video Background + Warm Vignette -->
+    <!-- Global 100% Edge-to-Edge Animated Minecraft Shader / Video Background + Optical Vignette -->
     <git.artdeell.mojo.ui.ZyroxShaderBackgroundView
         android:id="@+id/zyrox_shader_background"
         android:layout_width="0dp"
@@ -18,7 +20,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Global Slim Frosted Glass Sub-Page Header Bar (hidden on Home Hub, shown on all sub-pages) -->
+    <!-- Global Translucent Crystal-Glass Sub-Page Header Bar (hidden on Home Hub, shown on sub-pages) -->
     <LinearLayout
         android:id="@+id/zyrox_global_header"
         android:layout_width="0dp"
@@ -26,8 +28,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/bg_zyrox_header_bar"
-        android:paddingHorizontal="12dp"
-        android:elevation="8dp"
+        android:paddingHorizontal="14dp"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -39,12 +40,16 @@
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:gravity="center"
-            android:paddingHorizontal="10dp"
-            android:background="@drawable/bg_zyrox_nav_item"
+            android:paddingHorizontal="11dp"
+            android:background="@drawable/bg_zyrox_action_tile"
             android:text="@string/zyrox_back"
-            android:textColor="@color/zyrox_amber"
-            android:textSize="12sp"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="11sp"
             android:letterSpacing="0.06"
+            android:shadowColor="#BF090705"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:clickable="true"
             android:focusable="true"
             android:fontFamily="@font/minecraft_pixel"
@@ -63,8 +68,12 @@
             android:layout_weight="1"
             android:text="@string/zyrox_title_instance_studio"
             android:textColor="@color/zyrox_text_primary"
-            android:textSize="14sp"
+            android:textSize="13.5sp"
             android:letterSpacing="0.08"
+            android:shadowColor="#BF090705"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:singleLine="true"
             android:ellipsize="end"
             android:fontFamily="@font/minecraft_pixel"
@@ -76,10 +85,10 @@
             android:layout_width="wrap_content"
             android:layout_height="24dp"
             android:layout_marginEnd="8dp"
-            android:paddingHorizontal="8dp"
+            android:paddingHorizontal="9dp"
             android:gravity="center"
             android:background="@drawable/bg_zyrox_badge"
-            android:textColor="@color/zyrox_amber"
+            android:textColor="@color/zyrox_amber_stroke"
             android:textSize="9sp"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel"
@@ -90,7 +99,7 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btn_zyrox_top_action"
             android:layout_width="wrap_content"
-            android:layout_height="30dp"
+            android:layout_height="31dp"
             android:minWidth="112dp"
             android:layout_marginEnd="8dp"
             android:paddingHorizontal="12dp"
@@ -98,8 +107,13 @@
             android:text="@string/zyrox_new_instance"
             android:textColor="@color/zyrox_text_primary"
             android:textSize="10sp"
-            android:letterSpacing="0.05"
+            android:letterSpacing="0.06"
+            android:shadowColor="#BF120804"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="4"
             android:stateListAnimator="@null"
+            android:elevation="0dp"
             android:fontFamily="@font/minecraft_pixel"
             app:fontFamily="@font/minecraft_pixel"
             android:visibility="gone"
@@ -109,7 +123,7 @@
             android:id="@+id/setting_button"
             android:layout_width="34dp"
             android:layout_height="34dp"
-            android:background="@drawable/bg_zyrox_nav_item"
+            android:background="@drawable/bg_zyrox_action_tile"
             android:src="@drawable/ic_px_home"
             app:tint="@color/zyrox_amber"
             android:scaleType="fitCenter"
@@ -125,13 +139,12 @@
         android:layout_height="2dp"
         android:indeterminate="true"
         android:indeterminateTint="@color/zyrox_amber"
-        android:elevation="9dp"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/zyrox_global_header"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Main Dynamic Screen Container -->
+    <!-- Main Dynamic Screen Container (100% edge-to-edge on Home Hub) -->
     <androidx.fragment.app.FragmentContainerView
         android:id="@+id/container_fragment"
         android:name="git.artdeell.mojo.fragments.MainMenuFragment"
@@ -142,17 +155,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Persistent Frosted Glass Account Selector Card docked in Home Hub RIGHT Control Panel
-         (stays mounted in Activity so auth ExtraListeners remain active across fragments) -->
+    <!-- Persistent Ultra-Transparent Crystal Account Pill docked inside Home Hub Right Panel
+         (zero elevation shadow box; stays mounted so auth ExtraListeners persist across screens) -->
     <LinearLayout
         android:id="@+id/zyrox_account_dock_card"
-        android:layout_width="244dp"
-        android:layout_height="44dp"
-        android:layout_marginEnd="12dp"
+        android:layout_width="258dp"
+        android:layout_height="42dp"
+        android:layout_marginEnd="14dp"
         android:layout_marginTop="10dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:elevation="6dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -161,19 +173,19 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:dropDownWidth="244dp"
-            android:dropDownVerticalOffset="46dp" />
+            android:dropDownWidth="258dp"
+            android:dropDownVerticalOffset="45dp" />
 
         <ImageButton
             android:id="@+id/btn_open_account_vault"
-            android:layout_width="36dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="5dp"
+            android:layout_marginStart="6dp"
             android:background="@drawable/btn_zyrox_secondary"
             android:src="@drawable/ic_add"
-            app:tint="@color/zyrox_amber"
+            app:tint="@color/zyrox_amber_stroke"
             android:scaleType="centerInside"
-            android:padding="8dp"
+            android:padding="9dp"
             android:contentDescription="@string/main_add_account" />
     </LinearLayout>
 
@@ -182,9 +194,8 @@
         android:id="@+id/progress_layout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="10dp"
+        android:layout_marginHorizontal="12dp"
         android:layout_marginBottom="6dp"
-        android:elevation="10dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

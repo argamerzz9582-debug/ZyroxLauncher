@@ -222,31 +222,65 @@ public final class Tools {
     private static void setCutoutMode(Window window, boolean ignoreNotch) {
         WindowManager.LayoutParams layoutParams = window.getAttributes();
         if (ignoreNotch) {
-            layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            if (SDK_INT >= Build.VERSION_CODES.R) {
+                layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            } else {
+                layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            }
         } else {
             layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
         }
+        window.setAttributes(layoutParams);
         window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
     }
 
     @SuppressWarnings("deprecation")
+    private static void applyLegacyFullscreenFlags(View insetView) {
+        insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+    }
+
+    @SuppressWarnings("deprecation")
     private static void setLegacyFullscreen(View insetView, boolean fullscreen) {
-        View.OnSystemUiVisibilityChangeListener listener = (visibility)->{
-            if(fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-            }else if(!fullscreen) {
+        View.OnSystemUiVisibilityChangeListener listener = (visibility) -> {
+            if (fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                applyLegacyFullscreenFlags(insetView);
+            } else if (!fullscreen) {
                 insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
             }
         };
-        listener.onSystemUiVisibilityChange(insetView.getSystemUiVisibility());
+        if (fullscreen) {
+            applyLegacyFullscreenFlags(insetView);
+        } else {
+            insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+        }
         insetView.setOnSystemUiVisibilityChangeListener(listener);
     }
 
+    /** Re-applies sticky immersive bar hiding when focus returns after popups, dialogs, or IME. */
+    public static void hideSystemBars(Activity activity) {
+        if (SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode()) return;
+        Window window = activity.getWindow();
+        if (window == null) return;
+        if (SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                controller.hide(WindowInsets.Type.systemBars());
+            }
+        } else {
+            View insetView = activity.findViewById(android.R.id.content);
+            if (insetView != null) {
+                applyLegacyFullscreenFlags(insetView);
+            }
+        }
+    }
+
+    @SuppressWarnings("deprecation")
     public static void setInsetsMode(Activity activity, boolean noSystemBars, boolean ignoreNotch) {
         Window window = activity.getWindow();
         View insetView = activity.findViewById(android.R.id.content);
@@ -254,25 +288,28 @@ public final class Tools {
         if(SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode()) noSystemBars = false;
 
         int bgColor;
-        // The status bars are completely transparent and will take their color from the inset view
-        // background drawable.
         if(!noSystemBars) bgColor = activity.getResources().getColor(R.color.background_status_bar);
-        else bgColor = Color.parseColor("#0D0B0A");
+        else bgColor = Color.TRANSPARENT;
 
-        // On API 35 onwards, apps are edge-to-edge by default and are controlled entirely though the
-        // inset API. On levels below, we still need to set the correct cutout mode.
+        // Ensure completely transparent system bars and zero forced OEM scrim
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setStatusBarContrastEnforced(false);
+            window.setNavigationBarContrastEnforced(false);
+        }
+
+        // Configure edge-to-edge display cutout rendering on all supported API levels (28 through 36+)
         if(SDK_INT >= Build.VERSION_CODES.P) setCutoutMode(window, ignoreNotch);
 
-        // The AppCompat APIs don't work well, and break when opening alert dialogs on older Android
-        // versions. Use the legacy fullscreen flags for lower APIs. (notch is already handled above)
+        // Use sticky immersive flags for API < 30 (cutout already configured above)
         if(SDK_INT < Build.VERSION_CODES.R) {
             setLegacyFullscreen(insetView, noSystemBars);
             return;
         }
-        // Code below expects this to be set to false, since that's the SDK 35 default.
-        if(SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            window.setDecorFitsSystemWindows(false);
-        }
+
+        // Explicitly draw edge-to-edge across status, navigation, and cutout zones
+        window.setDecorFitsSystemWindows(false);
 
         WindowInsetsController insetsController = window.getInsetsController();
         if(insetsController != null) {
@@ -290,7 +327,7 @@ public final class Tools {
                 Insets insets = windowInsets.getInsets(insetMask);
                 v.setBackground(new InsetBackground(insets,bgColor));
                 insetView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            }else {
+            } else {
                 insetView.setPadding(0, 0, 0, 0);
                 v.setBackground(null);
             }

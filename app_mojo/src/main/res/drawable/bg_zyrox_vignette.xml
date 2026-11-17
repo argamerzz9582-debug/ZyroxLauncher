@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Warm atmospheric radial vignette -->
+    <!-- Subtle full-screen optical radial vignette keeping edges crisp yet completely luminous -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.42"
-                android:centerY="0.46"
-                android:gradientRadius="560dp"
-                android:startColor="#260A0807"
-                android:centerColor="#660A0807"
-                android:endColor="#BF0A0807" />
+                android:centerX="0.46"
+                android:centerY="0.48"
+                android:gradientRadius="72%p"
+                android:startColor="#040A0807"
+                android:centerColor="#1E0A0807"
+                android:endColor="#66090706" />
         </shape>
     </item>
-    <!-- Top & bottom subtle cinematic darkening -->
+    <!-- Whisper-soft bottom ground gradient so bottom-left card text pops with zero dark bars -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#660A0807"
-                android:centerColor="#000A0807"
-                android:endColor="#8C0A0807" />
+                android:startColor="#1C090706"
+                android:centerColor="#00000000"
+                android:endColor="#54090706" />
         </shape>
     </item>
 </layer-list>
