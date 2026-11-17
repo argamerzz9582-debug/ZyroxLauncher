@@ -1,91 +1,47 @@
-<H1 align="center">MojoLauncher (a.k.a. MJLauncher)</H1>
+<h1 align="center">Zyrox Launcher</h1>
 
-<a href="./README_RU.md">Readme на русском</a>
+<p align="center">
+  <strong>Minecraft: Java Edition Launcher for Android — Dark Glass &amp; Warm Amber Landscape Edition</strong>
+</p>
 
-<img src="./app_mojo/src/main/assets/mojo.png" align="left" width="150" height="150" alt="MojoLauncher logo">
+<p align="center">
+  <a href="https://github.com/argamerzz9582-debug/ZyroxLauncher/actions"><img src="https://github.com/argamerzz9582-debug/ZyroxLauncher/actions/workflows/android.yml/badge.svg" alt="Android CI"></a>
+  <a href="https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest"><img src="https://img.shields.io/github/v/release/argamerzz9582-debug/ZyroxLauncher?label=Latest%20APK&color=F59E0B" alt="Latest Release"></a>
+</p>
 
-[![Android CI](https://github.com/MojoLauncher/MojoLauncher/workflows/Android%20CI/badge.svg)](https://github.com/MojoLauncher/MojoLauncher/actions)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/MojoLauncher/MojoLauncher)](https://github.com/MojoLauncher/MojoLauncher/actions)
-[![Discord](https://img.shields.io/discord/1365346109131722753.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/VHdwQFsaGX)
+## Download Signed Release APK
 
-* MojoLauncher is a launcher, based on [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher), that allows you to play Minecraft: Java Edition on your Android device!
+Get the latest security-hardened, RSA-4096 v1/v2/v3 signed production builds directly from the **[GitHub Releases Section](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest)**:
 
-* It can run almost every version of Minecraft, allowing you to use .jar only installers to install modloaders such as [Forge](https://files.minecraftforge.net/) and [Fabric](http://fabricmc.net/) and mods like [OptiFine](https://optifine.net).
+- **[ZyroxLauncher-full-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-full-release.apk)** — Complete install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
+- **[ZyroxLauncher-noruntime-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
+- **[ZyroxLauncher-full-release.aab](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-full-release.aab)** — Signed Android App Bundle for Google Play Console
+- **[All Releases & SHA-256 Checksums](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases)**
 
-## Navigation
-- [Introduction](#introduction)
-- [Getting MojoLauncher](#getting-mojolauncher)
-- [Building](#building) 
-- [Current roadmap](#current-roadmap) 
-- [License](#license) 
-- [Contributing](#contributing) 
-- [Credits & Third party components and their licenses](#credits--third-party-components-and-their-licenses-if-available)
+## Highlights
+- Runs Minecraft: Java Edition across classic, modern release, and snapshot versions on Android with Forge, Fabric, NeoForge, Quilt, Modrinth (`.mrpack`), and CurseForge modpack support.
+- Landscape-first dark obsidian glass & warm amber UI with customizable touch/gamepad controls and multi-runtime OpenJDK management.
+- Hardened for Android & Google Play Protect (`com.zyrox.launcher`, `targetSdk 36`, `debuggable=false`, 100% TLS/HTTPS network policy, Android Keystore AES-256-GCM account token encryption, hardened OAuth WebView, canonical ZipSlip/TarSlip containment, and automated MobSF SAST + `apksigner` verification in CI). See [SECURITY.md](./SECURITY.md) and [PRIVACY_POLICY.md](./PRIVACY_POLICY.md).
 
-## Introduction 
-* MojoLauncher is a Minecraft: Java Edition launcher for Android based on [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher)
-* This launcher can launch almost all available Minecraft versions ranging from rd-132211 to 26.x snapshots (including Combat Test versions). 
-* Modding via Forge and Fabric are also supported. 
-
-## Getting MojoLauncher
-
-You can get MojoLauncher via four methods:
-
-1. You can get the prebuilt app from the [releases section](http://github.com/mojolauncher/mojolauncher/releases).
-
-2. You can get it from Google Play by clicking on this badge:
-[![Google Play](https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png)](https://play.google.com/store/apps/details?id=git.artdeell.mjlaunch)
-
-3. You can get early builds from [Github Actions](http://github.com/mojolauncher/mojolauncher/actions).
-
-4. You can [build](#building) from source.
-## Building   
-* Build the launcher (it will automatically download all required components)
+## Building from Source
+```bash
+./gradlew :app_mojo:assembleFullRelease
 ```
-./gradlew :app_mojo:assembleDebug
-```
-If you are building on Windows:
-* Replace `./gradlew` with `.\gradlew.bat`
-* Make sure `mojoexec`, `sdl`, `glfw` are symlinked into `app_mojo/src/main/jni/`
-
-## Current roadmap
-- [x] Instance system in favor of profiles
-- [x] Out-of-the box 1.21.5 support
-- [x] mrpack/CurseForge zip import
-- [x] LTW: enable compute shader/image extensions
-- [ ] LTW: resolve issues with Create
-- [ ] LTW: switch to a color-renderable format for framebuffers
-- [ ] Modpack/mod management tool
-- [ ] MMC-compatible instance import
-- [ ] Vintage Story support
-- [ ] Implement common native library standard
-
-## Known Issues
-- Some physical mice may have very slow mouse speed
-- On Holy GL4ES, large texture atlases may be distorted (resulting in stretched/blocky textures in modpacks)
-- Probably more, that's why we have a bug tracker ;) 
+To sign release builds with your own PKCS12/JKS certificate, see the instructions in [SECURITY.md](./SECURITY.md).
 
 ## License
-- MojoLauncher is licensed under [GNU LGPLv3](https://github.com/MojoLauncher/MojoLauncher/blob/v3_openjdk/LICENSE).
+- Licensed under [GNU LGPLv3](./LICENSE).
 
-## Contributing
-Contributions are welcome! We appreciate any type of contribution, not only code. For example, you can help the wiki shape up. You can help the [translation](https://mojolauncher.ru/translate/translator.html) too!
-
-
-Any code change to this repository should be submitted as a pull request. The description should explain what the code does and give steps to execute it.
-
-## Third party components, licenses and sources (when applicable)
-- [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher): [GNU LGPLv3 License](https://github.com/PojavLauncherTeam/PojavLauncher/blob/v3_openjdk/LICENSE)
-- Android Support Libraries: [Apache License 2.0](https://android.googlesource.com/platform/prebuilts/maven_repo/android/+/master/NOTICE.txt).
-- [Holy GL4ES](https://github.com/artdeell/gl4es_extra_extra/): [MIT License](https://github.com/ptitSeb/gl4es/blob/master/LICENSE).
-- [OpenJDK](https://github.com/PojavLauncherTeam/openjdk-multiarch-jdk8u): [GNU GPLv2 License](https://openjdk.java.net/legal/gplv2+ce.html).
-- [GLFW](https://github.com/MojoLauncher/glfw): [zlib license](https://github.com/MojoLauncher/glfw/blob/glfw34/LICENSE.md)
-- [SDL](https://github.com/MojoLauncher/MojoSDL): [zlib license](https://github.com/MojoLauncher/MojoSDL/blob/main/LICENSE.txt)
-- [LWJGL2-GLFW](https://github.com/MojoLauncher/lwjgl2-glfw): 3-Clause BSD license
-- [LWJGL3](https://github.com/LWJGL/lwjgl3): [BSD-3 License](https://github.com/LWJGL/lwjgl3/blob/master/LICENSE.md).
-- [mojoexec](https://github.com/MojoLauncher/mojoexec): [MIT License](https://github.com/MojoLauncher/mojoexec/blob/master/LICENSE)
-- [Mesa 3D Graphics Library](https://gitlab.freedesktop.org/mesa/mesa): [MIT License](https://docs.mesa3d.org/license.html).
-- [pro-grade](https://github.com/pro-grade/pro-grade) (Java sandboxing security manager): [Apache License 2.0](https://github.com/pro-grade/pro-grade/blob/master/LICENSE.txt).
-- [Authlib-Injector](https://github.com/yushijinhun/authlib-injector) (Used for authorisation via ely.by): [AGPL-3.0](https://github.com/yushijinhun/authlib-injector/blob/develop/LICENSE).
-- [alsoft](https://github.com/kcat/openal-soft/) (Audio output library): [GNU Library General Public License](https://github.com/kcat/openal-soft/blob/master/COPYING) and [Modified PFFFT](https://github.com/kcat/openal-soft/blob/master/LICENSE-pffft).
-- [oboe](https://github.com/google/oboe): [Apache License 2.0](https://github.com/google/oboe/blob/main/LICENSE).
-- Thanks to [Mineskin](https://mineskin.eu/) for providing Minecraft avatars.
+## Credits & Third-Party Components
+Zyrox Launcher builds upon the open-source work of [MojoLauncher](https://github.com/MojoLauncher/MojoLauncher) and [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher):
+- [MojoLauncher](https://github.com/MojoLauncher/MojoLauncher) & [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher): GNU LGPLv3 License
+- AndroidX / Android Support Libraries: Apache License 2.0
+- [Holy GL4ES](https://github.com/artdeell/gl4es_extra_extra/): MIT License
+- [OpenJDK](https://github.com/PojavLauncherTeam/openjdk-multiarch-jdk8u): GNU GPLv2 + Classpath Exception
+- [GLFW](https://github.com/MojoLauncher/glfw) & [SDL](https://github.com/MojoLauncher/MojoSDL): zlib License
+- [LWJGL2-GLFW](https://github.com/MojoLauncher/lwjgl2-glfw) & [LWJGL3](https://github.com/LWJGL/lwjgl3): BSD-3-Clause License
+- [mojoexec](https://github.com/MojoLauncher/mojoexec) & [Mesa 3D Graphics Library](https://gitlab.freedesktop.org/mesa/mesa): MIT License
+- [pro-grade](https://github.com/pro-grade/pro-grade) & [oboe](https://github.com/google/oboe): Apache License 2.0
+- [Authlib-Injector](https://github.com/yushijinhun/authlib-injector): AGPL-3.0 License
+- [OpenAL Soft](https://github.com/kcat/openal-soft/): GNU LGPL
+- Minecraft skin avatars provided by [Mineskin](https://mineskin.eu/).
