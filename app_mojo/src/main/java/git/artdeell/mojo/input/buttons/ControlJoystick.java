@@ -120,9 +120,22 @@ public class ControlJoystick extends JoystickView implements ControlInterface {
 
     @Override
     public void setBackground() {
-        setBorderWidth((int) Tools.dpToPx(getProperties().strokeWidth * (getControlLayoutParent().getLayoutScale()/100f)));
-        setBorderColor(getProperties().strokeColor);
-        setBackgroundColor(getProperties().bgColor);
+        float rawStroke = getProperties().strokeWidth;
+        float scale = getControlLayoutParent() != null ? (getControlLayoutParent().getLayoutScale() / 100f) : 1f;
+        int borderPx = rawStroke > 0
+                ? (int) Tools.dpToPx(rawStroke * scale)
+                : Math.max(2, (int) Tools.dpToPx(1.6f));
+        int bgColor = getProperties().bgColor;
+        boolean defaultBg = (bgColor == git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable.LEGACY_DEFAULT_CONTROL_BG
+                || bgColor == 0);
+        setBorderWidth(borderPx);
+        setBorderColor(rawStroke > 0 ? getProperties().strokeColor
+                : git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable.OUTER_RIM_TOP);
+        setBackgroundColor(defaultBg
+                ? git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable.NORMAL_BODY_MID
+                : bgColor);
+        setButtonColor(0xDCF7FAFF);
+        setAlpha(androidx.core.math.MathUtils.clamp(getProperties().opacity, 0.08f, 1.0f));
     }
 
     @Override

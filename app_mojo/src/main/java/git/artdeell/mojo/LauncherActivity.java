@@ -33,6 +33,9 @@ import git.artdeell.mojo.authenticator.accounts.Accounts;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.extra.ExtraListener;
+import git.artdeell.mojo.fragments.AboutSecurityFragment;
+import git.artdeell.mojo.fragments.ContentManagerFragment;
+import git.artdeell.mojo.fragments.DownloadCenterFragment;
 import git.artdeell.mojo.fragments.ElyByLoginFragment;
 import git.artdeell.mojo.fragments.FabriclikeInstallFragment;
 import git.artdeell.mojo.fragments.FileSelectorFragment;
@@ -46,6 +49,9 @@ import git.artdeell.mojo.fragments.ModVersionListFragment;
 import git.artdeell.mojo.fragments.ProfileTypeSelectFragment;
 import git.artdeell.mojo.fragments.SearchModFragment;
 import git.artdeell.mojo.fragments.SelectAuthFragment;
+import git.artdeell.mojo.fragments.ServerManagerFragment;
+import git.artdeell.mojo.fragments.SkinStudioFragment;
+import git.artdeell.mojo.fragments.WorldManagerFragment;
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.InstanceInstaller;
 import git.artdeell.mojo.instances.Instances;
@@ -142,6 +148,18 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             mPageTitleView.setText(R.string.zyrox_title_gamepad);
         } else if (f instanceof LogInspectorFragment) {
             mPageTitleView.setText(R.string.zyrox_title_log_inspector);
+        } else if (f instanceof ContentManagerFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_content_manager);
+        } else if (f instanceof WorldManagerFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_worlds);
+        } else if (f instanceof ServerManagerFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_servers);
+        } else if (f instanceof SkinStudioFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_skins);
+        } else if (f instanceof DownloadCenterFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_downloads);
+        } else if (f instanceof AboutSecurityFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_security);
         } else {
             mPageTitleView.setText(R.string.app_short_name);
         }
@@ -226,12 +244,42 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         }
         String normalizedVersionId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
         JVersionList.Version mcVersion = MoJsonExtras.getListedVersion(normalizedVersionId);
-        new MoJsonDownloader().start(
+        Runnable startLaunch = () -> new MoJsonDownloader().start(
                 this.getAssets(),
                 mcVersion,
                 normalizedVersionId,
                 new ContextAwareDoneListener(this, normalizedVersionId)
         );
+        java.io.File versionJar = new java.io.File(Tools.DIR_HOME_VERSION,
+                normalizedVersionId + "/" + normalizedVersionId + ".jar");
+        long freeBytes = git.artdeell.mojo.utils.NetworkPolicyHelper.queryFreeDiskBytes(
+                new java.io.File(Tools.DIR_GAME_HOME));
+        if (!versionJar.isFile() && freeBytes > 0L
+                && freeBytes < 128L * 1024L * 1024L) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Low Storage Warning")
+                    .setMessage("Only " + git.artdeell.mojo.utils.NetworkPolicyHelper.formatBytes(freeBytes)
+                            + " of free storage remains. Downloading Minecraft " + normalizedVersionId
+                            + " may fail unless you free up space first.")
+                    .setPositiveButton("Continue Anyway", (d, w) -> startLaunch.run())
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return false;
+        }
+        if (!versionJar.isFile() && git.artdeell.mojo.utils.NetworkPolicyHelper.shouldWarnForMobileDownload(
+                this,
+                git.artdeell.mojo.utils.NetworkPolicyHelper.DEFAULT_LARGE_MOBILE_DOWNLOAD_BYTES,
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_WARN_MOBILE_DATA)) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Mobile Data Download")
+                    .setMessage("Minecraft " + normalizedVersionId
+                            + " needs to download game files and you are currently on a metered mobile network. Continue downloading?")
+                    .setPositiveButton("Download & Launch", (d, w) -> startLaunch.run())
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return false;
+        }
+        startLaunch.run();
         return false;
     };
 
@@ -314,7 +362,13 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         }
         if (mHeaderTasksView != null) {
             mHeaderTasksView.setOnClickListener(v -> {
-                if (mProgressLayout != null) mProgressLayout.performClick();
+                FragmentManager manager = getSupportFragmentManager();
+                if (!manager.isStateSaved()) {
+                    Fragment current = manager.findFragmentById(mFragmentView.getId());
+                    if (!(current instanceof DownloadCenterFragment)) {
+                        Tools.swapFragment(this, DownloadCenterFragment.class, DownloadCenterFragment.TAG, null);
+                    }
+                }
             });
         }
 

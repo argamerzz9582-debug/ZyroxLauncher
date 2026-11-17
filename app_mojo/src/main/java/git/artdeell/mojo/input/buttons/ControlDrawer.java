@@ -50,6 +50,8 @@ public class ControlDrawer extends ControlButton {
 
     private void switchButtonVisibility(){
         areButtonsVisible = !areButtonsVisible;
+        setActivated(areButtonsVisible);
+        refreshDrawableState();
         int visibility = areButtonsVisible ? VISIBLE : GONE;
         for(ControlButton button : buttons){
             button.getControlView().setVisibility(visibility);
@@ -140,8 +142,16 @@ public class ControlDrawer extends ControlButton {
     public boolean onTouchEvent(MotionEvent event) {
         if(!getControlLayoutParent().getModifiable()){
             switch (event.getActionMasked()){
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    setPressed(true);
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                    setPressed(false);
+                    break;
                 case MotionEvent.ACTION_UP: // 1
                 case MotionEvent.ACTION_POINTER_UP: // 6
+                    setPressed(false);
                     switchButtonVisibility();
                     break;
             }

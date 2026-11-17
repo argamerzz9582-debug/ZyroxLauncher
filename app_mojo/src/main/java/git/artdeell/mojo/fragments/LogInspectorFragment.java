@@ -5,6 +5,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,13 +25,20 @@ import java.util.Locale;
 import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.diagnostics.GraphicsAdvisor;
+import git.artdeell.mojo.diagnostics.ZyroxCrashAnalyzer;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
+import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceManager;
+import git.artdeell.mojo.instances.Instances;
+import git.artdeell.mojo.security.LogRedactor;
 import git.artdeell.mojo.ui.ZyroxLogHighlighter;
 
 /**
- * Page 7: Zyrox Crash & Log Inspector — Full-width dark glass monospace terminal
- * with error (#EF4444) and warning (#FF8C42) syntax highlighting, copy, share, clear & relaunch.
+ * Zyrox 2.0 Smart Crash & Log Inspector (Zyrox Guard) — Dark glass monospace terminal with
+ * deterministic local crash classification, confidence scoring, redacted clipboard/file export,
+ * and safe recovery shortcuts.
  */
 public class LogInspectorFragment extends Fragment {
     public static final String TAG = "LOG_INSPECTOR_FRAGMENT";
@@ -40,7 +48,11 @@ public class LogInspectorFragment extends Fragment {
     private TextView mMetaView;
     private TextView mLogContentView;
     private ScrollView mTerminalScroll;
-    private String mCurrentRawLog = "";
+    private View mGuardContainer;
+    private TextView mGuardSummary;
+    private Button mGuardActionBtn;
+    private String mCurrentRedactedLog = "";
+    private ZyroxCrashAnalyzer.Diagnosis mCurrentDiagnosis;
 
     public LogInspectorFragment() {
         super(R.layout.fragment_log_inspector);
@@ -52,6 +64,9 @@ public class LogInspectorFragment extends Fragment {
         mMetaView = view.findViewById(R.id.tv_log_meta);
         mLogContentView = view.findViewById(R.id.tv_log_content);
         mTerminalScroll = view.findViewById(R.id.sv_log_terminal);
+        mGuardContainer = view.findViewById(R.id.layout_log_guard);
+        mGuardSummary = view.findViewById(R.id.tv_log_guard_summary);
+        mGuardActionBtn = view.findViewById(R.id.btn_log_guard_action);
 
         view.findViewById(R.id.btn_log_refresh).setOnClickListener(v -> loadLatestLog());
         view.findViewById(R.id.btn_log_clear).setOnClickListener(v -> clearLatestLog());
@@ -71,32 +86,82 @@ public class LogInspectorFragment extends Fragment {
             if (!logFile.isFile() || logFile.length() == 0) {
                 Tools.runOnUiThread(() -> {
                     if (!isAdded()) return;
-                    mCurrentRawLog = "";
-                    mMetaView.setText("latestlog.txt  •  0 KB");
+                    mCurrentRedactedLog = "";
+                    mCurrentDiagnosis = null;
+                    mMetaView.setText("latestlog.txt  •  0 KB  •  REDACTED");
                     mLogContentView.setText(R.string.zyrox_log_empty);
+                    if (mGuardContainer != null) mGuardContainer.setVisibility(View.GONE);
                     applyBadge(false);
                 });
                 return;
             }
 
             long totalLen = logFile.length();
-            String content = readLogTail(logFile, MAX_PREVIEW_BYTES);
-            CharSequence highlighted = ZyroxLogHighlighter.highlightBlock(content);
-            String upper = content.toUpperCase(Locale.ROOT);
-            boolean hasCrash = upper.contains("FATAL") || upper.contains("EXCEPTION")
-                    || upper.contains("SIGSEGV") || upper.contains("SIGABRT")
-                    || upper.contains("CRASH REPORT");
-            String meta = String.format(Locale.ROOT, "latestlog.txt  •  %.1f KB", totalLen / 1024f);
+            String rawTail = readLogTail(logFile, MAX_PREVIEW_BYTES);
+            String redacted = LogRedactor.redact(rawTail);
+            ZyroxCrashAnalyzer.Diagnosis diagnosis = ZyroxCrashAnalyzer.analyze(redacted);
+            CharSequence highlighted = ZyroxLogHighlighter.highlightBlock(redacted);
+            boolean hasCrash = diagnosis.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED;
+            String meta = String.format(Locale.ROOT, "latestlog.txt  •  %.1f KB  •  AUTO-REDACTED", totalLen / 1024f);
 
             Tools.runOnUiThread(() -> {
                 if (!isAdded()) return;
-                mCurrentRawLog = content;
+                mCurrentRedactedLog = redacted;
+                mCurrentDiagnosis = diagnosis;
                 mMetaView.setText(meta);
                 mLogContentView.setText(highlighted);
                 applyBadge(hasCrash);
+                bindGuardBanner(diagnosis);
                 mTerminalScroll.post(() -> mTerminalScroll.fullScroll(View.FOCUS_DOWN));
             });
         });
+    }
+
+    private void bindGuardBanner(@NonNull ZyroxCrashAnalyzer.Diagnosis diag) {
+        if (mGuardContainer == null || mGuardSummary == null) return;
+        if (diag.category == ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
+            mGuardContainer.setVisibility(View.GONE);
+            return;
+        }
+        mGuardContainer.setVisibility(View.VISIBLE);
+        mGuardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
+        if (mGuardActionBtn == null) return;
+
+        switch (diag.primaryAction) {
+            case OPEN_INSTANCE_STUDIO:
+                mGuardActionBtn.setVisibility(View.VISIBLE);
+                mGuardActionBtn.setText(R.string.zyrox_nav_instances);
+                mGuardActionBtn.setOnClickListener(v -> Tools.swapFragment(
+                        requireActivity(), InstanceEditorFragment.class, InstanceEditorFragment.TAG, null));
+                break;
+            case OPEN_MOD_MANAGER:
+                mGuardActionBtn.setVisibility(View.VISIBLE);
+                mGuardActionBtn.setText(R.string.zyrox_title_content_manager);
+                mGuardActionBtn.setOnClickListener(v -> Tools.swapFragment(
+                        requireActivity(), ContentManagerFragment.class, ContentManagerFragment.TAG, null));
+                break;
+            case OPEN_DOWNLOAD_CENTER:
+                mGuardActionBtn.setVisibility(View.VISIBLE);
+                mGuardActionBtn.setText(R.string.zyrox_title_downloads);
+                mGuardActionBtn.setOnClickListener(v -> Tools.swapFragment(
+                        requireActivity(), DownloadCenterFragment.class, DownloadCenterFragment.TAG, null));
+                break;
+            case SWITCH_SAFE_RENDERER:
+                mGuardActionBtn.setVisibility(View.VISIBLE);
+                mGuardActionBtn.setText(R.string.zyrox_safe_mode_apply);
+                mGuardActionBtn.setOnClickListener(v -> {
+                    GraphicsAdvisor.applyProfile(GraphicsAdvisor.Profile.SAFE_COMPATIBILITY);
+                    Instance cur = Instances.loadSelectedInstance();
+                    if (cur != null && cur.lastKnownGoodRenderer != null) {
+                        InstanceManager.restoreLastKnownGoodRenderer(cur);
+                    }
+                    Toast.makeText(requireContext(), R.string.zyrox_safe_mode_applied, Toast.LENGTH_LONG).show();
+                });
+                break;
+            default:
+                mGuardActionBtn.setVisibility(View.GONE);
+                break;
+        }
     }
 
     private void applyBadge(boolean isCrash) {
@@ -109,7 +174,7 @@ public class LogInspectorFragment extends Fragment {
         } else {
             mStatusBadge.setText(R.string.zyrox_console_title);
             mStatusBadge.setBackgroundResource(R.drawable.bg_zyrox_badge);
-            mStatusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.zyrox_amber));
+            mStatusBadge.setTextColor(ContextCompat.getColor(ctx, R.color.zyrox_lg_text));
         }
     }
 
@@ -129,8 +194,13 @@ public class LogInspectorFragment extends Fragment {
     private void copyLog(Context context) {
         ClipboardManager mgr = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (mgr != null) {
-            mgr.setPrimaryClip(ClipData.newPlainText("zyrox_log",
-                    mCurrentRawLog.isEmpty() ? mLogContentView.getText().toString() : mCurrentRawLog));
+            String safePayload = LogRedactor.redact(
+                    mCurrentRedactedLog.isEmpty() ? mLogContentView.getText().toString() : mCurrentRedactedLog);
+            if (mCurrentDiagnosis != null
+                    && mCurrentDiagnosis.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
+                safePayload = mCurrentDiagnosis.formatCompactSummary() + "\n\n" + safePayload;
+            }
+            mgr.setPrimaryClip(ClipData.newPlainText("zyrox_log", safePayload));
             Toast.makeText(context, R.string.zyrox_log_copied, Toast.LENGTH_SHORT).show();
         }
     }
@@ -149,7 +219,8 @@ public class LogInspectorFragment extends Fragment {
             if (offset > 0) {
                 int firstNl = text.indexOf('\n');
                 if (firstNl >= 0 && firstNl + 1 < text.length()) {
-                    text = "... [earlier lines truncated — use SHARE LOG for full file]\n" + text.substring(firstNl + 1);
+                    text = "... [earlier lines truncated — use SHARE LOG for full redacted file]\n"
+                            + text.substring(firstNl + 1);
                 }
             }
             return text;

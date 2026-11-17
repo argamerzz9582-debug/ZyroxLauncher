@@ -1,25 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <!-- Global Zyrox Shell & Brand -->
+    <!-- Global Zyrox 2.0 Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
-    <string name="zyrox_brand_subtitle">LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX ENGINE v1.0.3</string>
+    <string name="zyrox_brand_subtitle">LAUNCHER 2.0</string>
+    <string name="zyrox_engine_watermark">ZYROX ENGINE v2.0.0</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
-    <!-- Navigation Stack (Home Hub) -->
-    <string name="zyrox_nav_modpacks">MODPACKS</string>
+    <!-- Navigation Stack (Home Hub — Liquid Glass Command Center) -->
+    <string name="zyrox_nav_modpacks">MOD STORE</string>
     <string name="zyrox_nav_instances">INSTANCES</string>
+    <string name="zyrox_nav_mods">MODS &amp; PACKS</string>
+    <string name="zyrox_nav_worlds">WORLDS</string>
+    <string name="zyrox_nav_servers">SERVERS</string>
+    <string name="zyrox_nav_skins">SKINS</string>
     <string name="zyrox_nav_install_jar">INSTALL JAR</string>
     <string name="zyrox_nav_controls">CONTROLS</string>
     <string name="zyrox_nav_settings">SETTINGS</string>
     <string name="zyrox_nav_logs">LOGS</string>
     <string name="zyrox_nav_files">FILES</string>
+    <string name="zyrox_nav_downloads">QUEUE</string>
+    <string name="zyrox_nav_security">TRUST</string>
 
-    <!-- Game Launch Loading Lifecycle -->
-    <string name="zyrox_loading_preparing">Preparing Minecraft…</string>
-    <string name="zyrox_loading_resources">Loading game resources…</string>
-    <string name="zyrox_loading_starting">Starting game…</string>
+    <!-- Real 7-Stage Game Launch Loading Lifecycle -->
+    <string name="zyrox_loading_preparing">Validating installation…</string>
+    <string name="zyrox_loading_resources">Verifying game assets &amp; libraries…</string>
+    <string name="zyrox_loading_runtime">Preparing Java runtime…</string>
+    <string name="zyrox_loading_renderer">Preparing graphics renderer &amp; environment…</string>
+    <string name="zyrox_loading_starting">Launching Minecraft…</string>
 
     <!-- Version Metadata Sync -->
     <string name="zyrox_refresh_versions">Refresh</string>
@@ -32,7 +40,13 @@
     <!-- Page Titles -->
     <string name="zyrox_title_instance_studio">INSTANCE STUDIO</string>
     <string name="zyrox_title_create_instance">NEW INSTANCE STUDIO</string>
-    <string name="zyrox_title_mod_store">MODRINTH &amp; MODPACK STORE</string>
+    <string name="zyrox_title_mod_store">MODRINTH &amp; CURSEFORGE STORE</string>
+    <string name="zyrox_title_content_manager">MODS, PACKS, SHADERS &amp; CONFIGS</string>
+    <string name="zyrox_title_worlds">WORLD MANAGER &amp; BACKUPS</string>
+    <string name="zyrox_title_servers">MULTIPLAYER SERVER MANAGER</string>
+    <string name="zyrox_title_skins">SKIN STUDIO &amp; LIBRARY</string>
+    <string name="zyrox_title_downloads">DOWNLOAD &amp; CACHE CENTER</string>
+    <string name="zyrox_title_security">SECURITY, GRAPHICS &amp; PROFILES</string>
     <string name="zyrox_title_control_center">ZYROX CONTROL CENTER</string>
     <string name="zyrox_title_account_vault">ZYROX ACCOUNT VAULT</string>
     <string name="zyrox_title_microsoft_login">MICROSOFT AUTH</string>
@@ -40,25 +54,26 @@
     <string name="zyrox_title_modloader_install">MODLOADER INSTALLER</string>
     <string name="zyrox_title_file_browser">FILE EXPLORER</string>
     <string name="zyrox_title_gamepad">CONTROLLER MAPPER</string>
-    <string name="zyrox_title_log_inspector">ZYROX LOG INSPECTOR</string>
+    <string name="zyrox_title_log_inspector">ZYROX GUARD LOG INSPECTOR</string>
     <string name="zyrox_title_crash_report">ZYROX CRASH REPORT</string>
     <string name="zyrox_title_jar_installer">ZYROX RUNTIME &amp; JAR INSTALLER</string>
 
-    <!-- Instance & Profile Studio -->
+    <!-- Instance & Profile Studio 2.0 -->
     <string name="zyrox_new_instance">+ NEW INSTANCE</string>
     <string name="zyrox_new_short">+ NEW</string>
+    <string name="zyrox_studio_tools">STUDIO TOOLS</string>
     <string name="zyrox_save_instance">SAVE INSTANCE</string>
     <string name="zyrox_delete_instance">DELETE</string>
     <string name="zyrox_saved_profiles">SAVED PROFILES</string>
     <string name="zyrox_instance_config">INSTANCE CONFIGURATION</string>
-    <string name="zyrox_jvm_ram_label">JVM RAM ALLOCATION</string>
-    <string name="zyrox_renderer_hint_default">Uses global Zyrox Control Center graphics engine</string>
-    <string name="zyrox_renderer_hint_gles">High FPS &amp; widest compatibility (MC 1.21.4 and lower)</string>
-    <string name="zyrox_renderer_hint_ltw">Modern OpenGL ES 3 pipeline — great for 1.17+ &amp; Sodium</string>
-    <string name="zyrox_renderer_hint_zink">Desktop OpenGL via Vulkan — best for shaders &amp; modern packs</string>
-    <string name="zyrox_renderer_hint_freedreno">Direct Adreno Turnip/KGSL acceleration — peak Snapdragon FPS</string>
+    <string name="zyrox_jvm_ram_label">PER-INSTANCE JVM RAM</string>
+    <string name="zyrox_renderer_hint_default">Uses global Zyrox Control Center graphics renderer</string>
+    <string name="zyrox_renderer_hint_gles">Widest legacy compatibility (recommended for MC 1.16.5 and older; supports up to 1.21.4 vanilla)</string>
+    <string name="zyrox_renderer_hint_ltw">Modern OpenGL ES 3 pipeline — recommended for MC 1.17+ &amp; Sodium/Embeddium</string>
+    <string name="zyrox_renderer_hint_zink">Desktop OpenGL via Vulkan — suited for compatible shaders &amp; modern modpacks</string>
+    <string name="zyrox_renderer_hint_freedreno">Adreno Turnip/KGSL Vulkan driver path — tailored for supported Snapdragon GPUs</string>
 
-    <!-- Modrinth & Modpack Store -->
+    <!-- Modrinth & CurseForge Store -->
     <string name="zyrox_search_mods_hint">Search mods, modpacks, shaders...</string>
     <string name="zyrox_import_mrpack">IMPORT PACK</string>
     <string name="zyrox_platform_all">ALL</string>
@@ -77,18 +92,28 @@
     <string name="zyrox_select_version_title">COMPATIBLE VERSIONS</string>
     <string name="zyrox_loading_versions">Fetching compatible game versions...</string>
 
-    <!-- Settings / Zyrox Control Center -->
+    <!-- Settings / Zyrox Control Center / Accessibility / Performance -->
     <string name="zyrox_cat_video">VIDEO &amp; RENDERER</string>
     <string name="zyrox_cat_controls">CONTROLS &amp; INPUT</string>
     <string name="zyrox_cat_java">JAVA &amp; MEMORY</string>
     <string name="zyrox_cat_misc">MISCELLANEOUS</string>
     <string name="zyrox_cat_experimental">EXPERIMENTAL</string>
+    <string name="zyrox_cat_security">SECURITY &amp; GPU</string>
     <string name="zyrox_pref_animated_bg_title">Animated shader background</string>
-    <string name="zyrox_pref_animated_bg_summary">Enable live Minecraft shader motion, warm ambient embers, or custom zyrox_bg.mp4 loop.</string>
+    <string name="zyrox_pref_animated_bg_summary">Enable live Minecraft shader backdrop motion or custom zyrox_bg.mp4 loop.</string>
+    <string name="zyrox_pref_reduced_motion_title">Reduced motion</string>
+    <string name="zyrox_pref_reduced_motion_summary">Disable launcher transition animations, parallax movement, and button spring motion.</string>
+    <string name="zyrox_pref_low_effects_title">Low visual effects mode</string>
+    <string name="zyrox_pref_low_effects_summary">Simplify glass highlights and pause decorative layers for maximum efficiency on low-end devices.</string>
+    <string name="zyrox_pref_perf_hud_title">In-game performance HUD</string>
+    <string name="zyrox_pref_perf_hud_summary">Display real measured refresh rate (Hz), frame interval (ms), free RAM, thermal status, and session uptime.</string>
+    <string name="zyrox_pref_warn_mobile_title">Warn on metered mobile data</string>
+    <string name="zyrox_pref_warn_mobile_summary">Notify before running large version, asset, or modpack downloads over cellular data.</string>
+    <string name="zyrox_toggle_perf_hud">Toggle Performance HUD</string>
     <string name="zyrox_pref_select_bg_video_title">Custom background video (.mp4)</string>
-    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or long-press reset to built-in shader scene.</string>
+    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or reset to built-in scene.</string>
     <string name="zyrox_pref_reset_bg_video_title">Reset shader wallpaper</string>
-    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Create-Mod golden-hour shader canvas.</string>
+    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox golden-hour Minecraft shader canvas.</string>
     <string name="zyrox_ram_status_fmt">Allocated: %1$d MB  •  Free: %2$d MB / %3$d MB Total</string>
 
     <!-- Account & Skin Vault -->
@@ -110,15 +135,17 @@
     <string name="zyrox_hud_save">SAVE</string>
     <string name="zyrox_hud_more">PRESETS</string>
     <string name="zyrox_hud_exit">EXIT</string>
-    <string name="zyrox_hud_hint">TAP ANY BUTTON TO EDIT OPACITY, SCALE, RADIUS &amp; KEYCODES  •  DRAG TO ALIGN ON GRID</string>
+    <string name="zyrox_hud_hint">TAP ANY LIQUID GLASS CONTROL TO EDIT OPACITY, SCALE, RADIUS &amp; KEYCODES  •  DRAG TO ALIGN</string>
 
-    <!-- Crash & Log Inspector + Installer -->
+    <!-- Crash Analyzer (Zyrox Guard) & Log Inspector + Installer -->
+    <string name="zyrox_safe_mode_apply">SAFE MODE</string>
+    <string name="zyrox_safe_mode_applied">Safe Compatibility profile &amp; fallback renderer applied. Worlds and mods were not modified.</string>
     <string name="zyrox_copy_log">COPY LOG</string>
     <string name="zyrox_share_log">SHARE LOG</string>
     <string name="zyrox_relaunch">RELAUNCH ZYROX</string>
     <string name="zyrox_clear_log">CLEAR</string>
     <string name="zyrox_refresh_log">REFRESH</string>
-    <string name="zyrox_log_copied">Log copied to clipboard</string>
+    <string name="zyrox_log_copied">Redacted log copied to clipboard</string>
     <string name="zyrox_log_empty">No log entries recorded yet. Launch an instance or installer to capture live JVM &amp; renderer output.</string>
     <string name="zyrox_console_title">ZYROX CONSOLE</string>
     <string name="zyrox_installer_running">Executing Java Runtime &amp; Mod Installer...</string>

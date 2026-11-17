@@ -81,6 +81,13 @@ public class LauncherPreferences {
     public static boolean PREF_DISABLE_BLOCKLIST = false;
     public static String PREF_VULKAN_DRIVER = null;
     public static boolean PREF_ZYROX_ANIMATED_BG = true;
+    public static boolean PREF_ZYROX_REDUCED_MOTION = false;
+    public static boolean PREF_ZYROX_LOW_EFFECTS = false;
+    public static boolean PREF_ZYROX_PERF_HUD = false;
+    public static boolean PREF_ZYROX_WARN_MOBILE_DATA = true;
+    public static int PREF_ZYROX_DOWNLOAD_THREADS = 6;
+    public static int PREF_ZYROX_BACKUP_RETENTION = 5;
+    public static String PREF_ZYROX_GRAPHICS_PROFILE = "balanced";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -132,6 +139,14 @@ public class LauncherPreferences {
         PREF_DISABLE_BLOCKLIST = DEFAULT_PREF.getBoolean("disableServerBlocklist", true);
         PREF_VULKAN_DRIVER = DEFAULT_PREF.getString("customVulkanDriver", null);
         PREF_ZYROX_ANIMATED_BG = DEFAULT_PREF.getBoolean("zyroxAnimatedBg", true);
+        PREF_ZYROX_REDUCED_MOTION = DEFAULT_PREF.getBoolean("zyroxReducedMotion", false);
+        PREF_ZYROX_LOW_EFFECTS = DEFAULT_PREF.getBoolean("zyroxLowEffects", false);
+        PREF_ZYROX_PERF_HUD = DEFAULT_PREF.getBoolean("zyroxPerfHud", false);
+        PREF_ZYROX_WARN_MOBILE_DATA = DEFAULT_PREF.getBoolean("zyroxWarnMobileData", true);
+        PREF_ZYROX_DOWNLOAD_THREADS = Math.max(1, Math.min(8, DEFAULT_PREF.getInt("zyroxDownloadThreads", 6)));
+        PREF_ZYROX_BACKUP_RETENTION = Math.max(1, Math.min(25, DEFAULT_PREF.getInt("zyroxBackupRetention", 5)));
+        PREF_ZYROX_GRAPHICS_PROFILE = DEFAULT_PREF.getString("zyroxGraphicsProfile", "balanced");
+        git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";
         for (String arg : JREUtils.parseJavaArguments(PREF_CUSTOM_JAVA_ARGS)) {
@@ -235,5 +250,31 @@ public class LauncherPreferences {
 
     public static boolean hasVulkanDrivers() {
         return GpuUtils.getGlInfo().isAdreno();
+    }
+
+    /**
+     * Returns true when either the user enabled Reduced Motion in Zyrox Settings or Android system
+     * animator duration scale is turned off.
+     */
+    public static boolean isReducedMotionEnabled() {
+        if (PREF_ZYROX_REDUCED_MOTION) return true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return !android.animation.ValueAnimator.areAnimatorsEnabled();
+        }
+        return false;
+    }
+
+    public static boolean isReducedMotionEnabled(@androidx.annotation.Nullable Context ctx) {
+        if (isReducedMotionEnabled()) return true;
+        if (ctx != null) {
+            try {
+                float scale = android.provider.Settings.Global.getFloat(
+                        ctx.getContentResolver(),
+                        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f);
+                return scale <= 0.01f;
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
     }
 }

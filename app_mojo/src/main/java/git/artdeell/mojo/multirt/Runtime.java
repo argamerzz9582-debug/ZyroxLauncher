@@ -13,7 +13,7 @@ public class Runtime {
         this.arch = null;
         this.javaVersion = 0;
     }
-    Runtime(String name, String versionString, String arch, int javaVersion) {
+    public Runtime(String name, String versionString, String arch, int javaVersion) {
         this.name = name;
         this.versionString = versionString;
         this.arch = arch;

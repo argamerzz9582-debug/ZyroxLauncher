@@ -1,46 +1,94 @@
 package git.artdeell.mojo.input.handleview;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.vectordrawable.graphics.drawable.VectorDrawableCompat;
 
-import git.artdeell.mojo.R;
+import git.artdeell.mojo.ui.ZyroxControlGlyphRenderer;
+import git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable;
 
+/**
+ * In-game quick settings pull button styled in the signature Zyrox Liquid Glass squircle with
+ * 8-ray snow-white gear glyph, preserving original position and touch hitbox.
+ */
 public class DrawerPullButton extends View {
-    public DrawerPullButton(Context context) {super(context); init();}
-    public DrawerPullButton(Context context, @Nullable AttributeSet attrs) {super(context, attrs); init();}
+    private ZyroxLiquidGlassDrawable mGlassDrawable;
+    private ZyroxControlGlyphRenderer mGlyphRenderer;
 
-    private final Paint mBackgroundPaint = new Paint();
-    private VectorDrawableCompat mDrawable;
+    public DrawerPullButton(Context context) {
+        super(context);
+        init();
+    }
 
-    private void init(){
-        mDrawable = VectorDrawableCompat.create(getContext().getResources(), R.drawable.ic_sharp_settings_24, null);
-        setAlpha(0.33f);
-        mBackgroundPaint.setColor(Color.BLACK);
+    public DrawerPullButton(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    private void init() {
+        float density = getContext().getResources().getDisplayMetrics().density;
+        mGlassDrawable = new ZyroxLiquidGlassDrawable(density);
+        mGlyphRenderer = new ZyroxControlGlyphRenderer();
+        setAlpha(0.82f);
+        setContentDescription("In-game settings menu");
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            setPressed(true);
+            setAlpha(0.96f);
+            invalidate();
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            setPressed(false);
+            setAlpha(0.82f);
+            invalidate();
+        }
+        return super.onTouchEvent(event);
     }
 
     @Override
-    protected void onDraw(Canvas canvas) {
-        canvas.drawArc(getPaddingLeft(),-getHeight() + getPaddingBottom(),getWidth() - getPaddingRight(), getHeight() - getPaddingBottom(), 0, 180, true, mBackgroundPaint);
+    protected void drawableStateChanged() {
+        super.drawableStateChanged();
+        if (mGlassDrawable != null && mGlassDrawable.setState(getDrawableState())) {
+            invalidate();
+        }
+    }
 
-        mDrawable.setBounds(getPaddingLeft()/2, getPaddingTop()/2, getHeight() - getPaddingRight()/2, getHeight() - getPaddingBottom()/2);
+    @Override
+    protected void onDraw(@NonNull Canvas canvas) {
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 4 || h <= 4) return;
+
+        // Render centered Liquid Glass squircle pill + signature snow-white 8-ray gear glyph
+        int boxSize = Math.min(w, h);
+        int left = (w - boxSize) / 2;
+        int top = 0;
+        mGlassDrawable.setBounds(left, top, left + boxSize, top + boxSize);
+        mGlassDrawable.draw(canvas);
+
         canvas.save();
-        canvas.translate((getWidth()-getHeight())/2f, -getPaddingBottom()/2f);
-        mDrawable.draw(canvas);
+        canvas.translate(left, top);
+        mGlyphRenderer.drawGlyph(canvas, ZyroxControlGlyphRenderer.Glyph.GEAR, boxSize, boxSize);
         canvas.restore();
     }
 
-    // Move the button to the third quarter of the screen
+    // Move the button to the third quarter of the screen (preserves original reachable position)
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        int parentWidth = ((View) getParent()).getWidth();
-        setTranslationX((int)(parentWidth * 0.25));
+        View parent = (View) getParent();
+        if (parent != null) {
+            setTranslationX((int) (parent.getWidth() * 0.25f));
+        }
     }
 }

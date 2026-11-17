@@ -1,17 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox 2.0 Control Button XML Fallback — Exact Liquid Glass -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#8CF97316" />
-            <stroke android:width="1dp" android:color="#FDBA74" />
-            <corners android:radius="6dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient android:angle="270" android:startColor="#9EB0BCCB" android:endColor="#9AA6B3C4" />
+                    <stroke android:width="1.5dp" android:color="#F6FFFFFF" />
+                    <corners android:radius="11dp" />
+                </shape>
+            </item>
+            <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.9dp" android:color="#80F5F9FF" />
+                    <corners android:radius="8.5dp" />
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="4.5dp" android:right="10dp" android:height="2dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#1AFFFFFF" android:centerColor="#92FFFFFF" android:endColor="#1AFFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
     <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#80120E0C" />
-            <stroke android:width="1dp" android:color="#40FF8C42" />
-            <corners android:radius="6dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient android:angle="270" android:startColor="#90B1B8C2" android:endColor="#8CA4ACB7" />
+                    <stroke android:width="1.4dp" android:color="#F0FFFFFF" />
+                    <corners android:radius="11dp" />
+                </shape>
+            </item>
+            <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.9dp" android:color="#6EF4F7FA" />
+                    <corners android:radius="8.5dp" />
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="4.5dp" android:right="10dp" android:height="2dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#18FFFFFF" android:centerColor="#82FFFFFF" android:endColor="#18FFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </selector>

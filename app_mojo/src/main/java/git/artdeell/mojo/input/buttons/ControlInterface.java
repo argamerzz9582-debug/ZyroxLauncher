@@ -8,7 +8,6 @@ import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -25,6 +24,7 @@ import git.artdeell.mojo.input.LayoutBitmaps;
 import git.artdeell.mojo.input.handleview.EditControlSideDialog;
 import git.artdeell.mojo.game.platform.input.PlatformGrabListener;
 import git.artdeell.mojo.game.platform.Platform;
+import git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable;
 
 
 
@@ -122,15 +122,23 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
             }else {
                 drawable = new BitmapDrawable(getControlView().getResources(), bgBitmap);
             }
-        }else {
-            GradientDrawable gd = drawable instanceof GradientDrawable ?
-                    (GradientDrawable) drawable : new GradientDrawable();
-            gd.setColor(getProperties().bgColor);
-            gd.setStroke((int) Tools.dpToPx(getProperties().strokeWidth * (getControlLayoutParent().getLayoutScale()/100f)), getProperties().strokeColor);
-            gd.setCornerRadius(computeCornerRadius(getProperties().cornerRadius));
-            drawable = gd;
+        } else {
+            ControlLayout parentLayout = getControlLayoutParent();
+            float scale = parentLayout != null ? (parentLayout.getLayoutScale() / 100f) : 1f;
+            float density = getControlView().getResources().getDisplayMetrics().density;
+            ZyroxLiquidGlassDrawable lg = drawable instanceof ZyroxLiquidGlassDrawable
+                    ? (ZyroxLiquidGlassDrawable) drawable
+                    : new ZyroxLiquidGlassDrawable(density);
+            lg.configureControlStyle(
+                    getProperties().bgColor,
+                    getProperties().strokeColor,
+                    getProperties().strokeWidth * scale,
+                    getProperties().cornerRadius
+            );
+            drawable = lg;
         }
 
+        getControlView().setAlpha(MathUtils.clamp(getProperties().opacity, 0.08f, 1.0f));
         getControlView().setBackground(drawable);
     }
 
@@ -374,8 +382,8 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
                             mCanTriggerLongClick = false;
                         getControlLayoutParent().adaptPanelPosition();
                         snapAndAlign(
-                                MathUtils.clamp(event.getRawX() - downX, 0, getControlLayoutParent().getWidth() - view.getWidth()),
-                                MathUtils.clamp(event.getRawY() - downY, 0, getControlLayoutParent().getWidth() - view.getHeight())
+                                MathUtils.clamp(event.getRawX() - downX, 0, Math.max(0, getControlLayoutParent().getWidth() - view.getWidth())),
+                                MathUtils.clamp(event.getRawY() - downY, 0, Math.max(0, getControlLayoutParent().getHeight() - view.getHeight()))
                         );
                         break;
                     case MotionEvent.ACTION_UP:

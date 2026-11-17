@@ -75,7 +75,7 @@
 						android:layout_width="26dp"
 						android:layout_height="26dp"
 						android:indeterminate="true"
-						android:indeterminateTint="@color/zyrox_amber_stroke" />
+						android:indeterminateTint="@color/zyrox_lg_text" />
 
 					<TextView
 						android:id="@+id/main_loading_screen_text"
@@ -118,8 +118,8 @@
 			<git.artdeell.mojo.input.handleview.DrawerPullButton
 				android:id="@+id/drawer_button"
 				android:layout_width="40dp"
-				android:layout_height="20dp"
-				android:padding="8dp"
+				android:layout_height="34dp"
+				android:padding="2dp"
 				android:elevation="10dp"
 				android:layout_gravity="center_horizontal"/>
 			<git.artdeell.mojo.input.mouse.HotbarView

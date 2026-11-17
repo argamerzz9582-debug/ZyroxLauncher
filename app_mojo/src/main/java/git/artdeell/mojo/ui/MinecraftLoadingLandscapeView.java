@@ -556,7 +556,10 @@ public class MinecraftLoadingLandscapeView extends View {
             return;
         }
 
-        boolean animateNow = mRunning && areAnimatorsEnabledSafe();
+        boolean animateNow = mRunning
+                && !git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_REDUCED_MOTION
+                && !git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_LOW_EFFECTS
+                && areAnimatorsEnabledSafe();
         long nowMs = SystemClock.uptimeMillis();
         if (animateNow) {
             if (mLastFrameMs > 0L) {

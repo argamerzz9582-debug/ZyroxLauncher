@@ -11,11 +11,13 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import git.artdeell.mojo.diagnostics.ZyroxCrashAnalyzer;
+import git.artdeell.mojo.security.LogRedactor;
 import git.artdeell.mojo.ui.ZyroxLogHighlighter;
 
 /**
- * Page 7: Zyrox Fatal Crash Report Inspector with syntax-highlighted stack trace,
- * Copy Log, Share Log, and Relaunch Zyrox actions.
+ * Zyrox 2.0 Fatal Crash Report Inspector with Zyrox Guard smart diagnosis,
+ * automatic secret/token redaction on clipboard & share, and syntax-highlighted stack trace.
  */
 public class FatalErrorActivity extends AppCompatActivity {
 
@@ -32,22 +34,34 @@ public class FatalErrorActivity extends AppCompatActivity {
 
         boolean storageAllow = extras.getBoolean("storageAllow", false);
         Throwable throwable = (Throwable) extras.getSerializable("throwable");
-        final String stackTrace = throwable != null ? Tools.printToString(throwable) : "<null>";
+        final String rawTrace = throwable != null ? Tools.printToString(throwable) : "<null>";
+        final String redactedTrace = LogRedactor.redact(rawTrace);
         String strSavePath = extras.getString("savePath");
-        String errHeader = storageAllow
+        final String errHeader = LogRedactor.redact(storageAllow
                 ? "Crash report saved to " + strSavePath
-                : getString(R.string.error_fatal);
+                : getString(R.string.error_fatal));
 
         TextView subtitle = findViewById(R.id.tv_crash_subtitle);
         TextView traceView = findViewById(R.id.tv_crash_stacktrace);
         subtitle.setText(errHeader);
-        traceView.setText(ZyroxLogHighlighter.highlightBlock(stackTrace));
+        traceView.setText(ZyroxLogHighlighter.highlightBlock(redactedTrace));
+
+        // Zyrox Guard local crash classification
+        ZyroxCrashAnalyzer.Diagnosis diag = ZyroxCrashAnalyzer.analyze(redactedTrace);
+        View guardBox = findViewById(R.id.layout_zyrox_guard);
+        TextView guardSummary = findViewById(R.id.tv_zyrox_guard_summary);
+        if (guardBox != null && guardSummary != null
+                && diag.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
+            guardBox.setVisibility(View.VISIBLE);
+            guardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
+        }
 
         findViewById(R.id.btn_crash_close).setOnClickListener(v -> finish());
         findViewById(R.id.btn_crash_copy).setOnClickListener(v -> {
             ClipboardManager mgr = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (mgr != null) {
-                mgr.setPrimaryClip(ClipData.newPlainText("zyrox_crash", stackTrace));
+                mgr.setPrimaryClip(ClipData.newPlainText("zyrox_crash",
+                        diag.formatCompactSummary() + "\n\n" + redactedTrace));
                 Toast.makeText(this, R.string.zyrox_log_copied, Toast.LENGTH_SHORT).show();
             }
         });
@@ -56,7 +70,8 @@ public class FatalErrorActivity extends AppCompatActivity {
             Intent share = new Intent(Intent.ACTION_SEND);
             share.setType("text/plain");
             share.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.zyrox_title_crash_report));
-            share.putExtra(Intent.EXTRA_TEXT, errHeader + "\n\n" + stackTrace);
+            share.putExtra(Intent.EXTRA_TEXT,
+                    errHeader + "\n\n" + diag.formatCompactSummary() + "\n\n" + redactedTrace);
             startActivity(Intent.createChooser(share, getString(R.string.zyrox_share_log)));
         });
         findViewById(R.id.btn_crash_relaunch).setOnClickListener(v -> {

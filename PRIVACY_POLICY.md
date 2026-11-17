@@ -1,32 +1,46 @@
 # Privacy Policy — Zyrox Launcher
 
 **Effective Date:** November 16, 2026  
-**Application Package:** `com.zyrox.launcher`
+**Application:** Zyrox Launcher (`com.zyrox.launcher`)  
+**Official Repository:** <https://github.com/argamerzz9582-debug/ZyroxLauncher>
 
-## 1. Overview
-Zyrox Launcher is an open-source Minecraft: Java Edition launcher for Android. Zyrox Launcher contains **no advertising SDKs, no third-party analytics trackers, and no telemetry collection servers**.
+## 1. Zero Hidden Telemetry & Zero Trackers
+
+Zyrox Launcher is an open-source client application. It contains:
+- **No** advertising SDKs or behavioral tracking libraries.
+- **No** hidden analytics or silent usage telemetry.
+- **No** automatic background crash or log uploading.
+- **No** developer-operated server collecting your personal information, accounts, files, worlds, or gameplay history.
 
 ## 2. Data Stored Locally on Your Device
-- **Account Credentials**: When you sign in with Microsoft / Xbox Live or Ely.by, OAuth refresh tokens and Minecraft session tokens are stored solely on your device inside private application storage, encrypted with the Android hardware-backed Keystore (AES-256-GCM), and excluded from cloud/ADB backups. Offline/local accounts store only your chosen username locally.
-- **Game Data & Settings**: Minecraft instances, mods, resource packs, shader packs, Java runtimes, control layouts, and launcher settings are stored locally in the app's scoped storage directory.
-- **Crash & Runtime Logs**: Game and crash logs (`latestlog.txt`, `latestcrash.txt`) remain strictly on your device unless you explicitly choose to share them using the Android share sheet. Authentication tokens are scrubbed from logs.
 
-## 3. Network Communication
-All network traffic uses encrypted HTTPS/TLS connections directly between your device and the services you interact with:
-- Microsoft / Xbox Live / Mojang (`login.live.com`, `xboxlive.com`, `minecraftservices.com`, `mojang.com`) for account authentication and official game asset downloads.
-- Ely.by (`ely.by`) only if you choose to sign in with an Ely.by account.
-- Modrinth (`api.modrinth.com`) and CurseForge (`api.curseforge.com`) when browsing or installing community mods and modpacks.
+All launcher data stays locally inside Zyrox Launcher's Android app storage directory on your device:
+- **Account sessions:** Microsoft/Xbox/Minecraft or Ely.by tokens (stored strictly inside internal app-private storage, excluded from cloud backup/device transfer rules) and offline profile names.
+- **Game & instance data:** Installed Minecraft versions, OpenJDK runtimes, instances, singleplayer worlds, backups, mods, resource packs, shader packs, configs, saved multiplayer servers (`servers.dat`), local skin PNGs, and control layouts.
+- **Diagnostic logs & optional session metrics:** Local runtime log (`latestlog.txt`) and last-session performance metrics summary (when the optional in-game Performance HUD is enabled).
 
-## 4. Permissions Explained
-- **Internet & Network State**: Required for account sign-in and downloading Minecraft versions, libraries, and modpacks.
-- **Microphone (`RECORD_AUDIO`, optional)**: Requested only if you explicitly enable microphone access in Settings for in-game voice chat mods (such as Simple Voice Chat). Never recorded or transmitted by the launcher itself.
-- **Notifications (`POST_NOTIFICATIONS`, optional)**: Shows foreground download progress and active game session status.
-- **Foreground Service**: Keeps active game asset downloads and running Minecraft gameplay alive while in use.
-- **Vibration**: Optional haptic feedback for on-screen touch controls.
-- **Legacy Storage (Android 9 and below only)**: Used solely to store Minecraft game files on older Android versions.
+## 3. External Network Connections (User-Initiated)
 
-## 5. Data Deletion
-You can remove any signed-in account immediately from the in-app **Account Vault**, or delete all local data at any time by uninstalling Zyrox Launcher or clearing app storage in Android Settings.
+Zyrox Launcher connects over the network only to perform launcher functions you use:
+- **Microsoft / Xbox Live / Minecraft Services (`login.live.com`, `xboxlive.com`, `api.minecraftservices.com`, `mojang.com`, `minecraft.net`):** Official account sign-in, official skin upload (when explicitly chosen), and official Minecraft version, library, and asset downloads.
+- **Ely.by (optional):** Only if you choose to sign in with an Ely.by account.
+- **Modrinth & CurseForge APIs:** Only when browsing/installing mods or modpacks, or when you tap **Check Updates** in Mod Manager.
+- **GitHub / Runtime Mirrors:** Downloading OpenJDK runtimes or opening documentation links you tap.
+- **Multiplayer Servers:** Connecting to or pinging Minecraft servers you add and query.
 
-## 6. Contact
-For privacy or security inquiries, please open an issue or security advisory on the official Zyrox Launcher GitHub repository.
+Each third-party service governs its own requests under its respective privacy policy (Microsoft/Mojang, Modrinth, CurseForge, Ely.by, GitHub, and any multiplayer servers you join).
+
+## 4. Log Sharing & Automatic Redaction
+
+Logs and crash diagnostics are shared **only** when you explicitly tap **Copy Log**, **Share Log**, or **Copy Diagnostics**. Before copying or exporting, Zyrox Launcher automatically runs `LogRedactor` to redact access tokens, refresh tokens, JWTs, authorization headers, OAuth query codes, email addresses, and account UUIDs. Always review shared logs before posting them in public forums.
+
+## 5. Android Permissions
+
+- **Internet & Network State:** Downloading game files, authenticating accounts, browsing mods, connecting to multiplayer servers, and detecting metered mobile data.
+- **Foreground Service & Notifications:** Keeping active Minecraft sessions and file downloads running cleanly with visible status notifications.
+- **Microphone (optional, runtime-prompted):** Requested only if you explicitly enable microphone access for in-game voice chat mods; never recorded or transmitted by the launcher itself.
+- **Sensors (Gyroscope):** Used locally on-device only when optional gyroscope camera control is enabled.
+
+## 6. User Control & Data Deletion
+
+You have full control over all data stored by Zyrox Launcher. You can remove accounts, delete instances/worlds/skins/logs within the app at any time, or uninstall the app / clear app storage in Android Settings to erase all local data permanently.
