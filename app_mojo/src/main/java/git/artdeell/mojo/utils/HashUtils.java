@@ -13,19 +13,16 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 
 public class HashUtils {
 
-    public static final byte[] REQW_HASH = {0x51, 0x5d, 0x5f, 0x1c, 0x56, 0x5c, 0x53, 0x5f, 0x5d, 0x50, 0x5b, 0x5e, 0x57, 0x1c, 0x5f, 0x5d, 0x56, 0x5e, 0x4b, 0x5f, 0x5d, 0x56, 0x5f, 0x53, 0x5c, 0x53, 0x55, 0x57, 0x40};
-
     public static byte[] fileHash(MessageDigest messageDigest, File f) throws IOException {
         ByteBuffer buffer = ByteBuffer.allocateDirect(65535);
-        try(FileInputStream fileInputStream = new FileInputStream(f);
-            FileChannel channel = fileInputStream.getChannel()) {
-            while(true) {
+        try (FileInputStream fileInputStream = new FileInputStream(f);
+             FileChannel channel = fileInputStream.getChannel()) {
+            while (true) {
                 buffer.rewind();
-                if(channel.read(buffer) == -1) break;
+                if (channel.read(buffer) == -1) break;
                 buffer.flip();
                 messageDigest.update(buffer);
             }
@@ -36,25 +33,28 @@ public class HashUtils {
     public static String longHash(String source) {
         try {
             byte[] stringBytes = source.getBytes(StandardCharsets.UTF_8);
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             digest.update(stringBytes);
             byte[] hashBytes = digest.digest();
             return Base64.encodeToString(hashBytes, Base64.NO_PADDING | Base64.URL_SAFE | Base64.NO_WRAP);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("WTF? SHA-1 digest missing!", e);
+            throw new RuntimeException("SHA-256 digest unavailable", e);
         }
     }
 
-    public static boolean compareSHA1(File f, String sourceSHA) throws IOException{
+    /**
+     * Verifies downloaded Minecraft/Modrinth asset integrity against upstream-published SHA-1 hashes.
+     */
+    public static boolean compareSHA1(File f, String sourceSHA) throws IOException {
         try {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-1");
             byte[] wantedBytes = Hex.decodeHex(sourceSHA.toCharArray());
             byte[] localFileBytes = fileHash(messageDigest, f);
-            return Arrays.equals(localFileBytes, wantedBytes);
-        }catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("WTF? SHA-1 digest missing!", e);
-        }catch (DecoderException e) {
-            throw new IOException("Bad SHA-1 hash: "+sourceSHA+" for file "+f.getName());
+            return MessageDigest.isEqual(localFileBytes, wantedBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-1 digest unavailable", e);
+        } catch (DecoderException e) {
+            throw new IOException("Invalid digest format for file " + f.getName());
         }
     }
 }

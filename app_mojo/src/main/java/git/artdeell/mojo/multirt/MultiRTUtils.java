@@ -228,47 +228,65 @@ public class MultiRTUtils {
 
     @SuppressWarnings("SameParameterValue")
     private static void copyDummyNativeLib(String name, File dest) throws IOException {
-        File fileLib = new File(dest, name);
-        FileInputStream is = new FileInputStream(new File(NATIVE_LIB_DIR, name));
-        FileOutputStream os = new FileOutputStream(fileLib);
-        IOUtils.copy(is, os);
-        is.close();
-        os.close();
+        File fileLib = git.artdeell.mojo.utils.FileUtils.resolveInsideDirectory(dest, name);
+        try (FileInputStream is = new FileInputStream(new File(NATIVE_LIB_DIR, name));
+             FileOutputStream os = new FileOutputStream(fileLib)) {
+            IOUtils.copy(is, os);
+        }
     }
 
     private static void installRuntimeNamedNoRemove(InputStream runtimeInputStream, File dest) throws IOException {
-        uncompressTarXZ(runtimeInputStream,dest);
-        runtimeInputStream.close();
+        try (InputStream in = runtimeInputStream) {
+            uncompressTarXZ(in, dest);
+        }
     }
 
     private static void uncompressTarXZ(final InputStream tarFileInputStream, final File dest) throws IOException {
         git.artdeell.mojo.utils.FileUtils.ensureDirectory(dest);
+        String canonicalDest = dest.getCanonicalPath();
+        String canonicalPrefix = canonicalDest.endsWith(File.separator)
+                ? canonicalDest
+                : canonicalDest + File.separator;
 
         byte[] buffer = new byte[8192];
-        try(TarArchiveInputStream tarIn = new TarArchiveInputStream(new XZCompressorInputStream(tarFileInputStream))) {
+        try (TarArchiveInputStream tarIn = new TarArchiveInputStream(new XZCompressorInputStream(tarFileInputStream))) {
             TarArchiveEntry tarEntry;
-            // tarIn is a TarArchiveInputStream
             while ((tarEntry = tarIn.getNextTarEntry()) != null) {
-
                 final String tarEntryName = tarEntry.getName();
+                if (tarEntryName == null || tarEntryName.isEmpty() || tarEntryName.indexOf('\0') >= 0) {
+                    continue;
+                }
                 ProgressLayout.setProgress(ProgressLayout.UNPACK_RUNTIME, 100, R.string.global_unpacking, tarEntryName);
 
-                File destPath = new File(dest, tarEntry.getName());
+                File destPath = new File(dest, tarEntryName);
+                String canonicalEntry = destPath.getCanonicalPath();
+                if (!canonicalEntry.equals(canonicalDest) && !canonicalEntry.startsWith(canonicalPrefix)) {
+                    throw new IOException("Blocked TarSlip entry outside runtime directory: " + tarEntryName);
+                }
                 git.artdeell.mojo.utils.FileUtils.ensureParentDirectory(destPath);
                 if (tarEntry.isSymbolicLink()) {
+                    String linkTarget = tarEntry.getLinkName();
+                    if (linkTarget == null || linkTarget.isEmpty() || linkTarget.startsWith("/")) {
+                        Log.w("MultiRT", "Skipped unsafe absolute symlink in runtime archive");
+                        continue;
+                    }
+                    File resolvedTarget = new File(destPath.getParentFile(), linkTarget);
+                    String canonicalLinkTarget = resolvedTarget.getCanonicalPath();
+                    if (!canonicalLinkTarget.equals(canonicalDest) && !canonicalLinkTarget.startsWith(canonicalPrefix)) {
+                        Log.w("MultiRT", "Skipped symlink escaping runtime directory");
+                        continue;
+                    }
                     try {
-                        // android.system.Os
-                        // Libcore one support all Android versions
-                        Os.symlink(tarEntry.getName(), tarEntry.getLinkName());
+                        Os.symlink(linkTarget, destPath.getAbsolutePath());
                     } catch (Throwable e) {
-                        Log.e("MultiRT", e.toString());
+                        Log.w("MultiRT", "Symlink skipped: " + e.getMessage());
                     }
                 } else if (tarEntry.isDirectory()) {
                     git.artdeell.mojo.utils.FileUtils.ensureDirectory(destPath);
                 } else if (!destPath.exists() || destPath.length() != tarEntry.getSize()) {
-                    FileOutputStream os = new FileOutputStream(destPath);
-                    IOUtils.copyLarge(tarIn, os, buffer);
-                    os.close();
+                    try (FileOutputStream os = new FileOutputStream(destPath)) {
+                        IOUtils.copyLarge(tarIn, os, buffer);
+                    }
                 }
             }
         }

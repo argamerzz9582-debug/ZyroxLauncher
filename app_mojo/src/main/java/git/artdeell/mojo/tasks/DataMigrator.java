@@ -50,14 +50,12 @@ public class DataMigrator {
     }
 
     private Uri getFilesUri(Uri uri){
-        // Extract files subdirectory not to confuse copyFileTree
-        // Actually it shouldn't confuse anymore, but we copy files directly into "files" subdir already
         String[] projection = {DocumentsContract.Document.COLUMN_DOCUMENT_ID};
         String[] to = {"files"};
-        Cursor cursor = activity.getContentResolver().query(uri, projection, null, to, null);
-        if (cursor == null) throw new IllegalArgumentException();
-        cursor.moveToFirst();
-        return DocumentsContract.buildChildDocumentsUriUsingTree(uri, cursor.getString(0));
+        try (Cursor cursor = activity.getContentResolver().query(uri, projection, null, to, null)) {
+            if (cursor == null || !cursor.moveToFirst()) throw new IllegalArgumentException("Missing files directory");
+            return DocumentsContract.buildChildDocumentsUriUsingTree(uri, cursor.getString(0));
+        }
     }
 
     private void executeMigrate(){
@@ -91,12 +89,13 @@ public class DataMigrator {
     public void migrateData(){
         String authority = uri.getAuthority();
         if(authority == null) return;
-        // Shouldn't allow importing from any non-Mojo app
-        if(!authority.contains(activity.getString(R.string.group_id))) {
+        String groupId = activity.getString(R.string.group_id);
+        boolean isSupportedLauncher = authority.startsWith(groupId + ".") || authority.startsWith("git.artdeell.");
+        if(!isSupportedLauncher) {
             Toast.makeText(activity, R.string.migration_progress_foreign, Toast.LENGTH_LONG).show();
             return;
         }
-        // also shouldn't allow importing from self
+        // Shouldn't allow importing from self
         if(authority.equals(activity.getString(R.string.storageProviderAuthorities))){
             Toast.makeText(activity, R.string.migration_progress_self, Toast.LENGTH_LONG).show();
             return;
@@ -104,44 +103,34 @@ public class DataMigrator {
         sExecutorService.submit(this::executeMigrate);
     }
 
-    // Copy a file tree into the home directory
-    // The progress bar here works easy & dumb: each entry is a portion of initial 100 percents
-    // Each file will increment the progress by this portion, each directory will receive the portion
-    // to further divide it by files/folders amount in this directory
-    // both files in the end will increment the progress bar by the portion this call received
-    // Folder1(100%)
-    //          -> Folder2(50%), File2(50%)
-    //                  -> Folder3(25%), File3(25%)
-    //                          -> (File4(12,5%), File5(12,5%)
-    // Surprisingly no LLM model told me about this algorithm lol
     private void copyFileTree(Activity activity, Uri source, File dest, double progressPortion) throws IOException {
         ContentResolver cr = activity.getContentResolver();
         try(Cursor cursor = cr.query(source, TREE_PROJECTION, null, null, null)) {
             if (cursor == null) throw new IllegalArgumentException();
             int count = cursor.getCount();
+            if (count == 0) return;
             double step = progressPortion / (double) count;
             cursor.moveToPosition(-1);
             while (cursor.moveToNext()) {
-                String file = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
+                String rawName = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME));
+                String file = git.artdeell.mojo.utils.FileUtils.getFileName(rawName);
+                if (file == null || "accounts".equalsIgnoreCase(file)) continue;
                 String type = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE));
                 String id = cursor.getString(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID));
                 long size = cursor.getLong(cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE));
                 Uri child = DocumentsContract.buildChildDocumentsUriUsingTree(source, id);
-                if (type.equals(DocumentsContract.Document.MIME_TYPE_DIR)) {
-                    File destDir = new File(dest, file);
-                    // Prevent instance collisions
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(type)) {
+                    File destDir = git.artdeell.mojo.utils.FileUtils.resolveInsideDirectory(dest, file);
                     if(destDir.exists() && dest.getName().equals("instances"))
                         continue;
                     if (!destDir.exists()) destDir.mkdirs();
                     copyFileTree(activity, child, destDir, step);
-                }
-                // Assuming file
-                else {
-                    File destFile = new File(dest, file);
-                    // Ignore files with the same size
-                    // I mean this check may trigger for non-equal files, but this is designed only for clean import anyway
-                    if(destFile.length() == size) continue;
-                    Tools.write(cr.openInputStream(child), destFile);
+                } else {
+                    File destFile = git.artdeell.mojo.utils.FileUtils.resolveInsideDirectory(dest, file);
+                    if(destFile.exists() && destFile.length() == size) continue;
+                    try (java.io.InputStream in = cr.openInputStream(child)) {
+                        if (in != null) Tools.write(in, destFile);
+                    }
                 }
                 updateProgress(step, file);
             }

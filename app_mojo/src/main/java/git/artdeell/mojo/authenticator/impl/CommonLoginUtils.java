@@ -20,11 +20,16 @@ import git.artdeell.mojo.R;
 public class CommonLoginUtils {
 
     public static OAuthTokenResponse exchangeAuthCode(URL url, String formData) throws IOException, PresentableException {
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            throw new IOException("Refusing OAuth token exchange over non-HTTPS endpoint");
+        }
         HttpURLConnection conn = (HttpURLConnection)url.openConnection();
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         conn.setRequestProperty("charset", "utf-8");
         conn.setRequestProperty("Content-Length", Integer.toString(formData.getBytes(StandardCharsets.UTF_8).length));
         conn.setRequestMethod("POST");
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(20000);
         conn.setUseCaches(false);
         conn.setDoInput(true);
         conn.setDoOutput(true);
@@ -33,14 +38,17 @@ public class CommonLoginUtils {
             wr.write(formData.getBytes(StandardCharsets.UTF_8));
         }
         if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
-            try (InputStreamReader reader = new InputStreamReader(conn.getInputStream())) {
+            try (InputStreamReader reader = new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8)) {
                 return Tools.GLOBAL_GSON.fromJson(reader, OAuthTokenResponse.class);
             } finally {
                 conn.disconnect();
             }
         }else{
-            Log.i("CommonLogin", "Auth fail: "+Tools.read(conn.getErrorStream()));
-            throw getResponseThrowable(conn);
+            try {
+                throw getResponseThrowable(conn);
+            } finally {
+                conn.disconnect();
+            }
         }
     }
 

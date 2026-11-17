@@ -296,8 +296,6 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 }
         );
         checkNotificationPermission();
-        if (LauncherPreferences.PREF_MIGRATION_NOTICE)
-            MojoApplication.sExecutorService.submit(this::checkPreviousInstalls);
 
         mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         ProgressKeeper.addTaskCountListener(mDoubleLaunchPreventionListener);
@@ -428,22 +426,6 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             return;
         }
         showNotificationPermissionReasoning();
-    }
-
-    private void checkPreviousInstalls() {
-        final String[] packages = {"git.artdeell.mojo", "git.artdeell.mojo.debug", "git.artdeell.mojo.pub"};
-        for (String s : packages) {
-            Intent i = getPackageManager().getLaunchIntentForPackage(s);
-            if (i == null) continue;
-            Tools.runOnUiThread(() ->
-                    new AlertDialog.Builder(this)
-                            .setTitle(R.string.migration_progress_warning_title)
-                            .setMessage(R.string.migration_notice)
-                            .setPositiveButton(android.R.string.ok, (d, button) -> LauncherPreferences.DEFAULT_PREF.edit().putBoolean("migrationNotice", false).apply())
-                            .setOnDismissListener(d -> LauncherPreferences.PREF_MIGRATION_NOTICE = false)
-                            .show());
-            break;
-        }
     }
 
     private void showNotificationPermissionReasoning() {

@@ -16,36 +16,38 @@ public class ZipUtils {
     /**
      * Gets an InputStream for a given ZIP entry, throwing an IOException if the ZIP entry does not
      * exist.
-     * @param zipFile The ZipFile to get the entry from
-     * @param entryPath The full path inside of the ZipFile
-     * @return The InputStream provided by the ZipFile
-     * @throws IOException if the entry was not found
      */
-    public static InputStream getEntryStream(ZipFile zipFile, String entryPath) throws IOException{
+    public static InputStream getEntryStream(ZipFile zipFile, String entryPath) throws IOException {
         ZipEntry entry = zipFile.getEntry(entryPath);
-        if(entry == null) throw new IOException("No entry in ZIP file: "+entryPath);
+        if (entry == null) throw new IOException("No entry in ZIP file: " + entryPath);
         return zipFile.getInputStream(entry);
     }
 
     /**
      * Extracts all files in a ZipFile inside of a given directory to a given destination directory
-     * How to specify dirName:
-     * If you want to extract all files in the ZipFile, specify ""
-     * If you want to extract a single directory, specify its full path followed by a trailing /
-     * @param zipFile The ZipFile to extract files from
-     * @param dirName The directory to extract the files from
-     * @param destination The destination directory to extract the files into
-     * @throws IOException if it was not possible to create a directory or file extraction failed
+     * with strict canonical path containment against ZipSlip (CWE-22).
      */
     public static void zipExtract(ZipFile zipFile, String dirName, File destination) throws IOException {
-        Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
+        FileUtils.ensureDirectory(destination);
+        String canonicalBase = destination.getCanonicalPath();
+        String canonicalPrefix = canonicalBase.endsWith(File.separator)
+                ? canonicalBase
+                : canonicalBase + File.separator;
 
+        Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
         int dirNameLen = dirName.length();
-        while(zipEntries.hasMoreElements()) {
+        while (zipEntries.hasMoreElements()) {
             ZipEntry zipEntry = zipEntries.nextElement();
             String entryName = zipEntry.getName();
-            if(!entryName.startsWith(dirName) || zipEntry.isDirectory()) continue;
-            File zipDestination = new File(destination, entryName.substring(dirNameLen));
+            if (!entryName.startsWith(dirName) || zipEntry.isDirectory()) continue;
+            String relativeName = entryName.substring(dirNameLen);
+            if (relativeName.isEmpty() || relativeName.indexOf('\0') >= 0) continue;
+
+            File zipDestination = new File(destination, relativeName);
+            String canonicalTarget = zipDestination.getCanonicalPath();
+            if (!canonicalTarget.startsWith(canonicalPrefix)) {
+                throw new IOException("Blocked ZipSlip entry outside destination: " + entryName);
+            }
             FileUtils.ensureParentDirectory(zipDestination);
             try (InputStream inputStream = zipFile.getInputStream(zipEntry);
                  OutputStream outputStream = new FileOutputStream(zipDestination)) {
@@ -55,19 +57,33 @@ public class ZipUtils {
     }
 
     /**
-     * Extract ZipInputStream to destination
-     * @param inputStream ZipInputStream
-     * @param destination Destination path
-     * @throws IOException if file extraction failed
+     * Extracts a ZipInputStream into {@code destination} with strict canonical path containment
+     * against ZipSlip (CWE-22).
      */
     public static void zipStreamExtract(ZipInputStream inputStream, File destination) throws IOException {
+        FileUtils.ensureDirectory(destination);
+        String canonicalBase = destination.getCanonicalPath();
+        String canonicalPrefix = canonicalBase.endsWith(File.separator)
+                ? canonicalBase
+                : canonicalBase + File.separator;
+
         ZipEntry entry;
-        while((entry = inputStream.getNextEntry()) != null) {
-            if(entry.isDirectory()) {
-                FileUtils.ensureDirectory(new File(destination, entry.getName()));
+        while ((entry = inputStream.getNextEntry()) != null) {
+            String entryName = entry.getName();
+            if (entryName == null || entryName.isEmpty() || entryName.indexOf('\0') >= 0) {
                 continue;
             }
-            try(FileOutputStream fs = new FileOutputStream(new File(destination, entry.getName()))) {
+            File targetFile = new File(destination, entryName);
+            String canonicalTarget = targetFile.getCanonicalPath();
+            if (!canonicalTarget.equals(canonicalBase) && !canonicalTarget.startsWith(canonicalPrefix)) {
+                throw new IOException("Blocked ZipSlip entry outside destination: " + entryName);
+            }
+            if (entry.isDirectory()) {
+                FileUtils.ensureDirectory(targetFile);
+                continue;
+            }
+            FileUtils.ensureParentDirectory(targetFile);
+            try (FileOutputStream fs = new FileOutputStream(targetFile)) {
                 IOUtils.copy(inputStream, fs);
             }
         }

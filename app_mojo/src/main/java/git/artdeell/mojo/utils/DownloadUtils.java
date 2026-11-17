@@ -23,30 +23,25 @@ public class DownloadUtils {
     }
 
     public static void download(URL url, OutputStream os) throws IOException {
-        InputStream is = null;
+        HttpURLConnection conn = null;
         try {
-            // System.out.println("Connecting: " + url.toString());
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn = (HttpURLConnection) url.openConnection();
             conn.setRequestProperty("User-Agent", USER_AGENT);
-            conn.setConnectTimeout(10000);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(30000);
             conn.setDoInput(true);
             conn.connect();
             if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
                 throw new IOException("Server returned HTTP " + conn.getResponseCode()
                         + ": " + conn.getResponseMessage());
             }
-            is = conn.getInputStream();
-            IOUtils.copy(is, os);
+            try (InputStream is = conn.getInputStream()) {
+                IOUtils.copy(is, os);
+            }
         } catch (IOException e) {
             throw new IOException("Unable to download from " + url, e);
         } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+            if (conn != null) conn.disconnect();
         }
     }
 
@@ -69,8 +64,11 @@ public class DownloadUtils {
         FileUtils.ensureParentDirectory(outputFile);
 
         HttpURLConnection conn = (HttpURLConnection) new URL(urlInput).openConnection();
-        InputStream readStr = conn.getInputStream();
-        try (FileOutputStream fos = new FileOutputStream(outputFile)) {
+        conn.setRequestProperty("User-Agent", USER_AGENT);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(30000);
+        try (InputStream readStr = conn.getInputStream();
+             FileOutputStream fos = new FileOutputStream(outputFile)) {
             int current;
             int overall = 0;
             int length = conn.getContentLength();
@@ -82,13 +80,15 @@ public class DownloadUtils {
                 fos.write(buffer, 0, current);
                 monitor.updateProgress(overall, length);
             }
+        } finally {
             conn.disconnect();
         }
-
     }
 
     public static <T> T downloadStringCached(String url, String cacheName, ParseCallback<T> parseCallback) throws IOException, ParseException{
-        File cacheDestination = new File(Tools.DIR_CACHE, "string_cache/"+cacheName);
+        File cacheRoot = new File(Tools.DIR_CACHE, "string_cache");
+        FileUtils.ensureDirectorySilently(cacheRoot);
+        File cacheDestination = FileUtils.resolveInsideDirectory(cacheRoot, cacheName);
         if(cacheDestination.isFile() &&
                 cacheDestination.canRead() &&
                 System.currentTimeMillis() < (cacheDestination.lastModified() + 86400000)) {

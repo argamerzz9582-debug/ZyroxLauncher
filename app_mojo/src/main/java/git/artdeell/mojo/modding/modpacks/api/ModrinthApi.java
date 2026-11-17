@@ -196,14 +196,20 @@ public class ModrinthApi implements ModpackApi{
         }
 
         protected void startDownloads(ModrinthIndex.ModrinthIndexFile[] indexFiles, File instanceDestination) throws IOException, InterruptedException {
-            String absoluteInstancePath = instanceDestination.getAbsolutePath();
+            FileUtils.ensureDirectory(instanceDestination);
             ArrayList<TaskMetadata> taskMetadatas = new ArrayList<>(indexFiles.length);
             for(ModrinthIndex.ModrinthIndexFile file : indexFiles) {
-                File targetPath = new File(instanceDestination, file.path);
-                if(!targetPath.getAbsolutePath().startsWith(absoluteInstancePath)) throw new IOException("Bad path!");
+                File targetPath = FileUtils.resolveInsideDirectory(instanceDestination, file.path);
+                if (file.downloads == null || file.downloads.length == 0) {
+                    throw new IOException("Missing modpack file download URL");
+                }
+                URL downloadUrl = new URL(file.downloads[0]);
+                if (!"https".equalsIgnoreCase(downloadUrl.getProtocol())) {
+                    throw new IOException("Blocked non-HTTPS modpack download URL");
+                }
                 FileUtils.ensureParentDirectory(targetPath);
                 taskMetadatas.add(new TaskMetadata(
-                        targetPath, new URL(file.downloads[0]), // TODO source selection
+                        targetPath, downloadUrl,
                         file.fileSize, file.hashes.sha1,
                         DownloadMirror.DOWNLOAD_CLASS_NONE
                 ));

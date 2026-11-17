@@ -5,6 +5,12 @@ app_mojo/src/main/assets/components/jre
 /app_mojo/src/main/assets/components/jre-new/
 /app_mojo/src/main/assets/components/jre-21/
 local.properties
+keystore.properties
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.key
 .idea/
 app_mojo/.cxx/
 .vs/

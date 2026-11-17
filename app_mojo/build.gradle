@@ -21,11 +21,10 @@ def getVersionName = {
     def latestCommit = grgit.log(maxCommits: 1)
     def dateToday = getDate()
     if(currentBranch == null || latestCommit == null) {
-        return "LOCAL-${dateToday}"
+        return "1.0.1-${dateToday}"
     }else {
-        def branchName = currentBranch.getName()
         def commitAbbreviation = latestCommit.abbreviatedId
-        return "zyrox-${dateToday}-${commitAbbreviation}-${branchName}"
+        return "1.0.1-${dateToday}-${commitAbbreviation}"
     }
 }
 
@@ -56,36 +55,39 @@ android {
         abortOnError false
     }
 
+    def releaseKeystorePath = System.getenv("ZYROX_KEYSTORE_PATH")
+    def releaseKeystorePassword = System.getenv("ZYROX_KEYSTORE_PASSWORD")
+    def releaseKeyAlias = System.getenv("ZYROX_KEY_ALIAS")
+    def releaseKeyPassword = System.getenv("ZYROX_KEY_PASSWORD")
+    def hasReleaseSigning = releaseKeystorePath != null && !releaseKeystorePath.isEmpty() &&
+            new File(releaseKeystorePath).isFile() &&
+            releaseKeystorePassword != null && !releaseKeystorePassword.isEmpty() &&
+            releaseKeyAlias != null && !releaseKeyAlias.isEmpty()
+
     signingConfigs {
-        customDebug {
-            storeFile file("debug.keystore")
-            storePassword "android"
-            keyAlias "androiddebugkey"
-            keyPassword "android"
-        }
-        googlePlayBuild {
-            storeFile file("mojo_upload_next.jks")
-            storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
-            keyAlias "key0"
-            keyPassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
-        }
-        publicBuild {
-            storeFile file("mojo_release_next.jks")
-            storePassword System.getenv("MOJOPUB_KEYSTORE_PASSWORD")
-            keyAlias "key0"
-            keyPassword System.getenv("MOJOPUB_KEYSTORE_PASSWORD")
+        zyroxRelease {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword (releaseKeyPassword != null && !releaseKeyPassword.isEmpty() ? releaseKeyPassword : releaseKeystorePassword)
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+                enableV4Signing true
+            }
         }
     }
 
     defaultConfig {
-        applicationId "git.artdeell.mjlaunch"
+        applicationId "com.zyrox.launcher"
         minSdkVersion 21
         targetSdkVersion 36
         versionCode getDateSeconds()
         versionName getVersionName()
         multiDexEnabled false //important
         resValue 'string', 'curseforge_api_key', getCFApiKey()
-        resValue 'string', 'group_id', 'git.artdeell'
+        resValue 'string', 'group_id', 'com.zyrox'
     }
 
     flavorDimensions  = ["runtime"]
@@ -107,9 +109,8 @@ android {
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.customDebug
-            resValue 'string', 'application_package', 'git.artdeell.mjlaunch.debug'
-            resValue 'string', 'storageProviderAuthorities', 'git.artdeell.mjlaunch.scoped.gamefolder.debug'
+            resValue 'string', 'application_package', 'com.zyrox.launcher.debug'
+            resValue 'string', 'storageProviderAuthorities', 'com.zyrox.launcher.debug.scoped.gamefolder'
         }
         proguard {
             initWith debug
@@ -123,23 +124,27 @@ android {
         }
 
         release {
-            // Don't set to true or java.awt will be a.a or something similar.
+            // Keep minifyEnabled false because embedded AWT/LWJGL/JNI bridges resolve Java classes by name.
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // defaultConfig already set
-            // multiDexEnabled = true
-            // debuggable = true
-            resValue 'string', 'storageProviderAuthorities', 'git.artdeell.mjlaunch.scoped.gamefolder'
-            resValue 'string', 'application_package', 'git.artdeell.mjlaunch'
+            shrinkResources false
+            debuggable false
+            jniDebuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.zyroxRelease
+            }
+            ndk {
+                debugSymbolLevel 'NONE'
+            }
+            resValue 'string', 'storageProviderAuthorities', 'com.zyrox.launcher.scoped.gamefolder'
+            resValue 'string', 'application_package', 'com.zyrox.launcher'
         }
         gplay {
             initWith release
-            signingConfig signingConfigs.googlePlayBuild
             matchingFallbacks += List.of("release")
         }
         pubRelease {
             initWith release
-            signingConfig signingConfigs.publicBuild
             matchingFallbacks += List.of("release")
         }
     }

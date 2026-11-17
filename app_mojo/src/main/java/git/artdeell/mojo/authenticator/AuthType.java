@@ -20,7 +20,7 @@ public enum AuthType {
             ElyByBackgroundLogin.CREATOR,
             R.drawable.ic_auth_elyby,
             "ely.by",
-            "http://skinsystem.ely.by/skins/%s.png"
+            "https://skinsystem.ely.by/skins/%s.png"
     ),
     @SerializedName("local")
     LOCAL(null, 0, null, null);

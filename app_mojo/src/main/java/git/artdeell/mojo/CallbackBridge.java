@@ -99,16 +99,23 @@ public class CallbackBridge {
 
     @Keep
     public static void openLink(String link) {
-        ContextExecutor.executeActivity(ctx->{
+        if (link == null || link.isEmpty()) return;
+        ContextExecutor.executeActivity(ctx -> {
             try {
-                if(link.startsWith("file:")) {
-                    int truncLength = 5;
-                    if(link.startsWith("file://")) truncLength = 7;
-                    String path = link.substring(truncLength);
-                    Tools.openPath(ctx, new File(path), false);
-                }else {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setDataAndType(Uri.parse(link), "*/*");
+                if (link.startsWith("file:")) {
+                    int truncLength = link.startsWith("file://") ? 7 : 5;
+                    File target = new File(link.substring(truncLength));
+                    File safeTarget = git.artdeell.mojo.utils.FileUtils.ensureInsideDirectory(
+                            new File(Tools.DIR_GAME_HOME), target);
+                    Tools.openPath(ctx, safeTarget, false);
+                } else {
+                    Uri uri = Uri.parse(link);
+                    String scheme = uri.getScheme();
+                    if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) {
+                        return;
+                    }
+                    Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                    intent.addCategory(Intent.CATEGORY_BROWSABLE);
                     ctx.startActivity(intent);
                 }
             } catch (Throwable th) {
@@ -117,11 +124,14 @@ public class CallbackBridge {
         });
     }
 
-    @SuppressWarnings("unused") //TODO: actually use it
+    @SuppressWarnings("unused")
     public static void openPath(String path) {
-        ContextExecutor.executeActivity(ctx->{
+        if (path == null || path.isEmpty()) return;
+        ContextExecutor.executeActivity(ctx -> {
             try {
-                Tools.openPath(ctx, new File(path), false);
+                File safeTarget = git.artdeell.mojo.utils.FileUtils.ensureInsideDirectory(
+                        new File(Tools.DIR_GAME_HOME), new File(path));
+                Tools.openPath(ctx, safeTarget, false);
             } catch (Throwable th) {
                 Tools.showError(ctx, th);
             }

@@ -20,7 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
-import java.util.Random;
+import java.security.SecureRandom;
 
 import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
@@ -213,7 +213,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         private final Paint mCorePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint mGlowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint mSunbeamPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Random mRandom = new Random(0x5A5952L);
+        private final SecureRandom mRandom = new SecureRandom();
         private boolean mRunning = false;
         private boolean mSeeded = false;
         private long mStartTimeMs = 0L;

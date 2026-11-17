@@ -87,7 +87,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
                 msXsts  = xsts[0];
                 continuation.call();
             }catch (Exception e){
-                Log.e("MicroAuth", "Exception thrown during authentication", e);
+                Log.e("MicroAuth", "Authentication step failed: " + e.getClass().getSimpleName());
                 Tools.runOnUiThread(()->loginListener.onLoginError(e));
             } finally {
                 ProgressLayout.clearProgress(ProgressLayout.AUTHENTICATE);
@@ -127,7 +127,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
 
     private String acquireAccessToken(boolean isRefresh, String code) throws IOException, PresentableException {
         URL url = new URL(authTokenUrl);
-        Log.i("MicrosoftLogin", "isRefresh=" + isRefresh + ", authCode= "+code);
+        Log.i("MicrosoftLogin", "Exchanging OAuth grant (refresh=" + isRefresh + ")");
 
         String formData = CommonLoginUtils.convertToFormData(
                 "client_id", "00000000402b5328",
@@ -165,9 +165,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
             JSONObject jo = new JSONObject(Tools.read(conn.getInputStream()));
             conn.disconnect();
-            Log.i("MicrosoftLogin","Xbl Token = "+jo.getString("Token"));
             return jo.getString("Token");
-            //acquireXsts(jo.getString("Token"));
         }else{
             throw CommonLoginUtils.getResponseThrowable(conn);
         }
@@ -186,10 +184,8 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         data.put("TokenType", "JWT");
 
         String req = data.toString();
-        Log.i("MicroAuth", req);
         HttpURLConnection conn = (HttpURLConnection)url.openConnection();
         setCommonProperties(conn, req);
-        Log.i("MicroAuth", conn.getRequestMethod());
         conn.connect();
 
         try(OutputStream wr = conn.getOutputStream()) {
@@ -201,9 +197,7 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
             String uhs = jo.getJSONObject("DisplayClaims").getJSONArray("xui").getJSONObject(0).getString("uhs");
             String token = jo.getString("Token");
             conn.disconnect();
-            Log.i("MicrosoftLogin","Xbl Xsts = " + token + "; Uhs = " + uhs);
             return new String[]{uhs, token};
-            //acquireMinecraftToken(uhs,jo.getString("Token"));
         }else if(conn.getResponseCode() == 401) {
             String responseContents = Tools.read(conn.getErrorStream());
             JSONObject jo = new JSONObject(responseContents);
@@ -237,10 +231,8 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
             expiresAt = System.currentTimeMillis() + 86400000;
             JSONObject jo = new JSONObject(Tools.read(conn.getInputStream()));
             conn.disconnect();
-            Log.i("MicrosoftLogin","MC token: "+jo.getString("access_token"));
             mcToken = jo.getString("access_token");
-            //checkMcProfile(jo.getString("access_token"));
-            return jo.getString("access_token");
+            return mcToken;
         }else{
             throw CommonLoginUtils.getResponseThrowable(conn);
         }
@@ -251,14 +243,17 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
 
         HttpURLConnection conn = (HttpURLConnection)url.openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + mcAccessToken);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(20000);
         conn.setUseCaches(false);
         conn.connect();
-        if(conn.getResponseCode() < 200 || conn.getResponseCode() >= 300) {
-            throw CommonLoginUtils.getResponseThrowable(conn);
+        try {
+            if(conn.getResponseCode() < 200 || conn.getResponseCode() >= 300) {
+                throw CommonLoginUtils.getResponseThrowable(conn);
+            }
+        } finally {
+            conn.disconnect();
         }
-        // We don't need any data from this request, it just needs to happen in order for
-        // the MS servers to work properly. The data from this is practically useless
-        // as it does not indicate whether the user owns the game through Game Pass.
     }
 
     private void checkProfile(String mcAccessToken) throws IOException, JSONException, PresentableException {
@@ -266,13 +261,14 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
 
         HttpURLConnection conn = (HttpURLConnection)url.openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + mcAccessToken);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(20000);
         conn.setUseCaches(false);
         conn.connect();
 
         if(conn.getResponseCode() >= 200 && conn.getResponseCode() < 300) {
             String s= Tools.read(conn.getInputStream());
             conn.disconnect();
-            Log.i("MicrosoftLogin","profile:" + s);
             JSONObject jsonObject = new JSONObject(s);
             String name = (String) jsonObject.get("name");
             String uuid = (String) jsonObject.get("id");
@@ -280,15 +276,13 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
                     "(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)", "$1-$2-$3-$4-$5"
             );
             doesOwnGame = true;
-            Log.i("MicrosoftLogin","UserName = " + name);
-            Log.i("MicrosoftLogin","Uuid = " + uuidDashes);
             mcName=name;
             mcUuid=uuidDashes;
         }else{
+            conn.disconnect();
             Log.i("MicrosoftLogin","It seems that this Microsoft Account does not own the game.");
             doesOwnGame = false;
             throw new PresentableException(new RuntimeException(conn.getResponseMessage()), R.string.mc_not_owned);
-            //throwResponseError(conn);
         }
     }
 
@@ -304,11 +298,13 @@ public class MicrosoftBackgroundLogin implements BackgroundLogin{
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("charset", "utf-8");
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(20000);
         try {
             conn.setRequestProperty("Content-Length", Integer.toString(formData.getBytes(StandardCharsets.UTF_8).length));
             conn.setRequestMethod("POST");
         }catch (ProtocolException e) {
-            Log.e("MicrosoftAuth", e.toString());
+            Log.e("MicrosoftAuth", "Failed to configure POST request");
         }
         conn.setUseCaches(false);
         conn.setDoInput(true);
