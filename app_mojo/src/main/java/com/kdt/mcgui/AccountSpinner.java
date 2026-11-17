@@ -63,7 +63,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
         @Override
         public boolean onValueSet(String key, @NonNull String value) {
-            mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
+            mLoginBarPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.zyrox_amber_bright));
             BackgroundLogin backgroundLogin = mAuthType.createAuth();
             backgroundLogin.createAccount(AccountSpinner.this, value);
             return false;
@@ -131,7 +131,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         setPopupBackgroundDrawable(ResourcesCompat.getDrawable(getResources(), R.drawable.bg_zyrox_glass_modal, getContext().getTheme()));
         mLoginBarPaint.setAntiAlias(true);
         mLoginBarPaint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-        mLoginBarPaint.setColor(getResources().getColor(R.color.zyrox_amber));
+        mLoginBarPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.zyrox_amber_bright));
         mLoginBarPaint.setStrokeWidth(Math.max(2f, 2f * getResources().getDisplayMetrics().density));
         mLoginStepAnimator.addUpdateListener(this);
         mLoginStep = mMaxSteps;
@@ -142,18 +142,30 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         ExtraCore.addExtraListener(ExtraConstants.REFRESH_ACCOUNT_SPINNER, mRefreshAccountsListener);
     }
 
+    /**
+     * Releases static ExtraCore listeners and active login animator when the host Activity finishes.
+     */
+    public void cleanUpListeners() {
+        mLoginStepAnimator.cancel();
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.MOJANG_LOGIN_TODO, mMojangLoginListener);
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.ELYBY_LOGIN_TODO, mElyByLoginListener);
+        ExtraCore.removeExtraListenerFromValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, mRefreshAccountsListener);
+    }
+
     private void reload() {
         MojoApplication.sExecutorService.execute(()->{
             try {
                 Accounts accounts = Accounts.load();
                 Tools.runOnUiThread(()->refresh(accounts));
             } catch (IOException e) {
-                 throw new RuntimeException(e);
+                android.util.Log.e("AccountSpinner", "Failed to load saved accounts", e);
             }
         });
     }
 
     private void refresh(Accounts accounts) {
+        if (accounts == null || accounts.accounts == null) return;
         mAdapter.setNotifyOnChange(false);
         mAdapter.clear();
         mAdapter.add(null);
@@ -163,8 +175,12 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         if(accounts.accounts.isEmpty()) {
             setSelection(0);
         } else {
-            setSelection(accounts.selectionIndex + 1);
-            refreshAccount(Objects.requireNonNull((Account) getSelectedItem()));
+            int clampedIndex = Math.max(0, Math.min(accounts.selectionIndex, accounts.accounts.size() - 1));
+            setSelection(clampedIndex + 1);
+            Object selected = getSelectedItem();
+            if (selected instanceof Account) {
+                refreshAccount((Account) selected);
+            }
         }
     }
 

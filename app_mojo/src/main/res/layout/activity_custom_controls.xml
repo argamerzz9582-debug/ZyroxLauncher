@@ -11,6 +11,15 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <!-- Subtle Sakura Scene Preview Backdrop so Liquid Glass transparency can be judged accurately -->
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/bg_zyrox_shader_scene"
+            android:alpha="0.38"
+            android:importantForAccessibility="no" />
+
         <!-- Full-Screen Precision Alignment Grid & Center Crosshair -->
         <git.artdeell.mojo.ui.ZyroxGridOverlayView
             android:id="@+id/zyrox_hud_grid"

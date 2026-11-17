@@ -1,80 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Crisp Minecraft Steve full-body pixel avatar with warm Zyrox framing -->
+<!-- Crisp Minecraft Adventurer full-body pixel avatar with Zyrox Sakura Crystal tunic -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="80dp"
     android:height="160dp"
     android:viewportWidth="16"
     android:viewportHeight="32">
-    <!-- Ground shadow -->
+    <!-- Soft sakura glow shadow -->
     <path
-        android:fillColor="#40FF8C42"
+        android:fillColor="#48F5A9CE"
         android:pathData="M3,30.5h10v1.2h-10z" />
     <!-- Hair top & sides -->
     <path
-        android:fillColor="#3B2718"
+        android:fillColor="#3B2433"
         android:pathData="M4,0h8v3h-8zM4,3h1v1h-1zM11,3h1v1h-1z" />
     <!-- Skin face -->
     <path
-        android:fillColor="#C68E68"
+        android:fillColor="#CF9674"
         android:pathData="M5,2h6v1h-6zM5,3h6v1h-6zM4,4h8v4h-8z" />
-    <!-- Eyes (whites + indigo pupils) -->
+    <!-- Eyes (whites + amethyst-violet pupils) -->
     <path
-        android:fillColor="#FFF7ED"
+        android:fillColor="#FFFAFD"
         android:pathData="M5,4h1v1h-1zM10,4h1v1h-1z" />
     <path
-        android:fillColor="#4F46A5"
+        android:fillColor="#7E3AF2"
         android:pathData="M6,4h1v1h-1zM9,4h1v1h-1z" />
-    <!-- Nose & beard/mouth -->
+    <!-- Nose & mouth -->
     <path
-        android:fillColor="#8C5A3C"
+        android:fillColor="#9A6448"
         android:pathData="M7,5h2v1h-2z" />
     <path
-        android:fillColor="#5A3924"
-        android:pathData="M6,6h1v1h-1zM9,6h1v1h-1zM6,7h4v1h-4z" />
-    <!-- Zyrox Steampunk Adventurer Tunic (obsidian + warm amber trim) -->
+        android:fillColor="#6B4230"
+        android:pathData="M6,6.5h4v1h-4z" />
+    <!-- Zyrox Sakura Crystal Tunic (twilight plum + rose-quartz Z crest) -->
     <path
-        android:fillColor="#261D18"
+        android:fillColor="#2A1B33"
         android:pathData="M4,8h8v12h-8z" />
-    <!-- Tunic collar V-neck -->
     <path
-        android:fillColor="#A67150"
+        android:fillColor="#FCE7F3"
         android:pathData="M7,8h2v2h-2z" />
-    <!-- Warm amber chest harness & Z-emblem belt -->
+    <!-- Sakura shoulder pauldrons & glowing rose-quartz Z emblem -->
     <path
-        android:fillColor="#F97316"
+        android:fillColor="#F48FB8"
         android:pathData="M4,8h2v2h-2zM10,8h2v2h-2zM6,11h4v1h-4zM8,12h1v1h-1zM7,13h1v1h-1zM6,14h4v1h-4z" />
     <path
-        android:fillColor="#784212"
+        android:fillColor="#4A2A42"
         android:pathData="M4,18h8v2h-8z" />
     <path
-        android:fillColor="#FDBA74"
+        android:fillColor="#FBCFE8"
         android:pathData="M7,18h2v2h-2z" />
-    <!-- Left & Right Arms (sleeves + hands) -->
+    <!-- Left & Right Arms (sleeves + sakura cuff + hands) -->
     <path
-        android:fillColor="#3A281E"
+        android:fillColor="#382342"
         android:pathData="M0,8h4v4h-4zM12,8h4v4h-4z" />
     <path
-        android:fillColor="#FF8C42"
+        android:fillColor="#F5A9CE"
         android:pathData="M0,11h4v1h-4zM12,11h4v1h-4z" />
     <path
-        android:fillColor="#C68E68"
+        android:fillColor="#CF9674"
         android:pathData="M0,12h4v8h-4zM12,12h4v8h-4z" />
-    <!-- Wrist bracers -->
     <path
-        android:fillColor="#573926"
+        android:fillColor="#52324B"
         android:pathData="M0,17h4v1h-4zM12,17h4v1h-4z" />
     <!-- Legs / Trousers -->
     <path
-        android:fillColor="#2D324A"
+        android:fillColor="#2B2540"
         android:pathData="M4,20h4v9h-4zM8,20h4v9h-4z" />
     <path
-        android:fillColor="#1E2235"
+        android:fillColor="#1B162B"
         android:pathData="M7.7,20h0.6v9h-0.6z" />
-    <!-- Boots -->
+    <!-- Boots with pearl-sakura trim -->
     <path
-        android:fillColor="#3B2B23"
+        android:fillColor="#3A2438"
         android:pathData="M4,28h4v3h-4zM8,28h4v3h-4z" />
     <path
-        android:fillColor="#FF8C42"
+        android:fillColor="#F9B8D8"
         android:pathData="M4,28h4v0.6h-4zM8,28h4v0.6h-4z" />
 </vector>

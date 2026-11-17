@@ -12,11 +12,11 @@ import java.util.Locale;
  * and info lines in readable warm parchment (#D6D3D1).
  */
 public final class ZyroxLogHighlighter {
-    public static final int COLOR_ERROR = 0xFFEF4444;
-    public static final int COLOR_TRACE = 0xFFF87171;
-    public static final int COLOR_WARN = 0xFFFF8C42;
-    public static final int COLOR_HEADER = 0xFFFDBA74;
-    public static final int COLOR_INFO = 0xFFD6D3D1;
+    public static final int COLOR_ERROR = 0xFFFB7185;
+    public static final int COLOR_TRACE = 0xFFFDA4AF;
+    public static final int COLOR_WARN = 0xFFFCD34D;
+    public static final int COLOR_HEADER = 0xFFF9A8D4;
+    public static final int COLOR_INFO = 0xFFF0E4EE;
 
     private ZyroxLogHighlighter() {}
 

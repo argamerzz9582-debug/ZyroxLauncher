@@ -115,7 +115,7 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <!-- Recessed Monospace Terminal Log Box (#090706) -->
+        <!-- Recessed Monospace Terminal Log Box (@color/zyrox_terminal_bg) -->
         <ScrollView
             android:id="@+id/sv_log_terminal"
             android:layout_width="match_parent"

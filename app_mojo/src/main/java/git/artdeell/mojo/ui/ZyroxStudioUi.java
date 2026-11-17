@@ -210,7 +210,7 @@ public final class ZyroxStudioUi {
             mPixelPaint.setFilterBitmap(false);
             mPixelPaint.setAntiAlias(false);
             mPixelPaint.setDither(false);
-            mLabelPaint.setColor(0xCCDDE5EF);
+            mLabelPaint.setColor(0xD8F8E6F1);
             mLabelPaint.setTextAlign(Paint.Align.CENTER);
             mLabelPaint.setTextSize(10f * context.getResources().getDisplayMetrics().density);
             setBackgroundResource(R.drawable.bg_zyrox_terminal);

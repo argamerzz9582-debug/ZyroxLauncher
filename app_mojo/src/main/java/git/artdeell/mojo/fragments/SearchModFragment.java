@@ -194,7 +194,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mImportButton.setOnClickListener(v -> triggerLocalImport());
         mTaskCountListener = taskCount -> {
             runOnUiThread(() -> {
-                if (mImportButton != null) mImportButton.setEnabled(taskCount == 0);
+                if (isAdded() && mImportButton != null) mImportButton.setEnabled(taskCount == 0);
             });
             return false;
         };
@@ -282,8 +282,12 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
 
         mVersionScrim.setVisibility(View.VISIBLE);
         mVersionDrawer.setVisibility(View.VISIBLE);
-        mVersionDrawer.setTranslationX(mVersionDrawer.getWidth() > 0 ? mVersionDrawer.getWidth() : 400f);
-        mVersionDrawer.animate().translationX(0f).setDuration(220L).start();
+        if (git.artdeell.mojo.prefs.LauncherPreferences.isReducedMotionEnabled(requireContext())) {
+            mVersionDrawer.setTranslationX(0f);
+        } else {
+            mVersionDrawer.setTranslationX(mVersionDrawer.getWidth() > 0 ? mVersionDrawer.getWidth() : 400f);
+            mVersionDrawer.animate().translationX(0f).setDuration(220L).start();
+        }
 
         mDetailFuture = new SelfReferencingFuture(myFuture -> {
             ModDetail detail = modpackApi.getModDetails(item);
@@ -336,7 +340,8 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mStatusTextView.setVisibility(View.VISIBLE);
         switch (error) {
             case ERROR_INTERNAL:
-                mStatusTextView.setTextColor(Color.parseColor("#EF4444"));
+                mStatusTextView.setTextColor(androidx.core.content.ContextCompat.getColor(
+                        requireContext(), R.color.zyrox_danger));
                 mStatusTextView.setText(R.string.search_modpack_error);
                 break;
             case ERROR_NO_RESULTS:
@@ -363,9 +368,9 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             Button mSelectVersionButton = dialog.findViewById(R.id.search_mod_mc_version_button);
             Button mApplyButton = dialog.findViewById(R.id.search_mod_apply_filters);
 
-            assert mSelectVersionButton != null;
-            assert mSelectedVersion != null;
-            assert mApplyButton != null;
+            if (mSelectVersionButton == null || mSelectedVersion == null || mApplyButton == null) {
+                return;
+            }
 
             mSelectVersionButton.setOnClickListener(v ->
                     VersionSelectorDialog.open(v.getContext(), true, (id, snapshot) -> mSelectedVersion.setText(id)));

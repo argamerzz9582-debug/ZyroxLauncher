@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Studio Card -->
+<!-- Zyrox Sakura Smoked-Crystal Glass Card -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#480D1422"
-                android:endColor="#38090E18" />
+                android:startColor="#6C1A1025"
+                android:endColor="#5A140B1D" />
             <corners android:radius="16dp" />
         </shape>
     </item>
@@ -14,16 +14,16 @@
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#1AF8FCFF"
-                android:centerColor="#04FFFFFF"
-                android:endColor="#0EDCEBF8" />
-            <stroke android:width="1.05dp" android:color="#8CF4FAFF" />
+                android:startColor="#1EFFF2F8"
+                android:centerColor="#06FFFFFF"
+                android:endColor="#12FAD4E8" />
+            <stroke android:width="1.1dp" android:color="#A2FFE8F4" />
             <corners android:radius="16dp" />
         </shape>
     </item>
-    <item android:left="18dp" android:top="2.4dp" android:right="18dp" android:height="1.3dp" android:gravity="top">
+    <item android:left="18dp" android:top="2.2dp" android:right="18dp" android:height="1.2dp" android:gravity="top">
         <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#76FFFFFF" android:endColor="#00FFFFFF" />
+            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#7CFFF5FA" android:endColor="#00FFFFFF" />
             <corners android:radius="1dp" />
         </shape>
     </item>

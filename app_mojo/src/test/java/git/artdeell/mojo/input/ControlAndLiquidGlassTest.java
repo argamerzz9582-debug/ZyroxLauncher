@@ -101,6 +101,45 @@ public class ControlAndLiquidGlassTest {
     }
 
     @Test
+    public void verifiesSakuraLauncherIconsMonochromeAndLayoutParity() throws Exception {
+        File resDir = new File("src/main/res");
+        if (!resDir.isDirectory()) {
+            resDir = new File("app_mojo/src/main/res");
+        }
+        assertTrue("res dir must exist", resDir.isDirectory());
+
+        for (String density : new String[]{"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"}) {
+            for (String icon : new String[]{"ic_launcher.webp", "ic_launcher_round.webp", "ic_launcher_foreground.webp"}) {
+                File f = new File(resDir, "mipmap-" + density + "/" + icon);
+                assertTrue("Missing icon " + f.getPath(), f.isFile() && f.length() > 512L);
+            }
+        }
+        assertTrue(new File(resDir, "drawable/ic_launcher_monochrome.xml").isFile());
+        assertTrue(new File(resDir, "drawable/ic_zyrox_sakura_emblem.xml").isFile());
+        assertTrue(new File(resDir, "drawable-nodpi/bg_zyrox_shader_scene.webp").isFile());
+
+        try (FileInputStream in = new FileInputStream(new File(resDir, "mipmap-anydpi-v26/ic_launcher.xml"))) {
+            String adaptive = new String(ArchiveSecurity.readBytesBounded(in, 8192), StandardCharsets.UTF_8);
+            assertTrue("Adaptive launcher icon must include Material You monochrome layer",
+                    adaptive.contains("@drawable/ic_launcher_monochrome"));
+        }
+
+        // Portrait and landscape shell/home layouts must stay 100% identical (zero drift)
+        for (String fn : new String[]{"activity_mojo_ui.xml", "fragment_launcher.xml"}) {
+            byte[] mainBytes;
+            byte[] landBytes;
+            try (FileInputStream a = new FileInputStream(new File(resDir, "layout/" + fn));
+                 FileInputStream b = new FileInputStream(new File(resDir, "layout-land/" + fn))) {
+                mainBytes = ArchiveSecurity.readBytesBounded(a, 128 * 1024);
+                landBytes = ArchiveSecurity.readBytesBounded(b, 128 * 1024);
+            }
+            assertEquals("layout/" + fn + " and layout-land/" + fn + " must stay 1:1 synced",
+                    new String(mainBytes, StandardCharsets.UTF_8),
+                    new String(landBytes, StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
     public void validatesSkinPng64x64And64x32AndRejectsInvalidDimensionsOrMagic() throws Exception {
         SkinStudioManager.PngValidation modern = SkinStudioManager.validateSkinPngBytes(fakePngHeader(64, 64));
         assertTrue(modern.valid);

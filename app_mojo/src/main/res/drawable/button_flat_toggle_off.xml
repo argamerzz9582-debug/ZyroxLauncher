@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Toggle OFF -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="270" android:startColor="#1AF6FBFF" android:endColor="#0EDCEBF8" />
-    <stroke android:width="0.95dp" android:color="#7EF2F8FF" />
-    <corners android:radius="999dp" />
+    <gradient android:angle="270" android:startColor="#1CFFF2F8" android:endColor="#10FAD4E8" />
+    <stroke android:width="0.95dp" android:color="#82FCE8F3" />
+    <corners android:radius="12dp" />
 </shape>

@@ -6,7 +6,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#2E0D0A08"
+    android:background="#30150C1F"
     android:padding="12dp">
 
     <!-- LEFT RAIL (230dp): Saved Profiles / Instances + Quick + NEW Button -->
@@ -104,7 +104,8 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:scaleType="fitCenter"
-                            tools:src="@drawable/ic_zyrox_grass_block" />
+                            tools:src="@drawable/ic_zyrox_grass_block" 
+            android:importantForAccessibility="no"/>
 
                         <ImageView
                             android:layout_width="16dp"
@@ -113,7 +114,8 @@
                             android:src="@drawable/ic_px_edit"
                             app:tint="@color/zyrox_amber"
                             android:background="@drawable/bg_zyrox_badge"
-                            android:padding="2dp" />
+                            android:padding="2dp" 
+            android:importantForAccessibility="no"/>
                     </FrameLayout>
 
                     <LinearLayout
@@ -218,7 +220,8 @@
                         android:layout_marginEnd="10dp"
                         android:rotation="180"
                         android:src="@drawable/spinner_arrow"
-                        app:tint="@color/zyrox_amber" />
+                        app:tint="@color/zyrox_amber" 
+            android:importantForAccessibility="no"/>
                 </FrameLayout>
 
                 <TextView
@@ -273,7 +276,8 @@
                                 android:layout_marginEnd="8dp"
                                 android:rotation="180"
                                 android:src="@drawable/spinner_arrow"
-                                app:tint="@color/zyrox_amber" />
+                                app:tint="@color/zyrox_amber" 
+            android:importantForAccessibility="no"/>
                         </FrameLayout>
                     </LinearLayout>
 

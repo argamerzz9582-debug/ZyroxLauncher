@@ -1,27 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Sakura Twilight Atmospheric Vignette + Crisp Right-Dock Scrim -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Whisper-light optical radial edge vignette so the full-screen live scene stays vivid -->
+    <!-- Subtle warm plum perimeter bloom preserving 100% vivid sunlit cherry-blossom gazebo -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="radial"
-                android:centerX="0.46"
-                android:centerY="0.48"
-                android:gradientRadius="76%p"
-                android:startColor="#00070B14"
-                android:centerColor="#12070B14"
-                android:endColor="#4E070B14" />
+                android:gradientRadius="84%p"
+                android:centerX="0.38"
+                android:centerY="0.50"
+                android:startColor="#00120A19"
+                android:centerColor="#08120A19"
+                android:endColor="#38120A19" />
         </shape>
     </item>
-    <!-- Delicate bottom ground contrast so floating Liquid Glass labels remain crisp -->
+    <!-- Whisper-soft top crest scrim so ZYROX hero branding pops over sunlit morning sky -->
+    <item android:height="112dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#2C130B1B"
+                android:endColor="#00130B1B" />
+        </shape>
+    </item>
+    <!-- Silky twilight-plum right-edge transition so white Liquid Glass dock controls sparkle cleanly -->
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
-                android:angle="270"
-                android:startColor="#16070B14"
-                android:centerColor="#00000000"
-                android:endColor="#42070B14" />
+                android:angle="0"
+                android:startColor="#00120A19"
+                android:centerColor="#08120A19"
+                android:endColor="#44130A1C" />
         </shape>
     </item>
 </layer-list>

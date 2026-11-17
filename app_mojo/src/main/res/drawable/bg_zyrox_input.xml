@@ -1,58 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Input, Spinner & List Item Capsule -->
+<!-- Zyrox Sakura Pearl Crystal Input, Spinner & Studio Item Surface -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="270"
-                android:startColor="#3CE2F2FF"
-                android:endColor="#24C2E0FF" />
-            <stroke android:width="1.2dp" android:color="#ECFFFFFF" />
+            <gradient android:angle="270" android:startColor="#48FFE4F2" android:endColor="#30F5A8CE" />
+            <stroke android:width="1.25dp" android:color="#F4FFF5FA" />
             <corners android:radius="13dp" />
         </shape>
     </item>
+
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient
-                android:type="linear"
-                android:angle="270"
-                android:startColor="#30EAF5FF"
-                android:endColor="#1CCEE8FF" />
-            <stroke android:width="1.3dp" android:color="#F4FFFFFF" />
+            <gradient android:angle="270" android:startColor="#38FFEBF5" android:endColor="#24F8C4DF" />
+            <stroke android:width="1.45dp" android:color="#FAFFF7FB" />
             <corners android:radius="13dp" />
         </shape>
     </item>
+
     <item>
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient
-                        android:type="linear"
-                        android:angle="270"
-                        android:startColor="#24101826"
-                        android:endColor="#1C0B111C" />
+                    <solid android:color="#2E160D20" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
             <item>
                 <shape android:shape="rectangle">
                     <gradient
-                        android:type="linear"
                         android:angle="270"
-                        android:startColor="#1CF8FCFF"
-                        android:centerColor="#08EAF4FF"
-                        android:endColor="#12DCEBF8" />
-                    <stroke android:width="1dp" android:color="#8AF4FAFF" />
+                        android:startColor="#24FFF4FA"
+                        android:centerColor="#0EFCE6F2"
+                        android:endColor="#1AFAD2E7" />
+                    <stroke android:width="1.05dp" android:color="#B2FFEAF5" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
-            <item android:left="14dp" android:top="2dp" android:right="14dp" android:height="1.2dp" android:gravity="top">
+            <item android:left="12dp" android:top="2.4dp" android:right="12dp" android:height="1.1dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#68FFFFFF" android:endColor="#00FFFFFF" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#76FFFFFF" android:endColor="#00FFFFFF" />
                     <corners android:radius="1dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
+
 </selector>

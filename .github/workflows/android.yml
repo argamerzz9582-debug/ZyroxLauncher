@@ -11,9 +11,9 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag to publish (e.g. v2.0.1)"
+        description: "Release tag to publish (e.g. v2.1.0)"
         required: false
-        default: "v2.0.1"
+        default: "v2.1.0"
         type: string
 
 # Default least-privilege token across all jobs; only publish-release escalates to contents:write.
@@ -240,7 +240,7 @@ jobs:
               fail(f"aapt2 dump badging failed: {badging_proc.stderr[:400]}")
           badging = badging_proc.stdout
           pkg_line = badging.splitlines()[0] if badging else "empty"
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.0.1'", "targetSdkVersion:'36'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.1.0'", "targetSdkVersion:'36'"):
               if expected not in badging:
                   fail(f"Missing {expected} in badging ({pkg_line})")
           if "application-debuggable" in badging:
@@ -252,7 +252,7 @@ jobs:
               for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                   h.update(chunk)
           sha = h.hexdigest()
-          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.0.1 targetSdk=36 debuggable=false size={size_mb:.1f}MB sha256={sha}")
+          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.1.0 targetSdk=36 debuggable=false size={size_mb:.1f}MB sha256={sha}")
           PY
 
       - name: Upload Unsigned Release CI Artifact
@@ -419,7 +419,7 @@ jobs:
               fail(f"Continuity certificate SHA-256 mismatch: expected {expected_continuity}, got {cert_sha256}")
 
           badging = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True, check=True).stdout
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.0.1'", "targetSdkVersion:'36'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.1.0'", "targetSdkVersion:'36'"):
               if expected not in badging:
                   fail(f"Missing {expected} in signed APK badging")
           if "application-debuggable" in badging or "application-testOnly" in badging:
@@ -431,18 +431,16 @@ jobs:
                   h.update(chunk)
           apk_sha = h.hexdigest()
 
-          with open("out/SHA256SUMS.txt", "w") as sf:
-              sf.write(f"{apk_sha}  Zyrox.Launcher.apk\n")
           with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
               cf.write("Package: com.zyrox.launcher\n")
-              cf.write("Version: 2.0.1\n")
+              cf.write("Version: 2.1.0\n")
               cf.write("Signature Schemes: v1 + v2 + v3 (RSA-4096)\n")
               cf.write(f"Certificate DN: {cert_dn}\n")
               cf.write(f"Certificate SHA-256: {cert_sha256}\n")
               cf.write(f"APK SHA-256: {apk_sha}\n")
 
           size_mb = os.path.getsize(apk) / (1024 * 1024)
-          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.0.1 sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
+          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.1.0 sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
           PY
 
       - name: Upload Verified Signed Release Bundle
@@ -452,7 +450,6 @@ jobs:
           name: ZyroxLauncher-signed-release
           path: |
             out/Zyrox.Launcher.apk
-            out/SHA256SUMS.txt
             out/SIGNING_CERTIFICATE_SHA256.txt
           retention-days: 30
 
@@ -480,7 +477,7 @@ jobs:
           name: ZyroxLauncher-signed-release
           path: out
 
-      - name: Publish Signed GitHub Release with SHA-256 & Certificate Metadata
+      - name: Publish Signed GitHub Release (APK + Source Archives Only)
         env:
           INPUT_TAG: ${{ inputs.release_tag }}
         run: |
@@ -488,7 +485,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${INPUT_TAG:-v2.0.1}"
+            TAG="${INPUT_TAG:-v2.1.0}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
             echo "::error title=InvalidReleaseTag::Refusing invalid tag format: $TAG"
@@ -496,30 +493,34 @@ jobs:
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           {
-            echo "## Zyrox Launcher ${TAG}"
+            echo "## Zyrox Launcher ${TAG} — Sakura Crystal Edition"
             echo ""
-            echo "### What's New in 2.0.1"
-            echo "- **Seamless Full-Bleed Animated Loading Screen:** Displays only the continuous full-screen cherry-blossom Minecraft scene animation (no progress spinner, status text, or crash-warning overlay) at smooth native timing on RenderThread."
-            echo "- **Exact Mojang Official Splash Handoff:** New 3-state \`MojangSplashDetector\` + lightweight \`48×27\` \`TextureView\` / \`PixelCopy\` frame probe keeps the loading animation playing continuously through black \`glClear\` startup frames and cross-fades cleanly the exact moment Mojang's official loading screen appears (crimson, classic white, monochrome dark-mode, and Forge/NeoForge/custom splashes), then releases all GIF memory."
-            echo "- **Ultra-Clear Optical Liquid Glass Controls:** Re-engineered in-game buttons, control drawers, joystick, drawer handle, and vector glyphs to be ~93–96% transparent in the center with a 135° diagonal diamond specular rim, upper liquid-dome sheen, inner meniscus, and luminous ice-crystal press/toggle feedback so gameplay remains wide open while preserving full touch hitboxes, multi-touch, and the opacity slider."
-            echo "- **In-Game & Launcher UI Polish:** Unified crystal Liquid Glass floating in-game menu drawer, Quick Settings & control editor dialogs, contextual action pill toolbar, frost alignment grid, smoked-crystal Performance HUD & live console, capsule progress/seek bars, pure rounded modals, and synced portrait/landscape Home Hub panels."
+            echo "### What's New in 2.1.0"
+            echo "- **New Sakura Crystal App Logo & Adaptive Icon Suite:** Sculpted 3D rose-quartz Liquid Glass voxel \`Z\` emblem with pale cherry-wood bevels, pixel cherry blossoms, shimmering pond ripples, full \`mdpi–xxxhdpi\` adaptive + round icons, and Android 13–16 Material You monochrome icon support."
+            echo "- **Sakura Bloom × Optical Liquid Glass UI Theme:** Cohesive twilight-plum frosted docks, rose-quartz hero \`PLAY\` CTA, sakura-pearl buttons, progress bars, switches, filter chips, studio modals, Cherry Blossom instance emblem, Sakura hero crest, and live cherry-blossom backdrop preview inside the Touch Controls editor — while keeping in-game touch controls ~94% optically clear."
+            echo "- **Seamless Zero-Buffer Animated Home & Loading Scenes:** Replaced the legacy Home shader/ember animation with the full-bleed Cherry Blossom lakeside gazebo scene (\`zyrox_home_scene.gif\`) and built the new \`ZyroxGifDecoder\` + \`ZyroxSeamlessGifView\` engine powering both Home and Loading screens with zero end-of-loop freeze, C¹ cosine cross-dissolve loop continuity, 60/90/120 Hz VSYNC sub-frame blending, and automatic RAM release when Minecraft launches."
+            echo "- **App-Wide Audit, Memory-Leak Fixes & Polish:** Eliminated \`AccountSpinner\` static listener & \`LauncherActivity\` permission-launcher leaks, guarded out-of-bounds account selection, moved \`WorldManager\` icon decoding off the main thread with bounded sampling & bitmap recycling, fixed \`DownloadCenter\` trailing queue completion updates and paused-queue resume state, synchronized portrait/landscape layouts 1:1, and completed TalkBack accessibility descriptions."
             echo ""
-            echo "### Installation & Signing Continuity"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly. Signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher certificate for seamless in-place upgrade over \`v2.0.0\` and \`v1.0.x\` while preserving all accounts, instances, worlds, mods, and control profiles."
+            echo "### Download & Upgrade"
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.0.x\` / \`v1.0.x\`)."
             echo ""
-            echo "### Artifact Verification"
+            echo "### Signing & SHA-256 Verification"
             echo '```'
             cat out/SIGNING_CERTIFICATE_SHA256.txt
             echo '```'
-            echo "Verify locally against \`SHA256SUMS.txt\` and \`SIGNING_CERTIFICATE_SHA256.txt\` using \`sha256sum\` and \`apksigner verify --print-certs\`."
           } > "$NOTES_FILE"
 
-          ls -lh out/
+          ls -lh out/Zyrox.Launcher.apk
+          # Attach strictly ONLY the signed APK so the Release Assets list contains ONLY:
+          #   1. Zyrox.Launcher.apk (Zyrox Launcher.apk)
+          #   2. Source code (zip)   [GitHub built-in]
+          #   3. Source code (tar.gz) [GitHub built-in]
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            for extra in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(. != "Zyrox.Launcher.apk")'); do
+              gh release delete-asset "$TAG" "$extra" --yes --repo "$GITHUB_REPOSITORY" || true
+            done
             gh release upload "$TAG" \
               "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" \
-              "out/SHA256SUMS.txt" \
-              "out/SIGNING_CERTIFICATE_SHA256.txt" \
               --clobber \
               --repo "$GITHUB_REPOSITORY"
             gh release edit "$TAG" \
@@ -530,12 +531,10 @@ jobs:
           else
             gh release create "$TAG" \
               "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" \
-              "out/SHA256SUMS.txt" \
-              "out/SIGNING_CERTIFICATE_SHA256.txt" \
               --target "$GITHUB_SHA" \
               --title "Zyrox Launcher ${TAG}" \
               --notes-file "$NOTES_FILE" \
               --latest \
               --repo "$GITHUB_REPOSITORY"
           fi
-          echo "::notice title=ReleasePublished::Published Zyrox Launcher ${TAG} at https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          echo "::notice title=ReleasePublished::Published Zyrox Launcher ${TAG} (APK + Source zip/tar.gz only) at https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"

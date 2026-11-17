@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Toggle ON -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#42E2F3FF" android:endColor="#28C0E2FF" />
-            <stroke android:width="1.15dp" android:color="#F2FFFFFF" />
-            <corners android:radius="999dp" />
+            <gradient android:angle="270" android:startColor="#48FFE0F0" android:endColor="#2EF298C3" />
+            <stroke android:width="1.2dp" android:color="#F4FFF5FA" />
+            <corners android:radius="12dp" />
         </shape>
     </item>
-    <item android:left="10dp" android:top="2dp" android:right="10dp" android:height="1.2dp" android:gravity="top">
+    <item android:left="10dp" android:top="2.4dp" android:right="10dp" android:height="1.2dp" android:gravity="top">
         <shape android:shape="rectangle">
             <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#B8FFFFFF" android:endColor="#00FFFFFF" />
             <corners android:radius="1dp" />

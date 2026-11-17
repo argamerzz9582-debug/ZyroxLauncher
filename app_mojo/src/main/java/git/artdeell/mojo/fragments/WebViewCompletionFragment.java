@@ -49,7 +49,7 @@ public abstract class WebViewCompletionFragment extends Fragment {
             mUrlLabel.setText(formatSafeDisplayUrl(mAuthUrl));
         }
 
-        mWebview.setBackgroundColor(Color.parseColor("#0D0B0A"));
+        mWebview.setBackgroundColor(Color.parseColor("#130C1A"));
         mWebview.setFilterTouchesWhenObscured(true);
         mWebview.requestFocus();
         mWebview.setOnFocusChangeListener((v, f) -> {

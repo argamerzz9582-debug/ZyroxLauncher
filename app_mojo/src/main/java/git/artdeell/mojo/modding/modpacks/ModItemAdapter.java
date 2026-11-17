@@ -235,12 +235,14 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             boolean queued = mQueuedModIds.contains(mModItem.getIconCacheTag());
             if (queued) {
                 mInstallButton.setBackgroundResource(R.drawable.btn_zyrox_installed);
-                mInstallButton.setTextColor(Color.parseColor("#22C55E"));
+                mInstallButton.setTextColor(androidx.core.content.ContextCompat.getColor(
+                        mInstallButton.getContext(), R.color.zyrox_success));
                 mInstallButton.setText(R.string.zyrox_installed);
                 mInstallButton.setEnabled(true);
             } else {
                 mInstallButton.setBackgroundResource(R.drawable.btn_zyrox_play);
-                mInstallButton.setTextColor(Color.parseColor("#FFF7ED"));
+                mInstallButton.setTextColor(androidx.core.content.ContextCompat.getColor(
+                        mInstallButton.getContext(), R.color.zyrox_lg_text));
                 mInstallButton.setText(R.string.zyrox_install);
                 mInstallButton.setEnabled(!mTasksRunning);
             }

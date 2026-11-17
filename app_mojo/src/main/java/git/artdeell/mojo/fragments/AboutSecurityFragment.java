@@ -127,9 +127,6 @@ public class AboutSecurityFragment extends Fragment {
 
         LinearLayout actRow = new LinearLayout(ctx);
         actRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams aLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        aLp.topMargin = ZyroxStudioUi.dp(ctx, 8);
 
         Button btnCopySha = ZyroxStudioUi.createSecondaryButton(ctx, "Copy Cert SHA-256", true);
         btnCopySha.setOnClickListener(v -> copyText("zyrox_cert_sha256", report.certSha256Colon,
@@ -147,7 +144,14 @@ public class AboutSecurityFragment extends Fragment {
         actRow.addView(btnSecurity, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
-        signCard.addView(actRow, aLp);
+        android.widget.HorizontalScrollView actScroll = new android.widget.HorizontalScrollView(ctx);
+        actScroll.setHorizontalScrollBarEnabled(false);
+        actScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        actScroll.addView(actRow);
+        LinearLayout.LayoutParams aLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        aLp.topMargin = ZyroxStudioUi.dp(ctx, 8);
+        signCard.addView(actScroll, aLp);
         mBodyContainer.addView(signCard);
 
         // Card 2: Honest Android & Google Play Protect Guidance

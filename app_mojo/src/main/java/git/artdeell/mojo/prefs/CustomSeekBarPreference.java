@@ -62,11 +62,11 @@ public class CustomSeekBarPreference extends SeekBarPreference {
         super.onBindViewHolder(view);
         TextView titleTextView = (TextView) view.findViewById(android.R.id.title);
         if (titleTextView != null) {
-            titleTextView.setTextColor(0xFFFAFCFF);
+            titleTextView.setTextColor(0xFFFFFAFD);
         }
 
         mTextView = (TextView) view.findViewById(R.id.seekbar_value);
-        mTextView.setTextColor(0xFFE6F2FF);
+        mTextView.setTextColor(0xFFFBD8EB);
         mTextView.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
         SeekBar seekBar = (SeekBar) view.findViewById(R.id.seekbar);
 

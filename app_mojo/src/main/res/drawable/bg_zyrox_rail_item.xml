@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Settings & Instance Rail Item -->
+<!-- Zyrox Sakura Crystal Settings & Instance Rail Item -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#42E4F3FF" android:endColor="#28C4E2FF" />
-            <stroke android:width="1.15dp" android:color="#F4FFFFFF" />
+            <gradient android:angle="270" android:startColor="#4AFFE4F2" android:endColor="#30F4A4CC" />
+            <stroke android:width="1.15dp" android:color="#F6FFF7FB" />
             <corners android:radius="12dp" />
         </shape>
     </item>
@@ -12,14 +12,14 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#36E0F1FF" android:endColor="#1EBCE0FF" />
-                    <stroke android:width="1.1dp" android:color="#EAFFFFFF" />
+                    <gradient android:angle="270" android:startColor="#42FFE0F0" android:endColor="#28F29AC5" />
+                    <stroke android:width="1.15dp" android:color="#F0FFF5FA" />
                     <corners android:radius="12dp" />
                 </shape>
             </item>
             <item android:left="10dp" android:top="2.4dp" android:right="10dp" android:height="1.2dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#98FFFFFF" android:endColor="#00FFFFFF" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#A4FFFFFF" android:endColor="#00FFFFFF" />
                     <corners android:radius="1dp" />
                 </shape>
             </item>
@@ -27,15 +27,15 @@
     </item>
     <item android:state_activated="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#36E0F1FF" android:endColor="#1EBCE0FF" />
-            <stroke android:width="1.1dp" android:color="#EAFFFFFF" />
+            <gradient android:angle="270" android:startColor="#42FFE0F0" android:endColor="#28F29AC5" />
+            <stroke android:width="1.15dp" android:color="#F0FFF5FA" />
             <corners android:radius="12dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#14F6FBFF" android:endColor="#0ADCEBF8" />
-            <stroke android:width="0.8dp" android:color="#3CF0F7FF" />
+            <gradient android:angle="270" android:startColor="#18FFF2F8" android:endColor="#0EFAD4E8" />
+            <stroke android:width="0.85dp" android:color="#48FCE8F3" />
             <corners android:radius="12dp" />
         </shape>
     </item>

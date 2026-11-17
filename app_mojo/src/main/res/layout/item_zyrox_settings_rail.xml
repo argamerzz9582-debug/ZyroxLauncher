@@ -17,7 +17,8 @@
         android:layout_height="20dp"
         android:scaleType="fitCenter"
         app:tint="@color/zyrox_amber"
-        tools:src="@drawable/ic_px_image_renderer" />
+        tools:src="@drawable/ic_px_image_renderer" 
+            android:importantForAccessibility="no"/>
 
     <TextView
         android:id="@+id/tv_settings_cat_title"

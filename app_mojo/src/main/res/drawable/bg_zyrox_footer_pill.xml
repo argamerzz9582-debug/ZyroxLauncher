@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Liquid Glass Footer Capsule -->
+<!-- Zyrox Sakura Crystal Home Utility Capsule Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#260A101B" android:endColor="#1C080D16" />
-            <corners android:radius="999dp" />
+            <gradient android:angle="270" android:startColor="#38170E21" android:endColor="#2A130A1B" />
+            <corners android:radius="12dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#1AF8FCFF" android:endColor="#0EDCEBF8" />
-            <stroke android:width="1dp" android:color="#96F4FAFF" />
-            <corners android:radius="999dp" />
+            <gradient android:angle="270" android:startColor="#1EFFF2F8" android:endColor="#10FAD4E8" />
+            <stroke android:width="1dp" android:color="#A4FFEAF5" />
+            <corners android:radius="12dp" />
         </shape>
     </item>
 </layer-list>
