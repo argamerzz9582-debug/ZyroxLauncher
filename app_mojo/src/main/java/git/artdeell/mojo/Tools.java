@@ -88,7 +88,7 @@ public final class Tools {
     public static final String MAVEN_CENTRAL = "https://maven-central-eu.storage-download.googleapis.com/maven2/";
     public  static final float BYTE_TO_MB = 1024 * 1024;
     public static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
-    public static String APP_NAME = "MojoLauncher";
+    public static String APP_NAME = "Zyrox Launcher";
 
     public static final Gson GLOBAL_GSON = new GsonBuilder()
             .registerTypeAdapter(MavenName.class, new MavenNameAdapter())
@@ -105,7 +105,18 @@ public final class Tools {
     // New since 3.3.1
     public static String DIR_ACCOUNT_NEW;
     // PojavLauncher is left for compatibility purposes
-    public static String DIR_GAME_HOME = Environment.getExternalStorageDirectory().getAbsolutePath() + "/games/PojavLauncher";
+    public static String DIR_GAME_HOME = resolveInitialGameHome();
+
+    private static String resolveInitialGameHome() {
+        try {
+            File ext = Environment.getExternalStorageDirectory();
+            if (ext != null) {
+                return ext.getAbsolutePath() + "/games/PojavLauncher";
+            }
+        } catch (Throwable ignored) {
+        }
+        return "/sdcard/games/PojavLauncher";
+    }
     public static String DIR_GAME_NEW;
 
     // New since 2.4.2

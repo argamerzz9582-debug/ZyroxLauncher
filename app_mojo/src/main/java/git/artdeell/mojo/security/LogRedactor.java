@@ -31,12 +31,14 @@ import java.util.regex.Pattern;
 public final class LogRedactor {
     public static final String REDACTED = "[REDACTED]";
     public static final String REDACTED_EMAIL = "[REDACTED_EMAIL]";
+    public static final String REDACTED_UUID = "[REDACTED_UUID]";
     public static final String REDACTED_PATH = "[REDACTED_ACCOUNT_PATH]";
 
     private static final Set<String> SENSITIVE_CLI_FLAGS = new HashSet<>(Arrays.asList(
             "--accesstoken",
             "--session",
             "--clienttoken",
+            "--uuid",
             "--xuid",
             "--password",
             "--token",
@@ -46,7 +48,7 @@ public final class LogRedactor {
 
     // CLI flag pairs such as "--accessToken abc123" or "--accessToken=abc123"
     private static final Pattern CLI_TOKEN_PATTERN = Pattern.compile(
-            "(?i)(--(?:accessToken|session|clientToken|xuid|password|token|api[-_]?key))(?:\\s*=\\s*|\\s+)([^\\s,\\]\\\"']+)"
+            "(?i)(--(?:accessToken|session|clientToken|uuid|xuid|password|token|api[-_]?key))(?:\\s*=\\s*|\\s+)([^\\s,\\]\\\"']+)"
     );
 
     // JSON / key=value / header tokens
@@ -64,6 +66,16 @@ public final class LogRedactor {
     // Standalone Bearer tokens
     private static final Pattern BEARER_PATTERN = Pattern.compile(
             "(?i)(\\bBearer\\s+)([A-Za-z0-9._~+/=-]{12,})"
+    );
+
+    // Standalone Xbox Live XBL3.0 x=<uhs>;<token> credentials
+    private static final Pattern XBL_PATTERN = Pattern.compile(
+            "(?i)(\\bXBL3\\.0\\s+x=)([^\\s,\\\"'\\r\\n]+)"
+    );
+
+    // Standard RFC-4122 dashed UUIDs (account profile IDs in logs)
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b"
     );
 
     // Compact JWTs (header.payload.signature)
@@ -110,6 +122,7 @@ public final class LogRedactor {
         out = CLI_TOKEN_PATTERN.matcher(out).replaceAll("$1 " + REDACTED);
         out = AUTH_HEADER_PATTERN.matcher(out).replaceAll("$1" + REDACTED);
         out = BEARER_PATTERN.matcher(out).replaceAll("$1" + REDACTED);
+        out = XBL_PATTERN.matcher(out).replaceAll("$1" + REDACTED);
         out = KV_SECRET_PATTERN.matcher(out).replaceAll("$1" + REDACTED);
         out = URL_SECRET_QUERY_PATTERN.matcher(out).replaceAll("$1" + REDACTED);
         out = JWT_PATTERN.matcher(out).replaceAll(REDACTED);
@@ -117,6 +130,7 @@ public final class LogRedactor {
         out = CF_KEY_PATTERN.matcher(out).replaceAll(REDACTED);
         out = ACCOUNT_PATH_PATTERN.matcher(out).replaceAll("$1" + REDACTED_PATH);
         out = EMAIL_PATTERN.matcher(out).replaceAll(REDACTED_EMAIL);
+        out = UUID_PATTERN.matcher(out).replaceAll(REDACTED_UUID);
         return out;
     }
 

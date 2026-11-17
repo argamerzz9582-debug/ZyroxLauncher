@@ -180,6 +180,7 @@ public final class ZyroxCrashAnalyzer {
         // 3. Duplicate Mods
         if (lower.contains("duplicatemodsfoundexception")
                 || lower.contains("found duplicate mods")
+                || lower.contains("duplicate mods found")
                 || lower.contains("mod id is duplicated")) {
             return new Diagnosis(
                     Category.DUPLICATE_MOD,

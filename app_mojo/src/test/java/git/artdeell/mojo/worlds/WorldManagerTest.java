@@ -31,7 +31,7 @@ public class WorldManagerTest {
         File savesDir = new File(gameDir, "saves");
         File validWorld = new File(savesDir, "Hardcore_Season_2");
         new File(validWorld, "region").mkdirs();
-        writeFile(new File(validWorld, "level.dat"), "valid-level-dat-bytes");
+        writeGzip(new File(validWorld, "level.dat"), "valid-gzipped-nbt-level-dat-payload");
         writeFile(new File(validWorld, "region/r.0.0.mca"), "chunk-data-payload-12345");
         writeFile(new File(validWorld, "session.lock"), "lock");
 
@@ -84,6 +84,13 @@ public class WorldManagerTest {
     private static void writeFile(File f, String text) throws IOException {
         try (FileOutputStream out = new FileOutputStream(f)) {
             out.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static void writeGzip(File f, String text) throws IOException {
+        try (java.util.zip.GZIPOutputStream gz =
+                     new java.util.zip.GZIPOutputStream(new FileOutputStream(f))) {
+            gz.write(text.getBytes(StandardCharsets.UTF_8));
         }
     }
 }
