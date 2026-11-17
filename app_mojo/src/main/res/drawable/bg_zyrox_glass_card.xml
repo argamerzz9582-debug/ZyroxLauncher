@@ -1,27 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Ultra-Clear Liquid Glass Studio Card -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="270"
-                android:startColor="#4818120E"
-                android:endColor="#380E0B08" />
-            <corners android:radius="12dp" />
+                android:startColor="#480D1422"
+                android:endColor="#38090E18" />
+            <corners android:radius="16dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="270"
-                android:startColor="#12FFF9F2"
-                android:centerColor="#00FFFFFF"
-                android:endColor="#00FFFFFF" />
-            <stroke
-                android:width="1dp"
-                android:color="@color/zyrox_glass_border" />
-            <corners android:radius="12dp" />
+                android:startColor="#1AF8FCFF"
+                android:centerColor="#04FFFFFF"
+                android:endColor="#0EDCEBF8" />
+            <stroke android:width="1.05dp" android:color="#8CF4FAFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item android:left="18dp" android:top="2.4dp" android:right="18dp" android:height="1.3dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#76FFFFFF" android:endColor="#00FFFFFF" />
+            <corners android:radius="1dp" />
         </shape>
     </item>
 </layer-list>

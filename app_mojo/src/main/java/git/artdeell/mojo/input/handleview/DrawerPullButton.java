@@ -35,7 +35,7 @@ public class DrawerPullButton extends View {
         float density = getContext().getResources().getDisplayMetrics().density;
         mGlassDrawable = new ZyroxLiquidGlassDrawable(density);
         mGlyphRenderer = new ZyroxControlGlyphRenderer();
-        setAlpha(0.82f);
+        setAlpha(0.76f);
         setContentDescription("In-game settings menu");
     }
 
@@ -45,11 +45,11 @@ public class DrawerPullButton extends View {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
             setPressed(true);
-            setAlpha(0.96f);
+            setAlpha(0.98f);
             invalidate();
         } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             setPressed(false);
-            setAlpha(0.82f);
+            setAlpha(0.76f);
             invalidate();
         }
         return super.onTouchEvent(event);
@@ -78,7 +78,7 @@ public class DrawerPullButton extends View {
 
         canvas.save();
         canvas.translate(left, top);
-        mGlyphRenderer.drawGlyph(canvas, ZyroxControlGlyphRenderer.Glyph.GEAR, boxSize, boxSize);
+        mGlyphRenderer.drawGlyph(canvas, ZyroxControlGlyphRenderer.Glyph.GEAR, boxSize, boxSize, isPressed());
         canvas.restore();
     }
 

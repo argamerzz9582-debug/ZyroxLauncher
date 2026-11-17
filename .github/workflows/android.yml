@@ -105,6 +105,7 @@ jobs:
               ("deadlock_trap", r"\bwaitOnObj\b"),
               ("package_collision", r"git\.artdeell\.mjlaunch"),
               ("removed_updates_card", r"\bzyrox_updates_card\b"),
+              ("removed_loading_warning", r"\bloading_screen_warning\b|If you are stuck here"),
               ("stale_wiki_domain", r"mojolauncher\.ru"),
               ("raw_launchargs_log", r'Log\.[idwev]\(\s*"GameRunner"\s*,\s*"Running with "\s*\+\s*launchArgs\.toString\(\)'),
               ("token_log", r"Log\.[idwev]\([^;]*(authCode|Xbl Token|Xbl Xsts|MC token|access_token|refresh_token)"),

@@ -1,27 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Feather-Sheer Liquid Glass Soft Sub-Card -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="270"
-                android:startColor="#2B18110D"
-                android:endColor="#210D0A07" />
-            <corners android:radius="13dp" />
+                android:startColor="#2C0D1422"
+                android:endColor="#20090E18" />
+            <corners android:radius="14dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:type="linear"
                 android:angle="270"
-                android:startColor="#14FFF9F2"
-                android:centerColor="#00FFFFFF"
-                android:endColor="#00FFFFFF" />
-            <stroke
-                android:width="1dp"
-                android:color="#40FFC07A" />
-            <corners android:radius="13dp" />
+                android:startColor="#16F8FCFF"
+                android:centerColor="#04FFFFFF"
+                android:endColor="#0CDCEBF8" />
+            <stroke android:width="0.95dp" android:color="#6AF2F8FF" />
+            <corners android:radius="14dp" />
         </shape>
     </item>
 </layer-list>

@@ -4,16 +4,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="14dp">
 
     <SeekBar
         android:id="@+id/mouseSpeed"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="16dp"
+        android:layout_height="34dp"
+        android:layout_marginEnd="10dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/mouseSpeedTV"
         app:layout_constraintStart_toStartOf="parent"
@@ -22,10 +21,16 @@
     <TextView
         android:id="@+id/mouseSpeedTV"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="8dp"
-        android:text="TextView"
+        android:layout_height="28dp"
+        android:gravity="center"
+        android:paddingHorizontal="10dp"
+        android:background="@drawable/bg_zyrox_badge"
+        android:textColor="@color/zyrox_lg_text"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="100%" />
 </androidx.constraintlayout.widget.ConstraintLayout>

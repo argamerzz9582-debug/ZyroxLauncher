@@ -166,6 +166,10 @@ android {
         }
     }
 
+    androidResources {
+        noCompress 'gif'
+    }
+
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true

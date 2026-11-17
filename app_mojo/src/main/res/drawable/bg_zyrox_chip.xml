@@ -1,53 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox 2.0 Pill / Filter Chip — Compact Neutral Frosted Liquid Glass -->
+<!-- Zyrox Ultra-Clear Liquid Glass Capsule Chip -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <item android:state_selected="true">
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#9CB0BCCB" android:endColor="#94A6B3C4" />
-                    <stroke android:width="1.3dp" android:color="#F4FFFFFF" />
-                    <corners android:radius="9dp" />
-                </shape>
-            </item>
-            <item android:left="7dp" android:top="2.5dp" android:right="7dp" android:height="1.5dp" android:gravity="top">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#18FFFFFF" android:centerColor="#88FFFFFF" android:endColor="#18FFFFFF" />
-                    <corners android:radius="1.5dp" />
-                </shape>
-            </item>
-        </layer-list>
-    </item>
-
     <item android:state_pressed="true">
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#98B0BCCB" android:endColor="#90A6B3C4" />
-                    <stroke android:width="1.3dp" android:color="#F4FFFFFF" />
-                    <corners android:radius="9dp" />
-                </shape>
-            </item>
-        </layer-list>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#48E4F4FF" android:endColor="#32C8E4FF" />
+            <stroke android:width="1.2dp" android:color="#F8FFFFFF" />
+            <corners android:radius="999dp" />
+        </shape>
     </item>
-
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#3EE2F2FF" android:endColor="#28C2E2FF" />
+            <stroke android:width="1.2dp" android:color="#F0FFFFFF" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#3EE2F2FF" android:endColor="#28C2E2FF" />
+            <stroke android:width="1.2dp" android:color="#F0FFFFFF" />
+            <corners android:radius="999dp" />
+        </shape>
+    </item>
     <item>
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#72B1B8C2" android:endColor="#68A4ACB7" />
-                    <stroke android:width="1.1dp" android:color="#D8FFFFFF" />
-                    <corners android:radius="9dp" />
-                </shape>
-            </item>
-            <item android:left="7dp" android:top="2.5dp" android:right="7dp" android:height="1.4dp" android:gravity="top">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#14FFFFFF" android:centerColor="#6CFFFFFF" android:endColor="#14FFFFFF" />
-                    <corners android:radius="1.5dp" />
-                </shape>
-            </item>
-        </layer-list>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#1CF6FBFF" android:endColor="#10DCEBF8" />
+            <stroke android:width="0.95dp" android:color="#96F4FAFF" />
+            <corners android:radius="999dp" />
+        </shape>
     </item>
-
 </selector>

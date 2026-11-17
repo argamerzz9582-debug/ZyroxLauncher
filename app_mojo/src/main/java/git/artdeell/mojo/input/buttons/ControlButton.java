@@ -58,10 +58,21 @@ public class ControlButton extends TextView implements ControlInterface {
 
         setGravity(Gravity.CENTER);
         setAllCaps(LauncherPreferences.PREF_BUTTON_ALL_CAPS);
-        setTextColor(ZyroxLiquidGlassDrawable.GLYPH_SNOW_WHITE);
-        setShadowLayer(Math.max(2f, 2.2f * density), 0f, Math.max(1f, 1.0f * density),
+        setTextColor(new ColorStateList(
+                new int[][]{
+                        new int[]{android.R.attr.state_pressed},
+                        new int[]{android.R.attr.state_activated},
+                        new int[]{}
+                },
+                new int[]{
+                        ZyroxLiquidGlassDrawable.GLYPH_PRESSED_WHITE,
+                        ZyroxLiquidGlassDrawable.GLYPH_PRESSED_WHITE,
+                        0xDCFAFCFF
+                }
+        ));
+        setShadowLayer(Math.max(2f, 2.0f * density), 0f, Math.max(1f, 0.9f * density),
                 ZyroxLiquidGlassDrawable.GLYPH_SHADOW_COLOR);
-        setLetterSpacing(0.025f);
+        setLetterSpacing(0.035f);
         setSingleLine(true);
         setEllipsize(TextUtils.TruncateAt.END);
         setIncludeFontPadding(false);
@@ -149,7 +160,7 @@ public class ControlButton extends TextView implements ControlInterface {
                 ? raw.toString().toUpperCase()
                 : raw.toString();
         float density = getResources().getDisplayMetrics().density;
-        float maxTextPx = Math.min(h * 0.36f, 16.5f * density);
+        float maxTextPx = Math.min(h * 0.32f, 15.0f * density);
         float minTextPx = Math.max(7.5f * density, 9f);
         float availW = Math.max(8f, w - getPaddingLeft() - getPaddingRight() - 8f * density);
 
@@ -169,7 +180,8 @@ public class ControlButton extends TextView implements ControlInterface {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (!mHasBitmap && mActiveGlyph != ZyroxControlGlyphRenderer.Glyph.NONE) {
-            mGlyphRenderer.drawGlyph(canvas, mActiveGlyph, getWidth(), getHeight());
+            mGlyphRenderer.drawGlyph(canvas, mActiveGlyph, getWidth(), getHeight(),
+                    isPressed() || isActivated());
         }
     }
 

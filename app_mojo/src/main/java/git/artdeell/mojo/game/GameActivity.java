@@ -29,10 +29,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -70,6 +70,7 @@ import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.utils.lifecycle.ContextExecutor;
 import git.artdeell.mojo.game.platform.Platform;
 import git.artdeell.mojo.game.platform.backend.DummyBackend;
+import git.artdeell.mojo.game.platform.backend.PlatformBackend;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.prefs.QuickSettingSideDialog;
 import git.artdeell.mojo.services.GameService;
@@ -103,17 +104,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private HotbarView mHotbarView;
     private View mLoadingScreen;
     private MinecraftLoadingLandscapeView mLoadingLandscape;
-    private TextView mLoadingStatusText;
-    private View mLoadingWarningText;
     private PerformanceHudOverlay mPerfHudOverlay;
     private boolean mLoadingScreenHiding = false;
+    private static volatile boolean sMojangSplashReached = false;
     private static volatile int sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
-    private final Runnable mWindowWaitStatusRunnable = () -> setLoadingStatus(R.string.loading_screen_title);
-    private final Runnable mProlongedWaitHintRunnable = () -> {
-        if (mLoadingWarningText != null && mLoadingScreen != null && !mLoadingScreenHiding) {
-            mLoadingWarningText.setVisibility(View.VISIBLE);
-        }
-    };
     private GameRenderer mGameRenderer;
 
     Instance instance;
@@ -211,7 +205,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         });
 
         ingameControlsEditorArrayAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1, getResources().getStringArray(R.array.menu_customcontrol));
+                R.layout.item_zyrox_ingame_menu, getResources().getStringArray(R.array.menu_customcontrol));
         ingameControlsEditorListener = (parent, view, position, id) -> {
             switch(position) {
                 case 0: mControlLayout.addControlButton(new ControlData("New")); break;
@@ -270,7 +264,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
             allActions[baseActions.length] = getString(R.string.zyrox_toggle_perf_hud);
             gameActionArrayAdapter = new ArrayAdapter<>(this,
-                    android.R.layout.simple_list_item_1, allActions);
+                    R.layout.item_zyrox_ingame_menu, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
                 switch(position) {
                      case 0: dialogForceClose(GameActivity.this); break;
@@ -347,6 +341,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mControlLayout = findViewById(R.id.main_control_layout);
         launcherGLView = findViewById(R.id.main_game_render_view);
         drawerLayout = findViewById(R.id.main_drawer_options);
+        if (drawerLayout != null) {
+            drawerLayout.setScrimColor(0x2E04070D);
+        }
         navDrawer = findViewById(R.id.main_navigation_view);
         loggerView = findViewById(R.id.mainLoggerView);
         touchCharInput = findViewById(R.id.mainTouchCharInput);
@@ -355,14 +352,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mLoadingScreen = findViewById(R.id.main_loading_screen);
         if (mLoadingScreen != null) {
             mLoadingLandscape = mLoadingScreen.findViewById(R.id.main_loading_landscape);
-            mLoadingStatusText = mLoadingScreen.findViewById(R.id.main_loading_screen_text);
-            mLoadingWarningText = mLoadingScreen.findViewById(R.id.main_loading_screen_warning);
-            if (mLoadingWarningText != null) {
-                // Show crash-wait hint only if the JVM stays in window-wait for an extended period
-                mLoadingWarningText.setVisibility(View.INVISIBLE);
-            }
-            if (PLATFORM instanceof DummyBackend) {
-                setLoadingStatus(sCurrentLoadingStatusRes);
+            if (sMojangSplashReached && !(PLATFORM instanceof DummyBackend)) {
+                destroyLoadingScreenImmediate();
+            } else if (launcherGLView != null) {
+                launcherGLView.setFirstSplashFrameListener(() -> {
+                    sMojangSplashReached = true;
+                    hideLoadingScreen();
+                });
+                if (!(PLATFORM instanceof DummyBackend)) {
+                    launcherGLView.notifyNativeWindowBackendReady();
+                }
             }
         }
         // Attach lightweight optional Performance HUD overlay inside content_frame
@@ -382,40 +381,38 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     /**
-     * Thread-safe lifecycle hook updating the real launcher stage text shown on the loading screen.
-     * Never shows synthetic percentages or marks startup complete before the game window exists.
+     * Thread-safe launch lifecycle hook. The loading backdrop displays only the continuous animated
+     * scene GIF without distracting overlay text until Mojang's official splash screen renders.
      */
     public static void reportLoadingStage(@StringRes int stageStringRes) {
         sCurrentLoadingStatusRes = stageStringRes;
         ContextExecutor.executeActivity(activity -> {
             if (activity instanceof GameActivity) {
-                ((GameActivity) activity).onLoadingStageChanged(stageStringRes);
+                GameActivity ga = (GameActivity) activity;
+                if (ga.mLoadingLandscape != null && !ga.mLoadingScreenHiding) {
+                    ga.mLoadingLandscape.resumeAnimation();
+                }
             }
         });
     }
 
-    private void onLoadingStageChanged(@StringRes int stageStringRes) {
-        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
-        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
-        setLoadingStatus(stageStringRes);
-        if (stageStringRes == R.string.zyrox_loading_starting && mLoadingScreen != null && !mLoadingScreenHiding) {
-            // Once JavaRunner.startJvm is running Minecraft's main class, transition naturally to
-            // waiting for the native GLFW/SDL/AWT game window if it hasn't initialized yet.
-            Tools.MAIN_HANDLER.postDelayed(mWindowWaitStatusRunnable, 2200L);
-            Tools.MAIN_HANDLER.postDelayed(mProlongedWaitHintRunnable, 15000L);
+    /**
+     * Called when GLFW/SDL/AWT initializes. Keeps the loading GIF playing continuously until
+     * Mojang's official splash screen draws its first live visible frame on the game surface.
+     */
+    public void onNativeWindowBackendReady(PlatformBackend backend) {
+        if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
+            InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
         }
-    }
-
-    private void setLoadingStatus(@StringRes int stageStringRes) {
-        sCurrentLoadingStatusRes = stageStringRes;
-        if (mLoadingStatusText != null && mLoadingScreen != null && !mLoadingScreenHiding) {
-            mLoadingStatusText.setText(stageStringRes);
+        if (launcherGLView != null) {
+            launcherGLView.notifyNativeWindowBackendReady();
         }
     }
 
     private void destroyLoadingScreenImmediate() {
-        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
-        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
+        if (launcherGLView != null) {
+            launcherGLView.releaseSplashProbe();
+        }
         if (mLoadingLandscape != null) {
             mLoadingLandscape.release();
             mLoadingLandscape = null;
@@ -427,8 +424,6 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             }
             mLoadingScreen = null;
         }
-        mLoadingStatusText = null;
-        mLoadingWarningText = null;
         mLoadingScreenHiding = false;
     }
 
@@ -514,7 +509,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if(mLoadingScreen != null && !(PLATFORM instanceof DummyBackend)) hideLoadingScreen();
+        if (mLoadingScreen != null && sMojangSplashReached && !(PLATFORM instanceof DummyBackend)) {
+            hideLoadingScreen();
+        }
         if(launcherGLView != null)  // Useful when backing out of the app
             Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
     }
@@ -538,6 +535,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     private void runCraft(String versionId, File[] classpath) throws Throwable {
+        sMojangSplashReached = false;
         reportLoadingStage(R.string.zyrox_loading_preparing);
         Logger.appendToLog("--------- Starting game with Launcher Debug!");
         Tools.printLauncherInfo(versionId, instance.getLaunchArgs(), mGameRenderer.getCurrentRenderer(), this);
@@ -657,29 +655,25 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
     }
 
-    public void hideLoadingScreen(){
+    public void hideLoadingScreen() {
         if (mLoadingScreen == null || mLoadingScreenHiding) return;
         mLoadingScreenHiding = true;
-        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
-        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
-        if (mLoadingLandscape != null) {
-            mLoadingLandscape.pauseAnimation();
-        }
-        if (mLoadingWarningText != null) {
-            mLoadingWarningText.setVisibility(View.INVISIBLE);
+        sMojangSplashReached = true;
+        if (launcherGLView != null) {
+            launcherGLView.releaseSplashProbe();
         }
         if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
             InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
         }
-        if (mLoadingStatusText != null) {
-            mLoadingStatusText.setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
-        }
         if (LauncherPreferences.isReducedMotionEnabled(this)) {
             destroyLoadingScreenImmediate();
         } else {
+            // Keep the animated scene playing smoothly through the cross-fade directly into
+            // Mojang's live official splash screen, then release all GIF memory on completion.
             mLoadingScreen.animate()
                     .alpha(0f)
-                    .setDuration(260L)
+                    .setDuration(320L)
+                    .setInterpolator(new DecelerateInterpolator())
                     .withEndAction(this::destroyLoadingScreenImmediate)
                     .start();
         }

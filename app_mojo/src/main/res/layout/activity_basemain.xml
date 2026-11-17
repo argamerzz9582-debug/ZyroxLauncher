@@ -27,7 +27,7 @@
 				android:defaultFocusHighlightEnabled="false"
 				android:focusable="true"
 				android:descendantFocusability="blocksDescendants"
-                tools:ignore="UnusedAttribute">
+				tools:ignore="UnusedAttribute">
 
 				<git.artdeell.mojo.game.GameCursorView
 					android:layout_height="match_parent"
@@ -41,7 +41,7 @@
 
 			</git.artdeell.mojo.game.GameView>
 
-			<!-- Seamless Animated Minecraft Sunset Mountain Loading Backdrop (strictly behind all touch controls) -->
+			<!-- Pure Full-Bleed Animated Loading GIF (plays continuously until Mojang's official splash appears) -->
 			<FrameLayout
 				android:id="@+id/main_loading_screen"
 				android:layout_width="match_parent"
@@ -57,59 +57,13 @@
 					android:layout_height="match_parent"
 					android:clickable="false"
 					android:focusable="false" />
-
-				<LinearLayout
-					android:layout_width="wrap_content"
-					android:layout_height="wrap_content"
-					android:layout_marginBottom="16dp"
-					android:layout_gravity="center"
-					android:gravity="center"
-					android:clickable="false"
-					android:focusable="false"
-					android:paddingHorizontal="20dp"
-					android:paddingVertical="12dp"
-					android:orientation="vertical">
-
-					<ProgressBar
-						android:id="@+id/main_loading_screen_progress"
-						android:layout_width="26dp"
-						android:layout_height="26dp"
-						android:indeterminate="true"
-						android:indeterminateTint="@color/zyrox_lg_text" />
-
-					<TextView
-						android:id="@+id/main_loading_screen_text"
-						android:layout_width="wrap_content"
-						android:layout_height="wrap_content"
-						android:layout_marginTop="8dp"
-						android:text="@string/zyrox_loading_preparing"
-						android:textColor="@color/zyrox_text_primary"
-						android:shadowColor="#E6090705"
-						android:shadowDx="0"
-						android:shadowDy="2"
-						android:shadowRadius="6"
-						android:textSize="16sp" />
-
-					<TextView
-						android:id="@+id/main_loading_screen_warning"
-						android:layout_width="wrap_content"
-						android:layout_height="wrap_content"
-						android:layout_marginTop="3dp"
-						android:text="@string/loading_screen_warning"
-						android:textColor="#D9E7DFD5"
-						android:shadowColor="#E6090705"
-						android:shadowDx="0"
-						android:shadowDy="1"
-						android:shadowRadius="5"
-						android:textSize="12sp" />
-				</LinearLayout>
 			</FrameLayout>
 
 			<git.artdeell.mojo.input.keyboard.TouchCharInput
 				android:id="@+id/mainTouchCharInput"
 				android:layout_width="1dp"
 				android:layout_height="1dp"
-				android:background="@android:color/darker_gray"
+				android:background="@android:color/transparent"
 				android:ems="10"
 				android:imeOptions="flagNoFullscreen|flagNoExtractUi|flagNoPersonalizedLearning|actionDone"
 				android:inputType="textFilter|textImeMultiLine|textAutoComplete|textAutoCorrect"
@@ -117,11 +71,12 @@
 
 			<git.artdeell.mojo.input.handleview.DrawerPullButton
 				android:id="@+id/drawer_button"
-				android:layout_width="40dp"
+				android:layout_width="38dp"
 				android:layout_height="34dp"
 				android:padding="2dp"
 				android:elevation="10dp"
 				android:layout_gravity="center_horizontal"/>
+
 			<git.artdeell.mojo.input.mouse.HotbarView
 				android:id="@+id/hotbar_view"
 				android:layout_width="0px"
@@ -133,18 +88,29 @@
 			android:id="@+id/mainLoggerView"
 			android:layout_width="match_parent"
 			android:layout_height="match_parent"
-			android:visibility="gone"
-			/>
+			android:visibility="gone" />
 
 	</FrameLayout>
 
+	<!-- Floating Ultra-Clear Liquid Glass In-Game Command Drawer -->
 	<ListView
-		android:layout_width="200dp"
+		android:id="@+id/main_navigation_view"
+		android:layout_width="224dp"
 		android:layout_height="match_parent"
-		android:layout_gravity="right"
-		android:background="?attr/colorBackgroundFloating"
-		android:fitsSystemWindows="false"
-		android:id="@+id/main_navigation_view"/>
+		android:layout_gravity="end"
+		android:layout_marginTop="10dp"
+		android:layout_marginBottom="10dp"
+		android:layout_marginEnd="10dp"
+		android:paddingHorizontal="10dp"
+		android:paddingVertical="12dp"
+		android:clipToPadding="false"
+		android:divider="@android:color/transparent"
+		android:dividerHeight="6dp"
+		android:listSelector="@android:color/transparent"
+		android:scrollbars="none"
+		android:overScrollMode="ifContentScrolls"
+		android:background="@drawable/bg_zyrox_ingame_drawer"
+		android:elevation="14dp"
+		android:fitsSystemWindows="false" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
-

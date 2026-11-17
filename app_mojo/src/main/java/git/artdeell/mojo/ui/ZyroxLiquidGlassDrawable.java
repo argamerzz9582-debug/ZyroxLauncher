@@ -17,74 +17,79 @@ import androidx.annotation.Nullable;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 
 /**
- * Hardware-accelerated, zero-per-frame-allocation Zyrox Liquid Glass button drawable.
+ * Hardware-accelerated, zero-per-frame-allocation Zyrox Ultra-Clear Liquid Glass drawable.
  *
- * <p>Implements the exact optical layer stack of the Zyrox Liquid Glass control design system:
+ * <p>Engineered for maximum screen visibility and minimal visual obstruction over live Minecraft
+ * gameplay and animated backdrops:
  * <ol>
- *   <li>Soft outer frosted atmospheric halo skirt (cool neutral silver-ice normal, cool refractive
- *       ice-blue when pressed/activated)</li>
- *   <li>Translucent frosted glass body vertical gradient</li>
- *   <li>Crisp crystal-white outer specular rim ({@code #F0FFFFFF} → {@code #DCECF2F8})</li>
- *   <li>Concentric inner refractive bezel ring + vertical left/right micro-gleams</li>
- *   <li>Top pill-rounded specular light-bar capsule ({@code #82FFFFFF})</li>
- *   <li>Bottom centered pill-rounded caustic reflection capsule ({@code #4AFFFFFF})</li>
+ *   <li>Hairline optical contact contour ({@code #26050A14}) so crystal edges stay crisp over
+ *       bright skies, snow, or sunlit foliage without darkening the button interior</li>
+ *   <li>Ultra-sheer refractive water-glass lens fill (~93–96% transparent in the center)</li>
+ *   <li>Upper convex liquid-dome skylight sheen fading smoothly to pure transparency</li>
+ *   <li>135° diagonal diamond specular rim (bright incident top-left &amp; exit bottom-right glints
+ *       with airy vanishing cross-edges)</li>
+ *   <li>Delicate concentric inner meniscus ring + razor-fine top specular filament &amp; bottom
+ *       liquid-ice caustic reflection</li>
+ *   <li>Luminous translucent ice-crystal bloom on press and glacier-prism edge tint when toggled</li>
  * </ol>
- *
- * <p>Automatically simplifies to a fast single-pass frosted border in Low Visual Effects mode,
- * supports keyboard/controller focus rings, and blends custom user button tints cleanly.
  */
 public class ZyroxLiquidGlassDrawable extends Drawable {
-    /** Default legacy control background color treated as standard neutral Liquid Glass. */
+    /** Default legacy control background color treated as standard ultra-clear Liquid Glass. */
     public static final int LEGACY_DEFAULT_CONTROL_BG = 0x4D000000;
 
-    // Exact sampled RGBA tokens from Zyrox Liquid Glass optical specification
-    public static final int NORMAL_HALO_TOP = 0x52E6EDF3;
-    public static final int NORMAL_HALO_BOTTOM = 0x66B1BAC5;
-    public static final int PRESSED_HALO_TOP = 0x78C9D7E4;
-    public static final int PRESSED_HALO_BOTTOM = 0x86ADB9CA;
+    // Ultra-sheer optical Liquid Glass tokens (maximum screen visibility, crisp refractive edges)
+    public static final int NORMAL_HALO_TOP = 0x22060B14;
+    public static final int NORMAL_HALO_BOTTOM = 0x34050911;
+    public static final int PRESSED_HALO_TOP = 0x48CBE6FF;
+    public static final int PRESSED_HALO_BOTTOM = 0x3AA8D0F8;
 
-    public static final int NORMAL_BODY_TOP = 0x92B1B8C2;
-    public static final int NORMAL_BODY_MID = 0x8CAAB1BB;
-    public static final int NORMAL_BODY_BOTTOM = 0x92A4ACB7;
+    public static final int NORMAL_BODY_TOP = 0x1EF6FBFF;
+    public static final int NORMAL_BODY_MID = 0x09EBF4FF;
+    public static final int NORMAL_BODY_BOTTOM = 0x16DCEBF8;
 
-    public static final int PRESSED_BODY_TOP = 0x9EB0BCCB;
-    public static final int PRESSED_BODY_MID = 0x9AA9B6C6;
-    public static final int PRESSED_BODY_BOTTOM = 0x9EA6B3C4;
+    public static final int PRESSED_BODY_TOP = 0x3EE6F4FF;
+    public static final int PRESSED_BODY_MID = 0x22C4E2FF;
+    public static final int PRESSED_BODY_BOTTOM = 0x34D4ECFF;
 
-    public static final int OUTER_RIM_TOP = 0xF2FFFFFF;
-    public static final int OUTER_RIM_MID = 0xE3F6F9FC;
-    public static final int OUTER_RIM_BOTTOM = 0xE8FBFDFF;
+    public static final int TOGGLED_BODY_TOP = 0x34CCF0FF;
+    public static final int TOGGLED_BODY_MID = 0x1AA8DEFF;
+    public static final int TOGGLED_BODY_BOTTOM = 0x2ABCE8FF;
 
-    public static final int INNER_RIM_TOP = 0x74F4F7FA;
-    public static final int INNER_RIM_BOTTOM = 0x52CBD3DC;
+    public static final int OUTER_RIM_TOP = 0xD4FFFFFF;
+    public static final int OUTER_RIM_MID = 0x3CE4F0FC;
+    public static final int OUTER_RIM_BOTTOM = 0xA4ECF6FF;
 
-    public static final int TOP_SPECULAR_BAR = 0x82FFFFFF;
-    public static final int TOP_SPECULAR_BAR_PRESSED = 0x96FFFFFF;
-    public static final int BOTTOM_CAUSTIC_BAR = 0x48FFFFFF;
-    public static final int BOTTOM_CAUSTIC_BAR_PRESSED = 0x5CFFFFFF;
-    public static final int SIDE_MICRO_GLEAM = 0x62FFFFFF;
-    public static final int GLYPH_SNOW_WHITE = 0xFFFAFCFF;
-    public static final int GLYPH_SHADOW_COLOR = 0x621E2733;
+    public static final int INNER_RIM_TOP = 0x3CFFFFFF;
+    public static final int INNER_RIM_BOTTOM = 0x24DCF0FF;
+
+    public static final int TOP_SPECULAR_BAR = 0x88FFFFFF;
+    public static final int TOP_SPECULAR_BAR_PRESSED = 0xCCFFFFFF;
+    public static final int BOTTOM_CAUSTIC_BAR = 0x46E8F7FF;
+    public static final int BOTTOM_CAUSTIC_BAR_PRESSED = 0x7AE4F6FF;
+    public static final int SIDE_MICRO_GLEAM = 0x38FFFFFF;
+    public static final int GLYPH_SNOW_WHITE = 0xEEFAFCFF;
+    public static final int GLYPH_PRESSED_WHITE = 0xFFFFFFFF;
+    public static final int GLYPH_SHADOW_COLOR = 0x7C060B14;
 
     private final float mDensity;
+    private final boolean mHudSurfaceMode;
 
-    // Reusable paints & rects — zero allocations inside draw()
+    // Reusable paints & rects — strictly zero allocations inside draw()
     private final Paint mHaloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBodyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mDomePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mOuterRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mInnerRimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mTopBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBottomBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint mGleamPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mFocusPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private final RectF mHaloRect = new RectF();
     private final RectF mBodyRect = new RectF();
+    private final RectF mDomeRect = new RectF();
     private final RectF mInnerRect = new RectF();
     private final RectF mTopBarRect = new RectF();
     private final RectF mBottomBarRect = new RectF();
-    private final RectF mLeftGleamRect = new RectF();
-    private final RectF mRightGleamRect = new RectF();
 
     // State & configuration
     private boolean mPressed;
@@ -92,7 +97,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     private boolean mFocused;
     private boolean mDisabled;
     private int mMasterAlpha = 255;
-    private float mCornerRadiusPercent = 0f; // 0 => signature 24% squircle radius
+    private float mCornerRadiusPercent = 0f; // 0 => sculpted 30% liquid squircle radius
     private int mCustomBgColor = LEGACY_DEFAULT_CONTROL_BG;
     private int mCustomStrokeColor = Color.WHITE;
     private float mCustomStrokeDp = 0f;
@@ -100,28 +105,34 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     // Cached geometry metrics
     private float mHaloRadius;
     private float mBodyRadius;
+    private float mDomeRadius;
     private float mInnerRadius;
     private float mTopBarRadius;
     private float mBottomBarRadius;
     private boolean mGeometryDirty = true;
 
     public ZyroxLiquidGlassDrawable(float density) {
+        this(density, false);
+    }
+
+    public ZyroxLiquidGlassDrawable(float density, boolean hudSurfaceMode) {
         mDensity = density > 0f ? density : 2.75f;
+        mHudSurfaceMode = hudSurfaceMode;
 
         mHaloPaint.setStyle(Paint.Style.STROKE);
         mBodyPaint.setStyle(Paint.Style.FILL);
+        mDomePaint.setStyle(Paint.Style.FILL);
         mOuterRimPaint.setStyle(Paint.Style.STROKE);
         mInnerRimPaint.setStyle(Paint.Style.STROKE);
         mTopBarPaint.setStyle(Paint.Style.FILL);
         mBottomBarPaint.setStyle(Paint.Style.FILL);
-        mGleamPaint.setStyle(Paint.Style.FILL);
         mFocusPaint.setStyle(Paint.Style.STROKE);
-        mFocusPaint.setColor(0xFFFFFFFF);
-        mFocusPaint.setStrokeWidth(2.1f * mDensity);
+        mFocusPaint.setColor(0xE8FFFFFF);
+        mFocusPaint.setStrokeWidth(1.8f * mDensity);
     }
 
     /**
-     * Updates control appearance options while preserving Liquid Glass optical geometry.
+     * Updates control appearance options while preserving Liquid Glass optical refraction.
      */
     public void configureControlStyle(int bgColor, int strokeColor, float strokeWidthDp, float cornerRadiusPercent) {
         if (mCustomBgColor != bgColor
@@ -184,14 +195,14 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         boolean activeCool = mPressed || mActivated;
         boolean isWide = (w / Math.max(1f, h)) >= 1.45f;
 
-        // Outer halo stroke sits strictly inside View bounds so exact touch hitboxes stay unchanged
-        float haloStroke = clamp(minSide * 0.048f, 1.2f * mDensity, 2.8f * mDensity);
-        float bodyInset = clamp(minSide * 0.036f, 1.1f * mDensity, 2.4f * mDensity);
+        // Hairline optical insets sit strictly inside View bounds so touch hitboxes are 100% preserved
+        float haloStroke = clamp(minSide * 0.026f, 0.85f * mDensity, 1.5f * mDensity);
+        float bodyInset = clamp(minSide * 0.030f, 1.0f * mDensity, 1.9f * mDensity);
         float outerStroke = mCustomStrokeDp > 0f
-                ? clamp(mCustomStrokeDp * mDensity, 1.1f * mDensity, 3.2f * mDensity)
-                : clamp(minSide * 0.032f, 1.25f * mDensity, 1.95f * mDensity);
-        float innerGap = clamp(minSide * 0.068f, 2.2f * mDensity, 4.2f * mDensity);
-        float innerStroke = clamp(minSide * 0.020f, 0.85f * mDensity, 1.25f * mDensity);
+                ? clamp(mCustomStrokeDp * mDensity, 0.95f * mDensity, 2.8f * mDensity)
+                : clamp(minSide * 0.024f, 1.0f * mDensity, 1.45f * mDensity);
+        float innerGap = clamp(minSide * 0.056f, 1.8f * mDensity, 3.2f * mDensity);
+        float innerStroke = clamp(minSide * 0.015f, 0.65f * mDensity, 0.95f * mDensity);
 
         mBodyRect.set(
                 bounds.left + bodyInset,
@@ -216,21 +227,32 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         if (mCornerRadiusPercent > 0.5f) {
             mBodyRadius = (bodyMin * 0.5f) * (mCornerRadiusPercent / 100f);
         } else {
-            // Exact Zyrox Liquid Glass rounded-squircle curvature (~27% of shorter edge)
-            mBodyRadius = bodyMin * 0.275f;
+            // Fluid sculpted water-droplet squircle curvature (~30% of shorter side)
+            mBodyRadius = bodyMin * 0.30f;
         }
         mBodyRadius = Math.min(mBodyRadius, bodyMin * 0.5f);
         mHaloRadius = Math.min(Math.min(mHaloRect.width(), mHaloRect.height()) * 0.5f,
-                mBodyRadius + bodyInset * 0.65f);
-        mInnerRadius = Math.max(2f, mBodyRadius - innerGap * 0.82f);
+                mBodyRadius + bodyInset * 0.6f);
+        mInnerRadius = Math.max(2f, mBodyRadius - innerGap * 0.78f);
 
-        // Top specular light-bar capsule (matches y=31..36 on 190px HTML controls)
+        // Upper convex liquid-glass dome highlight (top 38% of lens, fading to pure transparent)
         float bodyW = mBodyRect.width();
         float bodyH = mBodyRect.height();
-        float topBarWidth = bodyW * (isWide ? 0.78f : 0.60f);
-        float topBarHeight = clamp(bodyH * 0.052f, 1.5f * mDensity, 3.4f * mDensity);
-        float topBarTop = mInnerRect.top + clamp(bodyH * 0.032f, 1.0f * mDensity, 2.8f * mDensity);
+        float domeInset = outerStroke * 0.7f;
+        float domeH = Math.max(4f, bodyH * 0.38f);
+        mDomeRect.set(
+                mBodyRect.left + domeInset,
+                mBodyRect.top + domeInset,
+                mBodyRect.right - domeInset,
+                Math.min(mBodyRect.bottom - domeInset, mBodyRect.top + domeH)
+        );
+        mDomeRadius = Math.max(2f, mBodyRadius - domeInset);
+
+        // Razor-fine top specular light filament
         float cx = mBodyRect.centerX();
+        float topBarWidth = bodyW * (isWide ? 0.68f : 0.54f);
+        float topBarHeight = clamp(bodyH * 0.034f, 1.0f * mDensity, 1.9f * mDensity);
+        float topBarTop = mBodyRect.top + clamp(bodyH * 0.048f, 1.4f * mDensity, 2.8f * mDensity);
         mTopBarRect.set(
                 cx - topBarWidth * 0.5f,
                 topBarTop,
@@ -239,10 +261,10 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         );
         mTopBarRadius = topBarHeight * 0.5f;
 
-        // Bottom centered caustic reflection capsule (matches y=155..159 on 190px HTML controls)
-        float bottomBarWidth = bodyW * (isWide ? 0.56f : 0.34f);
-        float bottomBarHeight = clamp(bodyH * 0.044f, 1.3f * mDensity, 2.8f * mDensity);
-        float bottomBarBottom = mInnerRect.bottom - clamp(bodyH * 0.030f, 0.9f * mDensity, 2.4f * mDensity);
+        // Delicate bottom underwater caustic reflection
+        float bottomBarWidth = bodyW * (isWide ? 0.46f : 0.32f);
+        float bottomBarHeight = clamp(bodyH * 0.028f, 0.9f * mDensity, 1.5f * mDensity);
+        float bottomBarBottom = mBodyRect.bottom - clamp(bodyH * 0.045f, 1.3f * mDensity, 2.5f * mDensity);
         mBottomBarRect.set(
                 cx - bottomBarWidth * 0.5f,
                 bottomBarBottom - bottomBarHeight,
@@ -251,49 +273,43 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         );
         mBottomBarRadius = bottomBarHeight * 0.5f;
 
-        // Left & right vertical refractive micro-gleams
-        float gleamW = clamp(mDensity * 1.15f, 1f, 2.4f);
-        float gleamH = Math.max(0f, mInnerRect.height() - mInnerRadius * 1.65f);
-        float cy = mBodyRect.centerY();
-        mLeftGleamRect.set(
-                mInnerRect.left + gleamW * 0.6f,
-                cy - gleamH * 0.5f,
-                mInnerRect.left + gleamW * 1.6f,
-                cy + gleamH * 0.5f
-        );
-        mRightGleamRect.set(
-                mInnerRect.right - gleamW * 1.6f,
-                cy - gleamH * 0.42f,
-                mInnerRect.right - gleamW * 0.6f,
-                cy + gleamH * 0.42f
-        );
-
-        // Configure stroke widths & cached shaders
+        // 1. Outer contrast contour (subtle dark micro-shadow idle; soft ice aura pressed)
         mHaloPaint.setStrokeWidth(haloStroke);
         mHaloPaint.setShader(new LinearGradient(
                 0f, mHaloRect.top, 0f, mHaloRect.bottom,
-                activeCool ? PRESSED_HALO_TOP : NORMAL_HALO_TOP,
-                activeCool ? PRESSED_HALO_BOTTOM : NORMAL_HALO_BOTTOM,
+                scaleAlpha(activeCool ? PRESSED_HALO_TOP : NORMAL_HALO_TOP),
+                scaleAlpha(activeCool ? PRESSED_HALO_BOTTOM : NORMAL_HALO_BOTTOM),
                 Shader.TileMode.CLAMP
         ));
 
+        // 2. Ultra-sheer optical lens body (92–96% see-through center so gameplay dominates!)
         int bodyTop;
         int bodyMid;
         int bodyBot;
         if (mDisabled) {
-            bodyTop = 0x45929AA6;
-            bodyMid = 0x3E87909C;
-            bodyBot = 0x427D8692;
+            bodyTop = 0x12D8E2EC;
+            bodyMid = 0x08CCD8E4;
+            bodyBot = 0x10C4D0DE;
+        } else if (mHudSurfaceMode) {
+            // Subtle smoked crystal for text telemetry pills (Performance HUD)
+            bodyTop = 0x440D1522;
+            bodyMid = 0x36090F1A;
+            bodyBot = 0x420B121E;
         } else if (hasCustomUserTint()) {
-            int base = activeCool ? blendArgb(mCustomBgColor, PRESSED_BODY_TOP, 0.42f)
-                    : blendArgb(mCustomBgColor, NORMAL_BODY_TOP, 0.35f);
-            bodyTop = brighten(base, 1.08f);
-            bodyMid = base;
-            bodyBot = brighten(base, 0.94f);
-        } else if (activeCool) {
+            // Preserve user's chosen tint hue while keeping ultra-sheer Liquid Glass translucency
+            int targetAlpha = Math.min(Color.alpha(mCustomBgColor), activeCool ? 96 : 66);
+            int sheerUser = (targetAlpha << 24) | (mCustomBgColor & 0x00FFFFFF);
+            bodyTop = brighten(sheerUser, 1.14f);
+            bodyMid = ((Math.max(12, targetAlpha / 2)) << 24) | (mCustomBgColor & 0x00FFFFFF);
+            bodyBot = brighten(sheerUser, 0.96f);
+        } else if (mPressed) {
             bodyTop = PRESSED_BODY_TOP;
             bodyMid = PRESSED_BODY_MID;
             bodyBot = PRESSED_BODY_BOTTOM;
+        } else if (mActivated) {
+            bodyTop = TOGGLED_BODY_TOP;
+            bodyMid = TOGGLED_BODY_MID;
+            bodyBot = TOGGLED_BODY_BOTTOM;
         } else {
             bodyTop = NORMAL_BODY_TOP;
             bodyMid = NORMAL_BODY_MID;
@@ -302,58 +318,99 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
 
         mBodyPaint.setShader(new LinearGradient(
                 0f, mBodyRect.top, 0f, mBodyRect.bottom,
-                new int[]{scaleAlpha(bodyTop), scaleAlpha(bodyMid), scaleAlpha(bodyBot)},
-                new float[]{0f, 0.52f, 1f},
+                new int[]{
+                        scaleAlpha(bodyTop),
+                        scaleAlpha(bodyMid),
+                        scaleAlpha(bodyMid),
+                        scaleAlpha(bodyBot)
+                },
+                new float[]{0f, 0.34f, 0.72f, 1f},
                 Shader.TileMode.CLAMP
         ));
 
-        int rimTop = mDisabled ? 0x6EFFFFFF
-                : (mCustomStrokeDp > 0f && mCustomStrokeColor != Color.WHITE
-                ? blendArgb(mCustomStrokeColor, OUTER_RIM_TOP, 0.55f) : OUTER_RIM_TOP);
-        int rimMid = mDisabled ? 0x54E6ECF2 : (activeCool ? 0xF0F4F9FF : OUTER_RIM_MID);
-        int rimBot = mDisabled ? 0x62EEF3F8 : (activeCool ? 0xF5FFFFFF : OUTER_RIM_BOTTOM);
+        // 3. Curved upper liquid-dome sheen
+        int domePeak = mPressed ? 0x38FFFFFF : (mActivated ? 0x2CE8F8FF : 0x20FFFFFF);
+        mDomePaint.setShader(new LinearGradient(
+                0f, mDomeRect.top, 0f, mDomeRect.bottom,
+                new int[]{scaleAlpha(domePeak), scaleAlpha(0x08FFFFFF), 0x00FFFFFF},
+                new float[]{0f, 0.55f, 1f},
+                Shader.TileMode.CLAMP
+        ));
+
+        // 4. Signature 135° diagonal diamond specular refraction rim
+        int rimTopLeft;
+        int rimCrossA;
+        int rimCrossB;
+        int rimBotRight;
+        if (mDisabled) {
+            rimTopLeft = 0x52FFFFFF;
+            rimCrossA = 0x1EFFFFFF;
+            rimCrossB = 0x1AFFFFFF;
+            rimBotRight = 0x3CFFFFFF;
+        } else if (mCustomStrokeDp > 0f && mCustomStrokeColor != Color.WHITE) {
+            rimTopLeft = blendArgb(mCustomStrokeColor, 0xEEFFFFFF, 0.45f);
+            rimCrossA = setAlphaChannel(mCustomStrokeColor, 84);
+            rimCrossB = setAlphaChannel(mCustomStrokeColor, 76);
+            rimBotRight = blendArgb(mCustomStrokeColor, 0xCCE8F4FF, 0.35f);
+        } else if (mPressed) {
+            rimTopLeft = 0xF8FFFFFF;
+            rimCrossA = 0x8CE4F2FF;
+            rimCrossB = 0x7ED8ECFF;
+            rimBotRight = 0xE8F0F8FF;
+        } else if (mActivated) {
+            rimTopLeft = 0xF0E6FAFF;
+            rimCrossA = 0x78B8E8FF;
+            rimCrossB = 0x6AA8E0FF;
+            rimBotRight = 0xDCF0FAFF;
+        } else {
+            rimTopLeft = OUTER_RIM_TOP;
+            rimCrossA = OUTER_RIM_MID;
+            rimCrossB = 0x32D8E8F8;
+            rimBotRight = OUTER_RIM_BOTTOM;
+        }
 
         mOuterRimPaint.setStrokeWidth(outerStroke);
         mOuterRimPaint.setShader(new LinearGradient(
-                0f, mBodyRect.top, 0f, mBodyRect.bottom,
-                new int[]{scaleAlpha(rimTop), scaleAlpha(rimMid), scaleAlpha(rimBot)},
+                mBodyRect.left, mBodyRect.top, mBodyRect.right, mBodyRect.bottom,
+                new int[]{
+                        scaleAlpha(rimTopLeft),
+                        scaleAlpha(rimCrossA),
+                        scaleAlpha(rimCrossB),
+                        scaleAlpha(rimBotRight)
+                },
+                new float[]{0f, 0.38f, 0.64f, 1f},
+                Shader.TileMode.CLAMP
+        ));
+
+        // 5. Concentric inner liquid meniscus ring
+        mInnerRimPaint.setStrokeWidth(innerStroke);
+        mInnerRimPaint.setShader(new LinearGradient(
+                0f, mInnerRect.top, 0f, mInnerRect.bottom,
+                new int[]{
+                        scaleAlpha(activeCool ? 0x6CFFFFFF : INNER_RIM_TOP),
+                        scaleAlpha(activeCool ? 0x1CE0F2FF : 0x0AFFFFFF),
+                        scaleAlpha(activeCool ? 0x48D8F0FF : INNER_RIM_BOTTOM)
+                },
                 new float[]{0f, 0.5f, 1f},
                 Shader.TileMode.CLAMP
         ));
 
-        mInnerRimPaint.setStrokeWidth(innerStroke);
-        mInnerRimPaint.setShader(new LinearGradient(
-                0f, mInnerRect.top, 0f, mInnerRect.bottom,
-                scaleAlpha(activeCool ? 0x8EF7FAFF : INNER_RIM_TOP),
-                scaleAlpha(activeCool ? 0x68D2DFEE : INNER_RIM_BOTTOM),
-                Shader.TileMode.CLAMP
-        ));
-
+        // 6. Tapered top specular filament & bottom liquid-ice caustic
+        int topPeak = activeCool ? TOP_SPECULAR_BAR_PRESSED : TOP_SPECULAR_BAR;
         mTopBarPaint.setShader(new LinearGradient(
                 mTopBarRect.left, 0f, mTopBarRect.right, 0f,
-                new int[]{
-                        scaleAlpha(0x18FFFFFF),
-                        scaleAlpha(activeCool ? TOP_SPECULAR_BAR_PRESSED : TOP_SPECULAR_BAR),
-                        scaleAlpha(activeCool ? TOP_SPECULAR_BAR_PRESSED : TOP_SPECULAR_BAR),
-                        scaleAlpha(0x18FFFFFF)
-                },
-                new float[]{0f, 0.12f, 0.88f, 1f},
+                new int[]{0x00FFFFFF, scaleAlpha(topPeak), scaleAlpha(topPeak), 0x00FFFFFF},
+                new float[]{0f, 0.24f, 0.76f, 1f},
                 Shader.TileMode.CLAMP
         ));
 
+        int botPeak = activeCool ? BOTTOM_CAUSTIC_BAR_PRESSED : BOTTOM_CAUSTIC_BAR;
         mBottomBarPaint.setShader(new LinearGradient(
                 mBottomBarRect.left, 0f, mBottomBarRect.right, 0f,
-                new int[]{
-                        scaleAlpha(0x10FFFFFF),
-                        scaleAlpha(activeCool ? BOTTOM_CAUSTIC_BAR_PRESSED : BOTTOM_CAUSTIC_BAR),
-                        scaleAlpha(activeCool ? BOTTOM_CAUSTIC_BAR_PRESSED : BOTTOM_CAUSTIC_BAR),
-                        scaleAlpha(0x10FFFFFF)
-                },
-                new float[]{0f, 0.16f, 0.84f, 1f},
+                new int[]{0x00E4F6FF, scaleAlpha(botPeak), scaleAlpha(botPeak), 0x00E4F6FF},
+                new float[]{0f, 0.28f, 0.72f, 1f},
                 Shader.TileMode.CLAMP
         ));
-
-        mGleamPaint.setColor(scaleAlpha(activeCool ? 0x7AFFFFFF : SIDE_MICRO_GLEAM));
     }
 
     @Override
@@ -366,26 +423,22 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
 
         boolean lowEffects = LauncherPreferences.PREF_ZYROX_LOW_EFFECTS;
 
-        // 1. Soft outer frosted halo skirt (skipped in low-effects performance mode)
+        // 1. Hairline outer contrast micro-contour / press aura
         if (!lowEffects && !mDisabled) {
             canvas.drawRoundRect(mHaloRect, mHaloRadius, mHaloRadius, mHaloPaint);
         }
 
-        // 2. Translucent frosted liquid-glass body fill
+        // 2. Ultra-sheer crystal liquid-glass lens fill (~93–96% see-through!)
         canvas.drawRoundRect(mBodyRect, mBodyRadius, mBodyRadius, mBodyPaint);
 
-        if (!lowEffects && !mDisabled && mInnerRect.width() > 8f * mDensity && mInnerRect.height() > 8f * mDensity) {
-            // 3. Concentric inner refractive bezel ring
+        if (!lowEffects && !mDisabled && mInnerRect.width() > 6f * mDensity && mInnerRect.height() > 6f * mDensity) {
+            // 3. Upper curved convex dome highlight
+            canvas.drawRoundRect(mDomeRect, mDomeRadius, mDomeRadius, mDomePaint);
+
+            // 4. Concentric inner refractive meniscus ring
             canvas.drawRoundRect(mInnerRect, mInnerRadius, mInnerRadius, mInnerRimPaint);
 
-            // 4. Vertical side refractive micro-gleams
-            if (mLeftGleamRect.height() > 3f * mDensity) {
-                float gr = mLeftGleamRect.width() * 0.5f;
-                canvas.drawRoundRect(mLeftGleamRect, gr, gr, mGleamPaint);
-                canvas.drawRoundRect(mRightGleamRect, gr, gr, mGleamPaint);
-            }
-
-            // 5. Signature top specular light-bar capsule & bottom caustic reflection bar
+            // 5. Tapered top specular crest filament & bottom water-caustic glint
             if (mTopBarRect.width() > 8f * mDensity) {
                 canvas.drawRoundRect(mTopBarRect, mTopBarRadius, mTopBarRadius, mTopBarPaint);
             }
@@ -394,7 +447,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             }
         }
 
-        // 6. Crisp crystal-white outer specular rim
+        // 6. 135° diagonal diamond specular prism rim
         canvas.drawRoundRect(mBodyRect, mBodyRadius, mBodyRadius, mOuterRimPaint);
 
         // 7. Accessibility focus ring for gamepad / keyboard navigation
@@ -405,7 +458,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
 
     private boolean hasCustomUserTint() {
         return mCustomBgColor != LEGACY_DEFAULT_CONTROL_BG
-                && mCustomBgColor != 0
+                && (mCustomBgColor & 0x00FFFFFF) != 0
                 && Color.alpha(mCustomBgColor) > 0;
     }
 
@@ -413,6 +466,10 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         if (mMasterAlpha >= 255) return argb;
         int a = (Color.alpha(argb) * mMasterAlpha) / 255;
         return (a << 24) | (argb & 0x00FFFFFF);
+    }
+
+    private static int setAlphaChannel(int argb, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (argb & 0x00FFFFFF);
     }
 
     private static float clamp(float val, float min, float max) {

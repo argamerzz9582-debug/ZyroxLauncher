@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Ultra-Sheer Liquid Glass Global Header Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#45100C09"
-                android:endColor="#2E0E0A08" />
+                android:startColor="#48090E18"
+                android:endColor="#28090E18" />
+        </shape>
+    </item>
+    <item android:height="14dp" android:gravity="top|fill_horizontal">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#16FFFFFF"
+                android:endColor="#00FFFFFF" />
         </shape>
     </item>
     <item
@@ -16,9 +25,9 @@
             <gradient
                 android:type="linear"
                 android:angle="0"
-                android:startColor="#2EFFC07A"
-                android:centerColor="#66FFB870"
-                android:endColor="#2EFFC07A" />
+                android:startColor="#20FFFFFF"
+                android:centerColor="#8AF4FAFF"
+                android:endColor="#20FFFFFF" />
         </shape>
     </item>
 </layer-list>
