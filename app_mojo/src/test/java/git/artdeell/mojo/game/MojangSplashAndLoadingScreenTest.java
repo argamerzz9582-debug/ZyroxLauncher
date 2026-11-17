@@ -196,12 +196,19 @@ public class MojangSplashAndLoadingScreenTest {
         assertEquals(expectedFrames, meta.frameCount);
         assertEquals(expectedDelayMs, meta.medianDelayMs);
 
-        // Decode raw (unblended) at 2x downsample to confirm baseline hard-cut discontinuity
+        // Decode raw (unblended) at 1x native resolution to measure baseline hard-cut discontinuity
         ZyroxGifDecoder.SeamlessSequence<short[]> rawSeq = ZyroxGifDecoder.decodeSeamlessLoop(
-                gifBytes, 2, false, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
+                gifBytes, 1, false, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
         assertTrue(rawSeq != null);
         assertEquals(expectedFrames, rawSeq.frames.size());
         double rawWrap = meanRgbDiff565(rawSeq.frames.get(rawSeq.frames.size() - 1), rawSeq.frames.get(0));
+
+        // Verify 2x low-RAM half-resolution decoder path as well
+        ZyroxGifDecoder.SeamlessSequence<short[]> lowRamSeq = ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, 2, true, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
+        assertTrue(lowRamSeq != null);
+        assertEquals(expectedW / 2, lowRamSeq.width);
+        assertEquals(expectedH / 2, lowRamSeq.height);
 
         // Decode C¹-continuous seamless loop at full 1x native resolution & verify preview parity
         AtomicInteger previewCount = new AtomicInteger();
