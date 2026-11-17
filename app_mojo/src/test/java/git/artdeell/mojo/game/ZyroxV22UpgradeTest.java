@@ -74,11 +74,14 @@ public class ZyroxV22UpgradeTest {
                 "[Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas\n",
                 t0 + 19_000L);
         assertTrue("Atlas upload must reach near-completion", s7.percent >= 88);
-        assertTrue("ETA formatter produces human-readable label", s7.etaText.contains("%"));
+        assertFalse("ETA formatter produces human-readable label", s7.etaText.isEmpty());
+        assertEquals("~12s left", GameLaunchProgressTracker.formatEta(65, 12));
+        assertEquals("Almost ready…", GameLaunchProgressTracker.formatEta(97, 2));
 
         GameLaunchProgressTracker.ProgressSnapshot done = tracker.markComplete(t0 + 20_500L);
         assertTrue(done.completed);
         assertEquals(100, done.percent);
+        assertEquals("Ready", done.etaText);
 
         long blended = GameLaunchProgressTracker.blendLearnedBootMs(20_000L, 16_000L);
         assertTrue(blended >= 16_000L && blended <= 20_000L);
