@@ -471,6 +471,7 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Download Verified Signed Release Artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -512,16 +513,19 @@ jobs:
             echo "Verify locally against \`SHA256SUMS.txt\` and \`SIGNING_CERTIFICATE_SHA256.txt\` using \`sha256sum\` and \`apksigner verify --print-certs\`."
           } > "$NOTES_FILE"
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          ls -lh out/
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" \
               "out/SHA256SUMS.txt" \
               "out/SIGNING_CERTIFICATE_SHA256.txt" \
-              --clobber
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
             gh release edit "$TAG" \
               --title "Zyrox Launcher ${TAG}" \
               --notes-file "$NOTES_FILE" \
-              --latest
+              --latest \
+              --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$TAG" \
               "out/Zyrox.Launcher.apk#Zyrox Launcher.apk" \
@@ -530,5 +534,7 @@ jobs:
               --target "$GITHUB_SHA" \
               --title "Zyrox Launcher ${TAG}" \
               --notes-file "$NOTES_FILE" \
-              --latest
+              --latest \
+              --repo "$GITHUB_REPOSITORY"
           fi
+          echo "::notice title=ReleasePublished::Published Zyrox Launcher ${TAG} at https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
