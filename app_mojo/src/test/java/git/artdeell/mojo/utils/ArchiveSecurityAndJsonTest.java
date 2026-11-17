@@ -65,15 +65,15 @@ public class ArchiveSecurityAndJsonTest {
         File dest = tmp.newFolder("safe_target");
         File sibling = new File(dest.getParentFile(), "pwned.txt");
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+        File badZip = new File(tmp.getRoot(), "malicious.zip");
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(badZip))) {
             zos.putNextEntry(new ZipEntry("../pwned.txt"));
             zos.write("attack".getBytes(StandardCharsets.UTF_8));
             zos.closeEntry();
         }
 
-        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(baos.toByteArray()))) {
-            ZipUtils.zipExtract(zis, "", dest);
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(badZip)) {
+            ZipUtils.zipExtract(zf, "", dest);
             fail("Expected Zip-Slip exception");
         } catch (IOException expected) {
             assertTrue(!sibling.exists());
