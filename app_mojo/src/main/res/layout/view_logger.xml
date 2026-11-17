@@ -80,9 +80,9 @@
         android:id="@+id/content_log_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:background="#E6090706"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp"
+        android:background="@color/zyrox_terminal_glass"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/top_log_view">
 

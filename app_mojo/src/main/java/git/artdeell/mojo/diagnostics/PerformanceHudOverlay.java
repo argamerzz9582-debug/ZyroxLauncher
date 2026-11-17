@@ -92,8 +92,8 @@ public class PerformanceHudOverlay extends AppCompatTextView implements Choreogr
         int padH = Math.round(9f * d);
         int padV = Math.round(5f * d);
         setPadding(padH, padV, padH, padV);
-        ZyroxLiquidGlassDrawable bg = new ZyroxLiquidGlassDrawable(d);
-        bg.setAlpha(210);
+        ZyroxLiquidGlassDrawable bg = new ZyroxLiquidGlassDrawable(d, true);
+        bg.setAlpha(215);
         setBackground(bg);
         setVisibility(GONE);
     }

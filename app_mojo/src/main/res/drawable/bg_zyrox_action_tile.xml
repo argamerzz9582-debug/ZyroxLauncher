@@ -1,108 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox 2.0 Action Tile & Icon Squircle Button — Exact Neutral Frosted Liquid Glass -->
+<!-- Zyrox Ultra-Clear Liquid Glass Action Tile & Squircle Button (~90–95% Transparent Crystal) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Pressed: Cool Ice-Blue Liquid Glass -->
     <item android:state_pressed="true">
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#66C9D7E4" android:endColor="#74ADB9CA" />
-                    <stroke android:width="1.2dp" android:color="#8AD2E2F2" />
-                    <corners android:radius="12dp" />
-                </shape>
-            </item>
-            <item android:left="1.4dp" android:top="1.4dp" android:right="1.4dp" android:bottom="1.4dp">
-                <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#9CB0BCCB"
-                        android:centerColor="#96A9B6C6"
-                        android:endColor="#9AA6B3C4" />
-                    <stroke android:width="1.5dp" android:color="#F6FFFFFF" />
-                    <corners android:radius="10.5dp" />
+                        android:startColor="#46E4F3FF"
+                        android:centerColor="#26C4E2FF"
+                        android:endColor="#38D4ECFF" />
+                    <stroke android:width="1.25dp" android:color="#F4FFFFFF" />
+                    <corners android:radius="12.5dp" />
                 </shape>
             </item>
-            <item android:left="3.8dp" android:top="3.8dp" android:right="3.8dp" android:bottom="3.8dp">
+            <item android:left="9dp" android:top="3dp" android:right="9dp" android:height="1.5dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.9dp" android:color="#80F5F9FF" />
-                    <corners android:radius="8.5dp" />
-                </shape>
-            </item>
-            <item android:left="9dp" android:top="4.8dp" android:right="9dp" android:height="2dp" android:gravity="top">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#1CFFFFFF" android:centerColor="#94FFFFFF" android:endColor="#1CFFFFFF" />
-                    <corners android:radius="2dp" />
-                </shape>
-            </item>
-            <item android:left="14dp" android:bottom="4.8dp" android:right="14dp" android:height="1.6dp" android:gravity="bottom">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#10FFFFFF" android:centerColor="#58FFFFFF" android:endColor="#10FFFFFF" />
-                    <corners android:radius="2dp" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#C0FFFFFF" android:endColor="#00FFFFFF" />
+                    <corners android:radius="1dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
 
-    <!-- Focused -->
     <item android:state_focused="true">
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <solid android:color="#4ED2E2F4" />
-                    <stroke android:width="2dp" android:color="#FFFFFFFF" />
-                    <corners android:radius="12dp" />
-                </shape>
-            </item>
-            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
-                <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#92B1B8C2" android:endColor="#8EA4ACB7" />
-                    <stroke android:width="1.3dp" android:color="#F2FFFFFF" />
-                    <corners android:radius="10dp" />
-                </shape>
-            </item>
-        </layer-list>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#30F0F8FF" android:endColor="#20D4EAFF" />
+            <stroke android:width="1.6dp" android:color="#FFFFFFFF" />
+            <corners android:radius="12.5dp" />
+        </shape>
     </item>
 
-    <!-- Default: Neutral Frosted Liquid Glass Squircle -->
+    <!-- Default: Ultra-Sheer Liquid Glass Tile (Background Shines Vividly Right Through) -->
     <item>
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#3CE6EDF3" android:endColor="#48B1BAC5" />
-                    <stroke android:width="1dp" android:color="#64E4EBF2" />
-                    <corners android:radius="12dp" />
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.85dp" android:color="#26060B14" />
+                    <corners android:radius="13dp" />
                 </shape>
             </item>
-            <item android:left="1.4dp" android:top="1.4dp" android:right="1.4dp" android:bottom="1.4dp">
+            <item android:left="0.8dp" android:top="0.8dp" android:right="0.8dp" android:bottom="0.8dp">
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#88B1B8C2"
-                        android:centerColor="#82AAB1BB"
-                        android:endColor="#86A4ACB7" />
-                    <stroke android:width="1.4dp" android:color="#EEFFFFFF" />
-                    <corners android:radius="10.5dp" />
+                        android:startColor="#22F8FCFF"
+                        android:centerColor="#0CEAF4FF"
+                        android:endColor="#18DCEBF8" />
+                    <stroke android:width="1.1dp" android:color="#BCFFFFFF" />
+                    <corners android:radius="12.2dp" />
                 </shape>
             </item>
-            <item android:left="3.8dp" android:top="3.8dp" android:right="3.8dp" android:bottom="3.8dp">
+            <item android:left="2.8dp" android:top="2.8dp" android:right="2.8dp" android:bottom="2.8dp">
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.9dp" android:color="#68F4F7FA" />
-                    <corners android:radius="8.5dp" />
+                    <stroke android:width="0.65dp" android:color="#34F4FAFF" />
+                    <corners android:radius="10dp" />
                 </shape>
             </item>
-            <item android:left="9dp" android:top="4.8dp" android:right="9dp" android:height="2dp" android:gravity="top">
+            <item android:left="9dp" android:top="2.8dp" android:right="9dp" android:height="1.3dp" android:gravity="top">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#18FFFFFF" android:centerColor="#80FFFFFF" android:endColor="#18FFFFFF" />
-                    <corners android:radius="2dp" />
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#8AFFFFFF" android:endColor="#00FFFFFF" />
+                    <corners android:radius="1dp" />
                 </shape>
             </item>
-            <item android:left="14dp" android:bottom="4.8dp" android:right="14dp" android:height="1.6dp" android:gravity="bottom">
+            <item android:left="16dp" android:bottom="2.8dp" android:right="16dp" android:height="1.1dp" android:gravity="bottom">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#10FFFFFF" android:centerColor="#46FFFFFF" android:endColor="#10FFFFFF" />
-                    <corners android:radius="2dp" />
+                    <gradient android:angle="0" android:startColor="#00E4F6FF" android:centerColor="#46E8F8FF" android:endColor="#00E4F6FF" />
+                    <corners android:radius="1dp" />
                 </shape>
             </item>
         </layer-list>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Ultra-Clear Floating Liquid Glass In-Game Drawer & Quick Inspector Surface -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 1. Subtle outer optical contact shadow so glass edges stay legible over bright sky/snow -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#2405080F" />
+            <stroke android:width="1dp" android:color="#3A060A12" />
+            <corners android:radius="20dp" />
+        </shape>
+    </item>
+    <!-- 2. Translucent smoked-crystal liquid glass core + crisp luminous prism rim -->
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#920D1420"
+                android:centerColor="#82090E17"
+                android:endColor="#900B111C" />
+            <stroke android:width="1.25dp" android:color="#B8F4FAFF" />
+            <corners android:radius="19dp" />
+        </shape>
+    </item>
+    <!-- 3. Upper curved liquid dome refraction sheen -->
+    <item android:left="2dp" android:top="2dp" android:right="2dp" android:height="42dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#20FFFFFF"
+                android:endColor="#00FFFFFF" />
+            <corners android:topLeftRadius="17dp" android:topRightRadius="17dp" />
+        </shape>
+    </item>
+    <!-- 4. Concentric inner refractive meniscus ring -->
+    <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <stroke android:width="0.8dp" android:color="#36F0F8FF" />
+            <corners android:radius="16.5dp" />
+        </shape>
+    </item>
+    <!-- 5. Top specular crest filament -->
+    <item android:left="22dp" android:top="3dp" android:right="22dp" android:height="1.6dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#00FFFFFF"
+                android:centerColor="#8CFFFFFF"
+                android:endColor="#00FFFFFF" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>

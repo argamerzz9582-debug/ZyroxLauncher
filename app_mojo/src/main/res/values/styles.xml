@@ -23,7 +23,7 @@
         <item name="alertDialogTheme">@style/Zyrox.AlertDialog</item>
         <item name="android:alertDialogTheme">@style/Zyrox.AlertDialog</item>
         <item name="android:textSize">13sp</item>
-        <item name="dialogCornerRadius">13dp</item>
+        <item name="dialogCornerRadius">18dp</item>
         <item name="android:seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="seekBarStyle">@style/MojoLauncher.SeekBar</item>
         <item name="android:switchStyle">@style/MojoLauncher.Switch</item>
@@ -39,9 +39,9 @@
         <item name="colorPrimary">@color/zyrox_amber_bright</item>
         <item name="android:textColorPrimary">@color/zyrox_text_primary</item>
         <item name="android:textColorSecondary">@color/zyrox_text_secondary</item>
-        <item name="android:background">@color/zyrox_glass_elevated</item>
+        <item name="android:background">@android:color/transparent</item>
         <item name="android:windowBackground">@drawable/bg_zyrox_glass_modal</item>
-        <item name="dialogCornerRadius">8dp</item>
+        <item name="dialogCornerRadius">18dp</item>
     </style>
 
     <style name="Zyrox.DialogActivity" parent="Theme.AppCompat.Dialog">

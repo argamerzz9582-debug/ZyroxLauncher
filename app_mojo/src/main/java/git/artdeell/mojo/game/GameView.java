@@ -10,16 +10,22 @@ import static git.artdeell.mojo.CallbackBridge.windowWidth;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PixelCopy;
 import android.view.Surface;
+import android.view.SurfaceView;
+import android.view.TextureView;
 import android.view.View;
 import android.widget.FrameLayout;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import git.artdeell.mojo.CallbackBridge;
@@ -65,6 +71,28 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     private boolean mLastGrabState = false;
     double cursorRatioX = 0;
     double cursorRatioY = 0;
+
+    // Lightweight one-shot detector that keeps the loading GIF alive until Mojang's official
+    // splash screen swaps its first real visible frame onto the rendering surface.
+    private static final int PROBE_W = 48;
+    private static final int PROBE_H = 27;
+    private static final long PROBE_INTERVAL_MS = 120L;
+    @Nullable private volatile Runnable mFirstSplashFrameListener;
+    private volatile boolean mNativeBackendInitialized = false;
+    private long mBackendReadyElapsedMs = 0L;
+    private long mLastProbeElapsedMs = 0L;
+    private int mSwappedFramesAfterInit = 0;
+    @Nullable private Bitmap mProbeBitmap;
+    @Nullable private int[] mProbePixels;
+    @Nullable private TextureView mPendingProbeTextureView;
+    private final Runnable mSurfaceViewPollRunnable = this::pollSurfaceViewForMojangSplash;
+    private final Runnable mDeferredTextureProbeRunnable = () -> {
+        TextureView tv = mPendingProbeTextureView;
+        mPendingProbeTextureView = null;
+        if (tv != null && mFirstSplashFrameListener != null) {
+            onSurfaceFrameUpdated(tv);
+        }
+    };
 
     public GameView(Context context) {
         this(context, null);
@@ -315,6 +343,9 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
 
     @Override
     public void onGrabState(boolean isGrabbing) {
+        if (isGrabbing && mFirstSplashFrameListener != null) {
+            fireMojangSplashReached();
+        }
         if(mLastGrabState != isGrabbing) {
             Log.i("MGLSurface", "Grabbing state changed! " + mLastGrabState + " -> " + isGrabbing);
             mCurrentTouchProcessor.prepareForSwitching();
@@ -349,6 +380,155 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     public void onSurfaceDestroyed() {
         if(PLATFORM != null)
             PLATFORM.surfaceDestroyed();
+    }
+
+    @Override
+    public void onSurfaceFrameUpdated(@Nullable TextureView textureView) {
+        if (mFirstSplashFrameListener == null || textureView == null) return;
+        if (mNativeBackendInitialized) {
+            mSwappedFramesAfterInit++;
+        }
+        long now = SystemClock.elapsedRealtime();
+        long delta = now - mLastProbeElapsedMs;
+        if (delta < PROBE_INTERVAL_MS) {
+            mPendingProbeTextureView = textureView;
+            Tools.MAIN_HANDLER.removeCallbacks(mDeferredTextureProbeRunnable);
+            Tools.MAIN_HANDLER.postDelayed(mDeferredTextureProbeRunnable, PROBE_INTERVAL_MS - delta + 8L);
+            return;
+        }
+        mLastProbeElapsedMs = now;
+        mPendingProbeTextureView = null;
+        Tools.MAIN_HANDLER.removeCallbacks(mDeferredTextureProbeRunnable);
+
+        int frameState = MojangSplashDetector.FRAME_UNREADABLE;
+        try {
+            ensureProbeBuffers();
+            if (mProbeBitmap != null && mProbePixels != null) {
+                Bitmap sampled = textureView.getBitmap(mProbeBitmap);
+                if (sampled != null) {
+                    sampled.getPixels(mProbePixels, 0, PROBE_W, 0, 0, PROBE_W, PROBE_H);
+                    frameState = MojangSplashDetector.classifyFrame(mProbePixels, PROBE_W, PROBE_H);
+                    if (frameState == MojangSplashDetector.FRAME_VISIBLE_SPLASH) {
+                        fireMojangSplashReached();
+                        return;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            frameState = MojangSplashDetector.FRAME_UNREADABLE;
+        }
+
+        long elapsed = (mNativeBackendInitialized && mBackendReadyElapsedMs > 0L)
+                ? (now - mBackendReadyElapsedMs) : 0L;
+        if (frameState == MojangSplashDetector.FRAME_UNREADABLE) {
+            // Only fall back on frame count if a GPU driver blocks TextureView readback while
+            // Minecraft's LoadingOverlay render loop is actively swapping frames.
+            if (mNativeBackendInitialized && mSwappedFramesAfterInit >= 30 && elapsed >= 4500L) {
+                fireMojangSplashReached();
+            }
+        } else if (mNativeBackendInitialized && mSwappedFramesAfterInit >= 180 && elapsed >= 60000L) {
+            // Extreme safety cap for custom packs rendering a 100% pitch-black zero-logo screen.
+            fireMojangSplashReached();
+        }
+    }
+
+    /** Registers a one-shot UI callback fired on the first rendered frame of Mojang's splash screen. */
+    public void setFirstSplashFrameListener(@Nullable Runnable listener) {
+        mFirstSplashFrameListener = listener;
+    }
+
+    /** Arms first-frame splash verification once GLFW/SDL/AWT initializes its native window backend. */
+    public void notifyNativeWindowBackendReady() {
+        mNativeBackendInitialized = true;
+        if (mBackendReadyElapsedMs == 0L) {
+            mBackendReadyElapsedMs = SystemClock.elapsedRealtime();
+        }
+        if (mFirstSplashFrameListener == null) return;
+        if (mSurface instanceof SurfaceView) {
+            Tools.MAIN_HANDLER.removeCallbacks(mSurfaceViewPollRunnable);
+            Tools.MAIN_HANDLER.postDelayed(mSurfaceViewPollRunnable, 220L);
+        }
+    }
+
+    private void pollSurfaceViewForMojangSplash() {
+        if (mFirstSplashFrameListener == null || !(mSurface instanceof SurfaceView)) return;
+        SurfaceView sv = (SurfaceView) mSurface;
+        long elapsed = mBackendReadyElapsedMs > 0L
+                ? (SystemClock.elapsedRealtime() - mBackendReadyElapsedMs) : 0L;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                && sv.getHolder().getSurface() != null
+                && sv.getHolder().getSurface().isValid()) {
+            try {
+                ensureProbeBuffers();
+                if (mProbeBitmap != null && mProbePixels != null) {
+                    final Bitmap target = mProbeBitmap;
+                    final int[] px = mProbePixels;
+                    PixelCopy.request(sv, target, copyResult -> {
+                        if (mFirstSplashFrameListener == null) return;
+                        if (copyResult == PixelCopy.SUCCESS && !target.isRecycled()) {
+                            target.getPixels(px, 0, PROBE_W, 0, 0, PROBE_W, PROBE_H);
+                            int state = MojangSplashDetector.classifyFrame(px, PROBE_W, PROBE_H);
+                            if (state == MojangSplashDetector.FRAME_VISIBLE_SPLASH) {
+                                fireMojangSplashReached();
+                                return;
+                            }
+                            if (state == MojangSplashDetector.FRAME_UNREADABLE && elapsed >= 5000L) {
+                                fireMojangSplashReached();
+                                return;
+                            }
+                        } else if (elapsed >= 5000L) {
+                            fireMojangSplashReached();
+                            return;
+                        }
+                        if (elapsed >= 60000L) {
+                            fireMojangSplashReached();
+                        } else {
+                            Tools.MAIN_HANDLER.postDelayed(mSurfaceViewPollRunnable, 220L);
+                        }
+                    }, Tools.MAIN_HANDLER);
+                    return;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        // API 21–23 SurfaceView fallback: allow time for Mojang splash texture upload after glfwInit
+        if (elapsed >= 3500L) {
+            fireMojangSplashReached();
+        } else {
+            Tools.MAIN_HANDLER.postDelayed(mSurfaceViewPollRunnable, 250L);
+        }
+    }
+
+    private void ensureProbeBuffers() {
+        if (mProbeBitmap == null || mProbeBitmap.isRecycled()) {
+            mProbeBitmap = Bitmap.createBitmap(PROBE_W, PROBE_H, Bitmap.Config.ARGB_8888);
+        }
+        if (mProbePixels == null) {
+            mProbePixels = new int[PROBE_W * PROBE_H];
+        }
+    }
+
+    private void fireMojangSplashReached() {
+        Runnable listener = mFirstSplashFrameListener;
+        releaseSplashProbe();
+        if (listener != null) {
+            Tools.runOnUiThread(listener);
+        }
+    }
+
+    /** Stops splash frame probing and frees the tiny probe buffer immediately. */
+    public void releaseSplashProbe() {
+        mFirstSplashFrameListener = null;
+        mPendingProbeTextureView = null;
+        Tools.MAIN_HANDLER.removeCallbacks(mSurfaceViewPollRunnable);
+        Tools.MAIN_HANDLER.removeCallbacks(mDeferredTextureProbeRunnable);
+        if (mProbeBitmap != null && !mProbeBitmap.isRecycled()) {
+            mProbeBitmap.recycle();
+        }
+        mProbeBitmap = null;
+        mProbePixels = null;
     }
 
     /** A small interface called when the listener is ready for the first time */

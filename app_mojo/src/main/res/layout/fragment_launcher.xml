@@ -111,7 +111,7 @@
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_marginTop="7dp"
-            android:background="@color/zyrox_divider"
+            android:background="@drawable/bg_zyrox_hero_divider"
             app:layout_constraintTop_toBottomOf="@id/zyrox_version_pill"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
@@ -439,10 +439,10 @@
             app:fontFamily="@font/minecraft_pixel" />
 
         <View
-            android:layout_width="136dp"
+            android:layout_width="148dp"
             android:layout_height="1.5dp"
             android:layout_marginTop="8dp"
-            android:background="@color/zyrox_glass_border_mid" />
+            android:background="@drawable/bg_zyrox_hero_divider" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

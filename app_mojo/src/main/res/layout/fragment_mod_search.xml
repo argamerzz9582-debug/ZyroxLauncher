@@ -196,7 +196,7 @@
         android:id="@+id/zyrox_version_drawer_scrim"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="#99090706"
+        android:background="@color/zyrox_bg_overlay"
         android:elevation="12dp"
         android:clickable="true"
         android:focusable="true"

@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Ultra-Sheer Liquid Glass Left Rail Dock -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="0"
-                android:startColor="#3B0C0906"
-                android:endColor="#240E0A07" />
+                android:startColor="#34090E18"
+                android:endColor="#20080D16" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+                android:startColor="#12F6FBFF"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#12070B13" />
         </shape>
     </item>
     <item
@@ -16,9 +27,9 @@
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#2EFFC482"
-                android:centerColor="#66FFB870"
-                android:endColor="#2EFFC482" />
+                android:startColor="#24FFFFFF"
+                android:centerColor="#84F4FAFF"
+                android:endColor="#24E0F0FF" />
         </shape>
     </item>
 </layer-list>

@@ -52,22 +52,40 @@ public class ActionRow extends LinearLayout {
         setTranslationZ(11);
         setVisibility(GONE);
         setOrientation(HORIZONTAL);
+        setBackgroundResource(R.drawable.bg_zyrox_floating_pill);
+        float density = getResources().getDisplayMetrics().density;
+        int pad = Math.round(4f * density);
+        int gap = Math.round(4f * density);
+        int hPad = Math.round(10f * density);
+        setPadding(pad, pad, pad, pad);
         setLayoutParams(new LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                getResources().getDimensionPixelOffset(R.dimen._40sdp)
+                getResources().getDimensionPixelOffset(R.dimen._36sdp)
         ));
 
         actionButtons[0] = new DeleteButton(getContext());
         actionButtons[1] = new CloneButton(getContext());
         actionButtons[2] = new AddSubButton(getContext());
 
-        // This is not pretty code, don't do this.
-        for(ActionButtonInterface buttonInterface: actionButtons){
-            View button = ((View)(buttonInterface));
-            addView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1F));
+        for (int i = 0; i < actionButtons.length; i++) {
+            View view = (View) actionButtons[i];
+            if (view instanceof android.widget.Button) {
+                android.widget.Button btn = (android.widget.Button) view;
+                btn.setBackgroundResource(i == 0 ? R.drawable.btn_zyrox_danger : R.drawable.bg_zyrox_nav_item);
+                btn.setTextColor(i == 0 ? 0xFFFFE4E8 : 0xFFFAFCFF);
+                btn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10.5f);
+                btn.setAllCaps(true);
+                btn.setSingleLine(true);
+                btn.setPadding(hPad, 0, hPad, 0);
+                btn.setStateListAnimator(null);
+                btn.setElevation(0f);
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1F);
+            if (i > 0) lp.setMarginStart(gap);
+            addView(view, lp);
         }
 
-        setElevation(5F);
+        setElevation(8f * density);
     }
 
     public void setFollowedButton(ControlInterface controlInterface){

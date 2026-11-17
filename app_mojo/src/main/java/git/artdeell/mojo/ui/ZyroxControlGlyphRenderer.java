@@ -43,20 +43,23 @@ public final class ZyroxControlGlyphRenderer {
 
     private float mCachedCornerRadius = -1f;
 
+    public static final int GLYPH_IDLE_COLOR = 0xD6FAFCFF;
+    public static final int GLYPH_ACTIVE_COLOR = 0xFFFFFFFF;
+
     public ZyroxControlGlyphRenderer() {
         mFillPaint.setStyle(Paint.Style.FILL);
-        mFillPaint.setColor(ZyroxLiquidGlassDrawable.GLYPH_SNOW_WHITE);
+        mFillPaint.setColor(GLYPH_IDLE_COLOR);
 
         mShadowFillPaint.setStyle(Paint.Style.FILL);
-        mShadowFillPaint.setColor(0x461E2733);
+        mShadowFillPaint.setColor(0x5E060B14);
 
         mStrokePaint.setStyle(Paint.Style.STROKE);
-        mStrokePaint.setColor(ZyroxLiquidGlassDrawable.GLYPH_SNOW_WHITE);
+        mStrokePaint.setColor(GLYPH_IDLE_COLOR);
         mStrokePaint.setStrokeCap(Paint.Cap.ROUND);
         mStrokePaint.setStrokeJoin(Paint.Join.ROUND);
 
         mShadowStrokePaint.setStyle(Paint.Style.STROKE);
-        mShadowStrokePaint.setColor(0x461E2733);
+        mShadowStrokePaint.setColor(0x5E060B14);
         mShadowStrokePaint.setStrokeCap(Paint.Cap.ROUND);
         mShadowStrokePaint.setStrokeJoin(Paint.Join.ROUND);
     }
@@ -128,11 +131,22 @@ public final class ZyroxControlGlyphRenderer {
      * during steady-state rendering.
      */
     public void drawGlyph(@NonNull Canvas canvas, @NonNull Glyph glyph, int width, int height) {
+        drawGlyph(canvas, glyph, width, height, false);
+    }
+
+    /**
+     * Draws an etched-crystal Liquid Glass {@code glyph} centered inside {@code [0, width] × [0, height]}
+     * with subtle airy translucency at rest and full luminous brilliance when pressed/activated.
+     */
+    public void drawGlyph(@NonNull Canvas canvas, @NonNull Glyph glyph, int width, int height, boolean active) {
         if (glyph == Glyph.NONE || width <= 4 || height <= 4) return;
+        int fg = active ? GLYPH_ACTIVE_COLOR : GLYPH_IDLE_COLOR;
+        mFillPaint.setColor(fg);
+        mStrokePaint.setColor(fg);
         float cx = width * 0.5f;
         float cy = height * 0.5f;
-        float minSide = Math.min(width, height);
-        float shadowDy = Math.max(1f, minSide * 0.022f);
+        float minSide = Math.min(width, height) * 0.90f;
+        float shadowDy = Math.max(0.9f, minSide * 0.020f);
 
         switch (glyph) {
             case UP:

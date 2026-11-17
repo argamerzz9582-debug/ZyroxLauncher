@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/zyrox_glass_elevated" />
-    <stroke
-        android:width="1dp"
-        android:color="@color/zyrox_glass_border_mid" />
-    <corners android:radius="22dp" />
-</shape>
+<!-- Zyrox Ultra-Clear Liquid Glass Floating Utility Capsule -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#2C0B111C" android:endColor="#20080D16" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#1EF8FCFF" android:centerColor="#08EAF4FF" android:endColor="#14DCEBF8" />
+            <stroke android:width="1.1dp" android:color="#A8F4FAFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item android:left="14dp" android:top="2.2dp" android:right="14dp" android:height="1.3dp" android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#82FFFFFF" android:endColor="#00FFFFFF" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>

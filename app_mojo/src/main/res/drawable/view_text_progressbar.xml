@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox Ultra-Clear Liquid Glass Task & Download Progress Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@android:id/background">
         <shape android:shape="rectangle">
-            <solid android:color="#CC171210" />
-            <stroke android:width="1dp" android:color="#33FF8C42" />
-            <corners android:radius="5dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="#26F4FAFF"
+                android:endColor="#16D8E8F8" />
+            <stroke android:width="1dp" android:color="#8AF2F8FF" />
+            <corners android:radius="999dp" />
         </shape>
     </item>
     <item android:id="@android:id/progress">
@@ -12,10 +16,11 @@
             <shape android:shape="rectangle">
                 <gradient
                     android:angle="0"
-                    android:startColor="#C2410C"
-                    android:endColor="#F97316"
+                    android:startColor="#54C8E8FF"
+                    android:centerColor="#72DCF2FF"
+                    android:endColor="#96F4FBFF"
                     android:type="linear" />
-                <corners android:radius="5dp" />
+                <corners android:radius="999dp" />
             </shape>
         </clip>
     </item>

@@ -92,7 +92,7 @@ public class Platform {
         Log.i("Platform", "Init backend : " + impl.backendName());
         ContextExecutor.executeActivity(activity -> {
             if (activity instanceof GameActivity) {
-                ((GameActivity) activity).hideLoadingScreen();
+                ((GameActivity) activity).onNativeWindowBackendReady(impl);
             }
         });
         resetCursorPosition();
