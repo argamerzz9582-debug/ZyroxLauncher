@@ -127,7 +127,9 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     }
 
     public void refreshBackgroundState() {
-        boolean animated = LauncherPreferences.PREF_ZYROX_ANIMATED_BG;
+        boolean animated = LauncherPreferences.PREF_ZYROX_ANIMATED_BG
+                && !LauncherPreferences.isReducedMotionEnabled(getContext())
+                && !LauncherPreferences.PREF_ZYROX_LOW_EFFECTS;
         Uri videoUri = animated ? resolveVideoUri() : null;
 
         if (videoUri != null && mResumed) {

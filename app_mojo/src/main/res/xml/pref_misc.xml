@@ -12,6 +12,34 @@
             android:title="@string/zyrox_pref_animated_bg_title"
             android:summary="@string/zyrox_pref_animated_bg_summary" />
 
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_px_alt_sliders"
+            android:key="zyroxReducedMotion"
+            android:title="@string/zyrox_pref_reduced_motion_title"
+            android:summary="@string/zyrox_pref_reduced_motion_summary" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_px_zap"
+            android:key="zyroxLowEffects"
+            android:title="@string/zyrox_pref_low_effects_title"
+            android:summary="@string/zyrox_pref_low_effects_summary" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_px_console"
+            android:key="zyroxPerfHud"
+            android:title="@string/zyrox_pref_perf_hud_title"
+            android:summary="@string/zyrox_pref_perf_hud_summary" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:icon="@drawable/ic_px_file_dl"
+            android:key="zyroxWarnMobileData"
+            android:title="@string/zyrox_pref_warn_mobile_title"
+            android:summary="@string/zyrox_pref_warn_mobile_summary" />
+
         <Preference
             android:key="selectBgVideo"
             android:icon="@drawable/ic_px_file"

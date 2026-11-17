@@ -1,112 +1,169 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox 2.0 Primary CTA Button — Signature Liquid Glass (Double Crystal Rims + Top/Bottom Specular Bars) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Disabled State -->
     <item android:state_enabled="false">
-        <shape android:shape="rectangle">
-            <solid android:color="#261C1612" />
-            <stroke
-                android:width="1dp"
-                android:color="#29FFF9F2" />
-            <corners android:radius="12dp" />
-        </shape>
-    </item>
-    <item android:state_pressed="true">
         <layer-list>
-            <item>
+            <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
                 <shape android:shape="rectangle">
                     <gradient
-                        android:type="linear"
                         android:angle="270"
-                        android:startColor="#94FFA64D"
-                        android:centerColor="#7DF97316"
-                        android:endColor="#6BEA580C" />
-                    <corners android:radius="12dp" />
-                </shape>
-            </item>
-            <item android:bottom="20dp">
-                <shape android:shape="rectangle">
-                    <gradient
-                        android:type="linear"
-                        android:angle="270"
-                        android:startColor="#38FFF9F2"
-                        android:endColor="#00FFFFFF" />
-                    <corners
-                        android:topLeftRadius="12dp"
-                        android:topRightRadius="12dp"
-                        android:bottomLeftRadius="4dp"
-                        android:bottomRightRadius="4dp" />
-                </shape>
-            </item>
-            <item>
-                <shape android:shape="rectangle">
-                    <solid android:color="@android:color/transparent" />
-                    <stroke
-                        android:width="1.5dp"
-                        android:color="#EBFFF4E4" />
-                    <corners android:radius="12dp" />
+                        android:startColor="#48929AA6"
+                        android:endColor="#3E7D8692" />
+                    <stroke android:width="1.2dp" android:color="#64FFFFFF" />
+                    <corners android:radius="13dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
+
+    <!-- Pressed State: Cool Refractive Ice-Blue Liquid Glass -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <!-- 1. Outer cool ice-blue atmospheric halo skirt -->
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#6EC9D7E4"
+                        android:endColor="#7AADB9CA" />
+                    <stroke android:width="1.4dp" android:color="#96D6E6F6" />
+                    <corners android:radius="14dp" />
+                </shape>
+            </item>
+            <!-- 2. Frosted cool ice-blue glass core + outer crystal rim -->
+            <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#B6B8C7DA"
+                        android:centerColor="#AEADC0D5"
+                        android:endColor="#B4A4B8CE" />
+                    <stroke android:width="1.7dp" android:color="#FAFFFFFF" />
+                    <corners android:radius="12.5dp" />
+                </shape>
+            </item>
+            <!-- 3. Concentric inner refractive bezel ring -->
+            <item android:left="4.5dp" android:top="4.5dp" android:right="4.5dp" android:bottom="4.5dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="1dp" android:color="#8EF6FAFF" />
+                    <corners android:radius="10dp" />
+                </shape>
+            </item>
+            <!-- 4. Top specular light-bar capsule -->
+            <item android:left="13dp" android:top="5.5dp" android:right="13dp" android:height="2.5dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="0"
+                        android:startColor="#24FFFFFF"
+                        android:centerColor="#A4FFFFFF"
+                        android:endColor="#24FFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+            <!-- 5. Bottom centered caustic light-bar capsule -->
+            <item android:left="24dp" android:bottom="5.5dp" android:right="24dp" android:height="2dp" android:gravity="bottom">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="0"
+                        android:startColor="#16FFFFFF"
+                        android:centerColor="#68FFFFFF"
+                        android:endColor="#16FFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Gamepad / Keyboard Focused State -->
     <item android:state_focused="true">
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
+                    <solid android:color="#5AD6E6F8" />
+                    <stroke android:width="2.2dp" android:color="#FFFFFFFF" />
+                    <corners android:radius="14dp" />
+                </shape>
+            </item>
+            <item android:left="2dp" android:top="2dp" android:right="2dp" android:bottom="2dp">
+                <shape android:shape="rectangle">
                     <gradient
-                        android:type="linear"
                         android:angle="270"
-                        android:startColor="#82FF9E44"
-                        android:endColor="#61EA580C" />
-                    <stroke
-                        android:width="1.5dp"
-                        android:color="#E0FFE8CC" />
+                        android:startColor="#ACBAC3CE"
+                        android:centerColor="#A4B0BAC6"
+                        android:endColor="#A8A7B2BF" />
+                    <stroke android:width="1.5dp" android:color="#F5FFFFFF" />
                     <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <item android:left="13dp" android:top="5.5dp" android:right="13dp" android:height="2.5dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#20FFFFFF" android:centerColor="#92FFFFFF" android:endColor="#20FFFFFF" />
+                    <corners android:radius="2dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
-    <!-- Default: Translucent Luminous Amber-Crystal Glass CTA (live shader glows right through) -->
+
+    <!-- Default State: Pure Luminous Neutral Frosted Liquid Glass -->
     <item>
         <layer-list>
+            <!-- 1. Outer soft silver-ice atmospheric halo skirt -->
             <item>
                 <shape android:shape="rectangle">
                     <gradient
-                        android:type="linear"
                         android:angle="270"
-                        android:startColor="#66FF9838"
-                        android:centerColor="#52F97316"
-                        android:endColor="#45D94E0A" />
-                    <corners android:radius="12dp" />
+                        android:startColor="#4CE6EDF3"
+                        android:endColor="#5AB1BAC5" />
+                    <stroke android:width="1.2dp" android:color="#7CE8EFF6" />
+                    <corners android:radius="14dp" />
                 </shape>
             </item>
-            <!-- Top optical crystal glass specular sheen -->
-            <item
-                android:left="1dp"
-                android:right="1dp"
-                android:top="1dp"
-                android:bottom="22dp">
+            <!-- 2. Translucent frosted glass core + crisp outer crystal rim -->
+            <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
                 <shape android:shape="rectangle">
                     <gradient
-                        android:type="linear"
                         android:angle="270"
-                        android:startColor="#29FFF9F2"
-                        android:endColor="#00FFFFFF" />
-                    <corners
-                        android:topLeftRadius="11dp"
-                        android:topRightRadius="11dp"
-                        android:bottomLeftRadius="4dp"
-                        android:bottomRightRadius="4dp" />
+                        android:startColor="#A8BBC3CE"
+                        android:centerColor="#A0B0B9C5"
+                        android:endColor="#A6A7B1BE" />
+                    <stroke android:width="1.6dp" android:color="#F5FFFFFF" />
+                    <corners android:radius="12.5dp" />
                 </shape>
             </item>
-            <!-- Crisp 1.25dp luminous champagne-amber glass rim -->
-            <item>
+            <!-- 3. Concentric inner refractive bezel ring -->
+            <item android:left="4.5dp" android:top="4.5dp" android:right="4.5dp" android:bottom="4.5dp">
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke
-                        android:width="1.25dp"
-                        android:color="#C2FFC888" />
-                    <corners android:radius="12dp" />
+                    <stroke android:width="1dp" android:color="#7AF5F8FB" />
+                    <corners android:radius="10dp" />
+                </shape>
+            </item>
+            <!-- 4. Signature top specular light-bar capsule -->
+            <item android:left="13dp" android:top="5.5dp" android:right="13dp" android:height="2.5dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="0"
+                        android:startColor="#1EFFFFFF"
+                        android:centerColor="#92FFFFFF"
+                        android:endColor="#1EFFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+            <!-- 5. Signature bottom centered caustic reflection bar -->
+            <item android:left="24dp" android:bottom="5.5dp" android:right="24dp" android:height="2dp" android:gravity="bottom">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="0"
+                        android:startColor="#12FFFFFF"
+                        android:centerColor="#56FFFFFF"
+                        android:endColor="#12FFFFFF" />
+                    <corners android:radius="2dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
+
 </selector>

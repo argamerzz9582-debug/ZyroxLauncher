@@ -1,12 +1,10 @@
 package git.artdeell.mojo.utils;
 
-import org.apache.commons.io.IOUtils;
+import androidx.annotation.NonNull;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -25,67 +23,107 @@ public class ZipUtils {
 
     /**
      * Extracts all files in a ZipFile inside of a given directory to a given destination directory
-     * with strict canonical path containment against ZipSlip (CWE-22).
+     * with strict canonical path containment against ZipSlip (CWE-22), symlink traversal, and
+     * decompression bomb limits.
      */
     public static void zipExtract(ZipFile zipFile, String dirName, File destination) throws IOException {
-        FileUtils.ensureDirectory(destination);
-        String canonicalBase = destination.getCanonicalPath();
-        String canonicalPrefix = canonicalBase.endsWith(File.separator)
-                ? canonicalBase
-                : canonicalBase + File.separator;
+        zipExtract(zipFile, dirName, destination, ArchiveSecurity.ExtractionLimits.defaults());
+    }
 
+    /**
+     * Extracts all files in a ZipFile matching {@code dirName} with explicit size/entry limits.
+     */
+    public static void zipExtract(@NonNull ZipFile zipFile,
+                                  @NonNull String dirName,
+                                  @NonNull File destination,
+                                  @NonNull ArchiveSecurity.ExtractionLimits limits) throws IOException {
+        FileUtils.ensureDirectory(destination);
+        File canonicalRoot = destination.getCanonicalFile();
+        String prefix = dirName.replace('\\', '/');
         Enumeration<? extends ZipEntry> zipEntries = zipFile.entries();
-        int dirNameLen = dirName.length();
+        int prefixLen = prefix.length();
+        int extractedEntries = 0;
+        long totalBytes = 0L;
+
         while (zipEntries.hasMoreElements()) {
             ZipEntry zipEntry = zipEntries.nextElement();
-            String entryName = zipEntry.getName();
-            if (!entryName.startsWith(dirName) || zipEntry.isDirectory()) continue;
-            String relativeName = entryName.substring(dirNameLen);
-            if (relativeName.isEmpty() || relativeName.indexOf('\0') >= 0) continue;
-
-            File zipDestination = new File(destination, relativeName);
-            String canonicalTarget = zipDestination.getCanonicalPath();
-            if (!canonicalTarget.startsWith(canonicalPrefix)) {
-                throw new IOException("Blocked ZipSlip entry outside destination: " + entryName);
+            String rawName = zipEntry.getName();
+            if (rawName == null) continue;
+            if (rawName.indexOf('\0') >= 0) {
+                throw new IOException("Blocked ZIP entry with NUL byte");
             }
-            FileUtils.ensureParentDirectory(zipDestination);
-            try (InputStream inputStream = zipFile.getInputStream(zipEntry);
-                 OutputStream outputStream = new FileOutputStream(zipDestination)) {
-                IOUtils.copy(inputStream, outputStream);
+            String normalizedName = rawName.replace('\\', '/');
+            if (!normalizedName.startsWith(prefix)) continue;
+            String relativeName = normalizedName.substring(prefixLen);
+            while (relativeName.startsWith("/") && !prefix.isEmpty()) {
+                relativeName = relativeName.substring(1);
+            }
+            if (relativeName.isEmpty()) continue;
+
+            extractedEntries++;
+            if (extractedEntries > limits.maxEntries) {
+                throw new IOException("Blocked archive exceeding maximum entry limit (" + limits.maxEntries + ")");
+            }
+
+            File zipDestination = ArchiveSecurity.resolveSafeEntry(canonicalRoot, relativeName);
+            if (zipEntry.isDirectory() || normalizedName.endsWith("/")) {
+                if (!zipDestination.equals(canonicalRoot)) {
+                    FileUtils.ensureDirectory(zipDestination);
+                }
+                continue;
+            }
+            try (InputStream inputStream = zipFile.getInputStream(zipEntry)) {
+                totalBytes += ArchiveSecurity.copyBoundedToFile(
+                        inputStream,
+                        zipDestination,
+                        limits.maxSingleFileBytes,
+                        limits.maxTotalBytes - totalBytes
+                );
             }
         }
     }
 
     /**
      * Extracts a ZipInputStream into {@code destination} with strict canonical path containment
-     * against ZipSlip (CWE-22).
+     * against ZipSlip (CWE-22), Windows backslash traversal, and decompression bombs.
      */
     public static void zipStreamExtract(ZipInputStream inputStream, File destination) throws IOException {
+        zipStreamExtract(inputStream, destination, ArchiveSecurity.ExtractionLimits.defaults());
+    }
+
+    /**
+     * Extracts a ZipInputStream into {@code destination} with explicit size and entry bounds.
+     */
+    public static void zipStreamExtract(@NonNull ZipInputStream inputStream,
+                                        @NonNull File destination,
+                                        @NonNull ArchiveSecurity.ExtractionLimits limits) throws IOException {
         FileUtils.ensureDirectory(destination);
-        String canonicalBase = destination.getCanonicalPath();
-        String canonicalPrefix = canonicalBase.endsWith(File.separator)
-                ? canonicalBase
-                : canonicalBase + File.separator;
+        File canonicalRoot = destination.getCanonicalFile();
+        int entryCount = 0;
+        long totalBytes = 0L;
 
         ZipEntry entry;
         while ((entry = inputStream.getNextEntry()) != null) {
             String entryName = entry.getName();
-            if (entryName == null || entryName.isEmpty() || entryName.indexOf('\0') >= 0) {
+            if (entryName == null || entryName.isEmpty()) continue;
+            entryCount++;
+            if (entryCount > limits.maxEntries) {
+                throw new IOException("Blocked archive stream exceeding maximum entry limit (" + limits.maxEntries + ")");
+            }
+            File targetFile = ArchiveSecurity.resolveSafeEntry(canonicalRoot, entryName);
+            if (entry.isDirectory() || entryName.endsWith("/") || entryName.endsWith("\\")) {
+                if (!targetFile.equals(canonicalRoot)) {
+                    FileUtils.ensureDirectory(targetFile);
+                }
                 continue;
             }
-            File targetFile = new File(destination, entryName);
-            String canonicalTarget = targetFile.getCanonicalPath();
-            if (!canonicalTarget.equals(canonicalBase) && !canonicalTarget.startsWith(canonicalPrefix)) {
-                throw new IOException("Blocked ZipSlip entry outside destination: " + entryName);
-            }
-            if (entry.isDirectory()) {
-                FileUtils.ensureDirectory(targetFile);
-                continue;
-            }
-            FileUtils.ensureParentDirectory(targetFile);
-            try (FileOutputStream fs = new FileOutputStream(targetFile)) {
-                IOUtils.copy(inputStream, fs);
-            }
+            if (targetFile.equals(canonicalRoot)) continue;
+            totalBytes += ArchiveSecurity.copyBoundedToFile(
+                    inputStream,
+                    targetFile,
+                    limits.maxSingleFileBytes,
+                    limits.maxTotalBytes - totalBytes
+            );
         }
     }
 }

@@ -95,7 +95,7 @@ public final class Tools {
             .setPrettyPrinting()
             .create();
 
-    public static final String URL_HOME = "https://mojolauncher.ru";
+    public static final String URL_HOME = git.artdeell.mojo.security.AppTrustVerifier.OFFICIAL_REPO_URL;
     public static String NATIVE_LIB_DIR;
     public static String DIR_DATA; //Initialized later to get context
     public static File DIR_CACHE;
@@ -405,7 +405,8 @@ public final class Tools {
         }
 
         Runnable runnable = () -> {
-            final String errMsg = showMore ? printToString(e) : rolledMessage != null ? rolledMessage : e.getMessage();
+            final String rawMsg = showMore ? printToString(e) : rolledMessage != null ? rolledMessage : e.getMessage();
+            final String errMsg = git.artdeell.mojo.security.LogRedactor.redact(rawMsg);
             AlertDialog.Builder builder = new AlertDialog.Builder(ctx)
                     .setTitle(titleId)
                     .setMessage(errMsg)
@@ -421,7 +422,10 @@ public final class Tools {
                     .setNegativeButton(showMore ? R.string.error_show_less : R.string.error_show_more, (p1, p2) -> showError(ctx, titleId, rolledMessage, e, exitIfOk, !showMore))
                     .setNeutralButton(android.R.string.copy, (p1, p2) -> {
                         ClipboardManager mgr = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                        mgr.setPrimaryClip(ClipData.newPlainText("error", printToString(e)));
+                        if (mgr != null) {
+                            mgr.setPrimaryClip(ClipData.newPlainText("error",
+                                    git.artdeell.mojo.security.LogRedactor.redact(printToString(e))));
+                        }
                         if(exitIfOk) {
                             if (ctx instanceof GameActivity) {
                                 fullyExit();
@@ -823,9 +827,24 @@ public final class Tools {
         MAIN_HANDLER.post(runnable);
     }
 
-    /** Triggers the share intent chooser, with the latestlog file attached to it */
+    /**
+     * Triggers the Android share chooser with a sanitized, token-redacted copy of {@code latestlog.txt}.
+     * Never auto-uploads logs; shares only on explicit user action.
+     */
     public static void shareLog(Context context){
-        openPath(context, new File(Tools.DIR_GAME_HOME, "latestlog.txt"), true);
+        File sourceLog = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
+        if (!sourceLog.isFile() || sourceLog.length() == 0L) {
+            Toast.makeText(context, R.string.zyrox_log_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            File exportDir = new File(Tools.DIR_GAME_HOME, "logs");
+            File redactedLog = new File(exportDir, "latestlog-redacted.txt");
+            git.artdeell.mojo.security.LogRedactor.writeRedactedLogFile(sourceLog, redactedLog, 8L * 1024L * 1024L);
+            openPath(context, redactedLog, true);
+        } catch (IOException e) {
+            Toast.makeText(context, e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     /**

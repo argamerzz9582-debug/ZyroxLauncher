@@ -43,6 +43,19 @@ public class HashUtils {
     }
 
     /**
+     * Computes lowercase hexadecimal SHA-1 digest of {@code f} (used for Modrinth version lookups
+     * and asset integrity verification).
+     */
+    public static String getFileSHA1(File f) throws IOException {
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-1");
+            return new String(Hex.encodeHex(fileHash(messageDigest, f), true));
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-1 digest unavailable", e);
+        }
+    }
+
+    /**
      * Verifies downloaded Minecraft/Modrinth asset integrity against upstream-published SHA-1 hashes.
      */
     public static boolean compareSHA1(File f, String sourceSHA) throws IOException {

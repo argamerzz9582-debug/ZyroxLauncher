@@ -92,12 +92,13 @@ public class JavaRunner {
      *  and the auto-generated ones (eg. the window resolution).
      * @return A list filled with args.
      */
-    private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments) {
+    private static List<String> getJavaArgs(String runtimeHome, List<String> userArguments, int ramAllocationMb) {
         String resolvFile;
         resolvFile = new File(Tools.DIR_DATA,"resolv.conf").getAbsolutePath();
+        int safeHeapMb = Math.max(256, ramAllocationMb > 0 ? ramAllocationMb : LauncherPreferences.PREF_RAM_ALLOCATION);
 
-        userArguments.add(0, "-Xms"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
-        userArguments.add(0, "-Xmx"+LauncherPreferences.PREF_RAM_ALLOCATION+"M");
+        userArguments.add(0, "-Xms" + safeHeapMb + "M");
+        userArguments.add(0, "-Xmx" + safeHeapMb + "M");
 
         ArrayList<String> overridableArguments = new ArrayList<>(Arrays.asList(
                 "-Djava.home=" + runtimeHome,
@@ -227,9 +228,11 @@ public class JavaRunner {
                 case "--patch-module":
                 case "--upgrade-module-path":
                     iterator.remove();
-                    String argValue = iterator.next();
-                    iterator.remove();
-                    iterator.add(arg+"="+argValue);
+                    if (iterator.hasNext()) {
+                        String argValue = iterator.next();
+                        iterator.remove();
+                        iterator.add(arg + "=" + argValue);
+                    }
                     break;
                 case "-d32":
                 case "-d64":
@@ -242,8 +245,10 @@ public class JavaRunner {
                 case "-cp":
                     // remove classpath and the next argument (which is either garbage or pointless classpath definition)
                     iterator.remove();
-                    iterator.next();
-                    iterator.remove();
+                    if (iterator.hasNext()) {
+                        iterator.next();
+                        iterator.remove();
+                    }
                     break;
                 default:
                     if(arg.startsWith("-Xms") || arg.startsWith("-Xmx") || arg.startsWith("-XX:ActiveProcessorCount")) iterator.remove();
@@ -271,7 +276,11 @@ public class JavaRunner {
      * @param applicationArgs the application arguments
      * @throws VMLoadException if an error occurred during VM loading
      */
-    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException{
+    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs) throws VMLoadException {
+        startJvm(runtime, vmArgs, classpathEntries, mainClass, applicationArgs, LauncherPreferences.PREF_RAM_ALLOCATION);
+    }
+
+    public static void startJvm(Runtime runtime, List<String> vmArgs, List<String> classpathEntries, String mainClass, List<String> applicationArgs, int ramAllocationMb) throws VMLoadException {
         File runtimeHomeDir = MultiRTUtils.getRuntimeHome(runtime.name);
         File vmPath = findVmPath(runtimeHomeDir, runtime.arch);
         if(vmPath == null) {
@@ -281,7 +290,7 @@ public class JavaRunner {
         boolean hasJavaAgent = preprocessUserArgs(vmArgs);
         List<String> runtimeArgs = new ArrayList<>();
         if(getCacioJavaArgs(runtimeArgs,runtime.javaVersion == 8)) hasJavaAgent = true;
-        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs));
+        runtimeArgs.addAll(getJavaArgs(runtimeHomeDir.getAbsolutePath(), vmArgs, ramAllocationMb));
         vmArgs.clear();
 
 

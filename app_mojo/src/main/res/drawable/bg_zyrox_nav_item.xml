@@ -1,36 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox 2.0 Navigation Rail & Segmented Tab Button — Neutral Frosted Liquid Glass -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#42FF963D" />
-            <stroke
-                android:width="1dp"
-                android:color="#C2FFC482" />
-            <corners android:radius="9dp" />
-        </shape>
-    </item>
+
+    <!-- Active / Selected Tab: Luminous Cool Ice-Blue Liquid Glass -->
     <item android:state_selected="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#33FF963D" />
-            <stroke
-                android:width="1dp"
-                android:color="#8CFFC07A" />
-            <corners android:radius="9dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <gradient android:angle="270" android:startColor="#62C9D7E4" android:endColor="#6EADB9CA" />
+                    <stroke android:width="1.1dp" android:color="#88D2E2F2" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <item android:left="1.4dp" android:top="1.4dp" android:right="1.4dp" android:bottom="1.4dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#A2B4C2D2"
+                        android:centerColor="#9AAAB9CA"
+                        android:endColor="#9EA4B3C5" />
+                    <stroke android:width="1.5dp" android:color="#F6FFFFFF" />
+                    <corners android:radius="10.5dp" />
+                </shape>
+            </item>
+            <item android:left="3.8dp" android:top="3.8dp" android:right="3.8dp" android:bottom="3.8dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.9dp" android:color="#7EF5F9FF" />
+                    <corners android:radius="8.5dp" />
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="4.8dp" android:right="10dp" android:height="2dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#1CFFFFFF" android:centerColor="#92FFFFFF" android:endColor="#1CFFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+            <item android:left="16dp" android:bottom="4.8dp" android:right="16dp" android:height="1.6dp" android:gravity="bottom">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#10FFFFFF" android:centerColor="#56FFFFFF" android:endColor="#10FFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
+    <!-- Pressed: Cool Ice-Blue Liquid Glass -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#5CC9D7E4" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <item android:left="1.4dp" android:top="1.4dp" android:right="1.4dp" android:bottom="1.4dp">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="270" android:startColor="#98B0BCCB" android:endColor="#92A6B3C4" />
+                    <stroke android:width="1.4dp" android:color="#F4FFFFFF" />
+                    <corners android:radius="10.5dp" />
+                </shape>
+            </item>
+            <item android:left="3.8dp" android:top="3.8dp" android:right="3.8dp" android:bottom="3.8dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.9dp" android:color="#74F5F9FF" />
+                    <corners android:radius="8.5dp" />
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="4.8dp" android:right="10dp" android:height="2dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#1AFFFFFF" android:centerColor="#8AFFFFFF" android:endColor="#1AFFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+    <!-- Focused -->
     <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#2BFF963D" />
-            <stroke
-                android:width="1dp"
-                android:color="#99FFC07A" />
-            <corners android:radius="9dp" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#48D2E2F4" />
+                    <stroke android:width="2dp" android:color="#FFFFFFFF" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
+    <!-- Inactive Nav Item: Subtle Frosted Liquid Glass -->
     <item>
-        <shape android:shape="rectangle">
-            <solid android:color="@android:color/transparent" />
-            <corners android:radius="9dp" />
-        </shape>
+        <layer-list>
+            <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+                <shape android:shape="rectangle">
+                    <gradient
+                        android:angle="270"
+                        android:startColor="#56ADB4BE"
+                        android:endColor="#4E9EA6B2" />
+                    <stroke android:width="1.1dp" android:color="#B8FFFFFF" />
+                    <corners android:radius="10.5dp" />
+                </shape>
+            </item>
+            <item android:left="3.4dp" android:top="3.4dp" android:right="3.4dp" android:bottom="3.4dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke android:width="0.8dp" android:color="#4AF4F7FA" />
+                    <corners android:radius="8.5dp" />
+                </shape>
+            </item>
+            <item android:left="10dp" android:top="4.4dp" android:right="10dp" android:height="1.6dp" android:gravity="top">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#12FFFFFF" android:centerColor="#5CFFFFFF" android:endColor="#12FFFFFF" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
+
 </selector>

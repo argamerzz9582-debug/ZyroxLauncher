@@ -72,27 +72,32 @@
 
     <style name="MojoLauncher.Button" parent="Widget.AppCompat.Button">
         <item name="android:background">@drawable/btn_zyrox_secondary</item>
-        <item name="android:textColor">@color/zyrox_amber_stroke</item>
+        <item name="android:textColor">@color/zyrox_lg_text</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">3</item>
         <item name="android:stateListAnimator">@null</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
+        <item name="android:letterSpacing">0.03</item>
+        <item name="android:textSize">11.5sp</item>
         <item name="android:textAllCaps">true</item>
     </style>
 
     <style name="MojoLauncher.Button.Toggle" parent="MojoLauncher.Button">
         <item name="android:background">@drawable/button_flat_toggle</item>
-        <item name="android:textColor">@color/zyrox_text_primary</item>
+        <item name="android:textColor">@color/zyrox_lg_text</item>
     </style>
 
     <!-- Zyrox Typography & Component Styles -->
     <style name="Zyrox.SectionLabel" parent="Widget.AppCompat.TextView">
-        <item name="android:textColor">@color/zyrox_amber</item>
+        <item name="android:textColor">@color/zyrox_lg_text_muted</item>
         <item name="android:textSize">10sp</item>
         <item name="android:letterSpacing">0.08</item>
         <item name="android:textAllCaps">true</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="Zyrox.NavItem" parent="Widget.AppCompat.Button">
@@ -103,14 +108,18 @@
         <item name="android:paddingStart">10dp</item>
         <item name="android:paddingEnd">10dp</item>
         <item name="android:drawablePadding">10dp</item>
-        <item name="android:textColor">@color/zyrox_amber</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/zyrox_lg_text</item>
+        <item name="android:shadowColor">@color/zyrox_lg_shadow</item>
+        <item name="android:shadowDx">0</item>
+        <item name="android:shadowDy">1</item>
+        <item name="android:shadowRadius">3</item>
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:letterSpacing">0.04</item>
         <item name="android:textAllCaps">true</item>
         <item name="android:singleLine">true</item>
         <item name="android:stateListAnimator">@null</item>
-        <item name="android:fontFamily">@font/minecraft_pixel</item>
-        <item name="fontFamily">@font/minecraft_pixel</item>
+        <item name="android:fontFamily">@font/noto_sans_bold</item>
+        <item name="fontFamily">@font/noto_sans_bold</item>
     </style>
 
     <style name="Zyrox.FilterChip" parent="Widget.AppCompat.TextView">

@@ -46,8 +46,7 @@ public class RendererCache {
         ArrayList<String> rendererNames = new ArrayList<>(rendererIds);
         for (String renderer : renderers) {
             RenderSpec r = GameRenderer.getKnownRenderer(renderer);
-            assert r != null;
-            if (!r.compatibleDevice(context)) continue;
+            if (r == null || !r.compatibleDevice(context)) continue;
             rendererIds.add(renderer);
             rendererNames.add(resources.getString(r.displayName()));
         }
@@ -60,7 +59,9 @@ public class RendererCache {
      * Destroy compatible renderers cache
      */
     public static void releaseRendererCache() {
-        sCompatibleRenderers.rendererIds.clear();
-        sCompatibleRenderers = null;
+        if (sCompatibleRenderers != null) {
+            sCompatibleRenderers.rendererIds.clear();
+            sCompatibleRenderers = null;
+        }
     }
 }

@@ -63,7 +63,9 @@ import git.artdeell.mojo.input.EditorExitable;
 import git.artdeell.mojo.input.keyboard.TouchCharInput;
 import git.artdeell.mojo.input.mouse.GyroControl;
 import git.artdeell.mojo.input.mouse.HotbarView;
+import git.artdeell.mojo.diagnostics.PerformanceHudOverlay;
 import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceManager;
 import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.utils.lifecycle.ContextExecutor;
 import git.artdeell.mojo.game.platform.Platform;
@@ -103,6 +105,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private MinecraftLoadingLandscapeView mLoadingLandscape;
     private TextView mLoadingStatusText;
     private View mLoadingWarningText;
+    private PerformanceHudOverlay mPerfHudOverlay;
     private boolean mLoadingScreenHiding = false;
     private static volatile int sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
     private final Runnable mWindowWaitStatusRunnable = () -> setLoadingStatus(R.string.loading_screen_title);
@@ -259,11 +262,15 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             setIntent(activityIntent);
 
-            setTitle("MojoLauncher (" + version + ")");
+            setTitle("Zyrox Launcher (" + version + ")");
 
-            // Menu
+            // In-game menu (preserves existing 5 actions + optional truthful Performance HUD toggle)
+            String[] baseActions = getResources().getStringArray(R.array.menu_ingame);
+            String[] allActions = new String[baseActions.length + 1];
+            System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
+            allActions[baseActions.length] = getString(R.string.zyrox_toggle_perf_hud);
             gameActionArrayAdapter = new ArrayAdapter<>(this,
-                    android.R.layout.simple_list_item_1, getResources().getStringArray(R.array.menu_ingame));
+                    android.R.layout.simple_list_item_1, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
                 switch(position) {
                      case 0: dialogForceClose(GameActivity.this); break;
@@ -271,6 +278,16 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                      case 2: dialogSendCustomKey(); break;
                      case 3: openQuickSettings(); break;
                      case 4: openCustomControls(); break;
+                     case 5:
+                         if (mPerfHudOverlay != null) {
+                             boolean next = !mPerfHudOverlay.isHudEnabled();
+                             mPerfHudOverlay.setHudEnabled(next);
+                             LauncherPreferences.PREF_ZYROX_PERF_HUD = next;
+                             if (LauncherPreferences.DEFAULT_PREF != null) {
+                                 LauncherPreferences.DEFAULT_PREF.edit().putBoolean("zyroxPerfHud", next).apply();
+                             }
+                         }
+                         break;
                 }
                 drawerLayout.closeDrawers();
             };
@@ -348,6 +365,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 setLoadingStatus(sCurrentLoadingStatusRes);
             }
         }
+        // Attach lightweight optional Performance HUD overlay inside content_frame
+        ViewGroup contentFrame = findViewById(R.id.content_frame);
+        if (contentFrame != null && instance != null) {
+            mPerfHudOverlay = new PerformanceHudOverlay(this);
+            String rTag = (mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null)
+                    ? mGameRenderer.getCurrentRenderer().tag() : instance.getLaunchRenderer();
+            mPerfHudOverlay.configureSession(rTag, instance.getEffectiveRamAllocationMb());
+            android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            int m = Math.round(6f * getResources().getDisplayMetrics().density);
+            lp.setMargins(m, m, m, m);
+            contentFrame.addView(mPerfHudOverlay, lp);
+            mPerfHudOverlay.setHudEnabled(LauncherPreferences.PREF_ZYROX_PERF_HUD);
+        }
     }
 
     /**
@@ -409,6 +440,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (mLoadingLandscape != null && !mLoadingScreenHiding) {
             mLoadingLandscape.resumeAnimation();
         }
+        if (mPerfHudOverlay != null && mPerfHudOverlay.isHudEnabled()) {
+            mPerfHudOverlay.startMonitoring();
+        }
         PLATFORM.setHovered(true);
     }
 
@@ -416,6 +450,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     protected void onPause() {
         ContextExecutor.clearActivity();
         mGyroControl.disable();
+        if (mPerfHudOverlay != null) {
+            mPerfHudOverlay.stopMonitoring(false);
+        }
         // Avoid going through the JNI each time.
         if (Platform.isGrabbing()){
             CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
@@ -447,6 +484,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onDestroy() {
+        if (mPerfHudOverlay != null) {
+            mPerfHudOverlay.stopMonitoring(true);
+            mPerfHudOverlay = null;
+        }
         destroyLoadingScreenImmediate();
         sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
         super.onDestroy();
@@ -627,14 +668,21 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (mLoadingWarningText != null) {
             mLoadingWarningText.setVisibility(View.INVISIBLE);
         }
+        if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
+            InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
+        }
         if (mLoadingStatusText != null) {
             mLoadingStatusText.setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
         }
-        mLoadingScreen.animate()
-                .alpha(0f)
-                .setDuration(280L)
-                .withEndAction(this::destroyLoadingScreenImmediate)
-                .start();
+        if (LauncherPreferences.isReducedMotionEnabled(this)) {
+            destroyLoadingScreenImmediate();
+        } else {
+            mLoadingScreen.animate()
+                    .alpha(0f)
+                    .setDuration(260L)
+                    .withEndAction(this::destroyLoadingScreenImmediate)
+                    .start();
+        }
     }
 
     @Override

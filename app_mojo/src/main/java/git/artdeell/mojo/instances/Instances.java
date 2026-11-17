@@ -2,12 +2,10 @@ package git.artdeell.mojo.instances;
 
 import android.util.Log;
 
-import com.google.gson.JsonSyntaxException;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-import git.artdeell.mojo.Tools;
-import git.artdeell.mojo.prefs.LauncherPreferences;
-import git.artdeell.mojo.utils.FileUtils;
-import git.artdeell.mojo.utils.JSONUtils;
+import com.google.gson.JsonParseException;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,9 +14,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.prefs.LauncherPreferences;
+import git.artdeell.mojo.utils.FileUtils;
+import git.artdeell.mojo.utils.JSONUtils;
+
 public class Instances {
     private static final File sInstancePath = new File(Tools.DIR_GAME_HOME, "instances");
     public static final File SHARED_DATA_DIRECTORY = new File(Tools.DIR_GAME_HOME, "shared_dir");
+    private static volatile List<String> sLastCorruptedDirs = Collections.emptyList();
 
     public final List<DisplayInstance> list;
     public final int selectedIndex;
@@ -28,14 +32,67 @@ public class Instances {
         this.selectedIndex = selectedIndex;
     }
 
-    private static <T extends DisplayInstance> T read(File instanceRoot, Class<T> tClass) {
-        try {
-            T instance = JSONUtils.readFromFile(metadataLocation(instanceRoot), tClass);
-            if(instance == null) return null;
-            instance.mInstanceRoot = instanceRoot;
-            return instance;
-        }catch (IOException | JsonSyntaxException e) {
-            return null;
+    /**
+     * Reads instance metadata with automatic recovery from {@code mojo_instance.json.bak} when the
+     * primary JSON is truncated or corrupted, while preserving the damaged file as
+     * {@code mojo_instance.json.corrupt} so user data is never silently destroyed.
+     */
+    @Nullable
+    static <T extends DisplayInstance> T readWithRecovery(@Nullable File instanceRoot, @NonNull Class<T> tClass) {
+        if (instanceRoot == null || !instanceRoot.isDirectory()) return null;
+        File metaFile = metadataLocation(instanceRoot);
+        if (metaFile.isFile() && metaFile.length() > 0L) {
+            try {
+                T instance = JSONUtils.readFromFile(metaFile, tClass);
+                if (instance != null) {
+                    instance.mInstanceRoot = instanceRoot;
+                    return instance;
+                }
+            } catch (IOException | JsonParseException | RuntimeException e) {
+                Log.w("Instances", "Corrupted metadata in " + instanceRoot.getName() + ", attempting .bak recovery");
+            }
+        }
+
+        // Preserve damaged metadata file without destroying user data
+        File bakFile = new File(instanceRoot, "mojo_instance.json.bak");
+        if (metaFile.isFile() && metaFile.length() > 0L) {
+            File quarantine = new File(instanceRoot, "mojo_instance.json.corrupt");
+            if (!quarantine.exists()) {
+                try {
+                    JSONUtils.writeToFileAtomic(quarantine, null, false);
+                } catch (Throwable ignored) {
+                }
+                // Copy raw corrupt bytes for diagnostics
+                copyRawQuietly(metaFile, quarantine);
+            }
+        }
+
+        if (bakFile.isFile() && bakFile.length() > 0L) {
+            try {
+                T recovered = JSONUtils.readFromFile(bakFile, tClass);
+                if (recovered != null) {
+                    recovered.mInstanceRoot = instanceRoot;
+                    copyRawQuietly(bakFile, metaFile);
+                    Log.i("Instances", "Recovered instance metadata from .bak: " + instanceRoot.getName());
+                    return recovered;
+                }
+            } catch (IOException | JsonParseException | RuntimeException e) {
+                Log.w("Instances", "Backup metadata also unreadable for " + instanceRoot.getName());
+            }
+        }
+        return null;
+    }
+
+    private static void copyRawQuietly(@NonNull File src, @NonNull File dst) {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(src);
+             java.io.FileOutputStream out = new java.io.FileOutputStream(dst, false)) {
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+            }
+            out.flush();
+        } catch (IOException ignored) {
         }
     }
 
@@ -43,54 +100,79 @@ public class Instances {
         return new File(instanceDir, "mojo_instance.json");
     }
 
+    public static File getInstancesDirectory() {
+        return sInstancePath;
+    }
+
+    /** Returns names of instance folders whose metadata could not be parsed during the last scan. */
+    @NonNull
+    public static List<String> getLastCorruptedDirs() {
+        return sLastCorruptedDirs;
+    }
+
     private static File selectedInstanceLocation() {
         String directoryName = LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_INSTANCE, "");
+        if (directoryName.isEmpty() || directoryName.contains("..") || directoryName.contains("/") || directoryName.contains("\\")) {
+            return null;
+        }
         File instanceRoot = new File(sInstancePath, directoryName);
-        if(!instanceRoot.exists())
-            Log.e("Instances", "New instance dir doesn't exist!");
-        if(!metadataLocation(instanceRoot).exists()) return null;
+        if (!instanceRoot.exists()) {
+            Log.w("Instances", "Selected instance directory missing: " + directoryName);
+            return null;
+        }
+        File meta = metadataLocation(instanceRoot);
+        File bak = new File(instanceRoot, "mojo_instance.json.bak");
+        if (!meta.exists() && !bak.exists()) return null;
         return instanceRoot;
     }
 
     private static boolean filterInstanceDirectories(File instanceDir) {
-        if(!instanceDir.canRead() || !instanceDir.canWrite()) return false;
-        if(!instanceDir.isDirectory()) return false;
+        if (!instanceDir.canRead() || !instanceDir.canWrite()) return false;
+        if (!instanceDir.isDirectory()) return false;
         File instanceMetadata = metadataLocation(instanceDir);
-        if(!instanceMetadata.isFile()) return false;
-        return instanceMetadata.canRead();
+        File bakMetadata = new File(instanceDir, "mojo_instance.json.bak");
+        return (instanceMetadata.isFile() && instanceMetadata.canRead())
+                || (bakMetadata.isFile() && bakMetadata.canRead());
     }
 
-    private static <T extends DisplayInstance> List<T> loadInstances(Class<T> tClass, int[] selectionDst) throws IOException {
+    private static <T extends DisplayInstance> List<T> loadInstances(Class<T> tClass, int[] selectionDst)
+            throws IOException {
         synchronized (sInstancePath) {
             FileUtils.ensureDirectory(sInstancePath);
         }
         File[] instanceDirectories = sInstancePath.listFiles(Instances::filterInstanceDirectories);
-        if(instanceDirectories == null) throw new IOException("Failed to enumerate instances");
+        if (instanceDirectories == null) throw new IOException("Failed to enumerate instances");
         File selectedInstanceLocation = selectionDst != null ? selectedInstanceLocation() : null;
         ArrayList<T> instances = new ArrayList<>(instanceDirectories.length);
+        ArrayList<String> corrupted = new ArrayList<>();
 
-        for(File instanceDir : instanceDirectories) {
-            T instance = read(instanceDir, tClass);
-
-            if(instance == null) continue;
+        for (File instanceDir : instanceDirectories) {
+            T instance = readWithRecovery(instanceDir, tClass);
+            if (instance == null) {
+                corrupted.add(instanceDir.getName());
+                continue;
+            }
             instance.sanitize();
             instances.add(instance);
 
-            if(selectionDst != null && instanceDir.equals(selectedInstanceLocation)) {
+            if (selectionDst != null && instanceDir.equals(selectedInstanceLocation)) {
                 selectionDst[0] = instances.size() - 1;
             }
         }
+        sLastCorruptedDirs = corrupted.isEmpty()
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(corrupted);
         instances.trimToSize();
         return instances;
     }
 
     public static Instances loadDisplay() throws IOException {
-        int[] selectionIndex = new int[] { -1 };
+        int[] selectionIndex = new int[]{-1};
         List<DisplayInstance> instances = loadInstances(DisplayInstance.class, selectionIndex);
-        if(instances.isEmpty()) {
+        if (instances.isEmpty()) {
             createFirstTimeInstance();
             return loadDisplay();
-        }else if(selectionIndex[0] == -1) {
+        } else if (selectionIndex[0] == -1) {
             setSelectedInstance(instances.get(0));
             selectionIndex[0] = 0;
         }
@@ -101,23 +183,27 @@ public class Instances {
         return loadInstances(Instance.class, null);
     }
 
-    private static File findNewInstanceRoot(String prefix) {
+    static File findNewInstanceRoot(File baseDir, String prefix) {
         File instanceRoot;
+        String safePrefix = (prefix != null && !prefix.trim().isEmpty())
+                ? FileUtils.escapeFileName(prefix.trim())
+                : null;
         do {
             String proposedDirectoryName = UUID.randomUUID().toString();
-            if(prefix != null) {
-                proposedDirectoryName = prefix + "-" + proposedDirectoryName;
+            if (safePrefix != null && !safePrefix.isEmpty()) {
+                proposedDirectoryName = safePrefix + "-" + proposedDirectoryName;
             }
-            instanceRoot = new File(sInstancePath, proposedDirectoryName);
-        } while(instanceRoot.exists() && instanceRoot.isDirectory());
+            instanceRoot = new File(baseDir, proposedDirectoryName);
+        } while (instanceRoot.exists());
         return instanceRoot;
     }
 
-    /**
-     * Set the currently selected instance and save it in user preferences
-     * @param instance new selected instance
-     */
+    private static File findNewInstanceRoot(String prefix) {
+        return findNewInstanceRoot(sInstancePath, prefix);
+    }
+
     public static void setSelectedInstance(DisplayInstance instance) {
+        if (instance == null || instance.mInstanceRoot == null) return;
         LauncherPreferences.DEFAULT_PREF.edit()
                 .putString(
                         LauncherPreferences.PREF_KEY_CURRENT_INSTANCE,
@@ -125,96 +211,78 @@ public class Instances {
                 ).apply();
     }
 
-    /**
-     * Remove the instance. This also removes its data storage folder.
-     * @param instance the Instance to remove
-     * @throws IOException in case of errors during directory removal
-     */
     public static void removeInstance(Instance instance) throws IOException {
+        if (instance == null) return;
         File instanceDirectory = instance.mInstanceRoot;
-        if(instanceDirectory == null) return;
+        if (instanceDirectory == null) return;
+        // Safety guard: never delete the shared game directory when removing a profile!
+        if (instanceDirectory.getCanonicalFile().equals(SHARED_DATA_DIRECTORY.getCanonicalFile())) {
+            throw new IOException("Refusing to delete shared game directory");
+        }
         org.apache.commons.io.FileUtils.deleteDirectory(instanceDirectory);
     }
 
-    /**
-     * Create a new instance intended for first-time launcher users.
-     */
     private static void createFirstTimeInstance() throws IOException {
-        internalCreateInstance((instance)-> {
+        internalCreateInstance(instance -> {
             instance.sharedData = true;
-            instance.versionId = "1.12.2";
-        }, null);
+            instance.versionId = Instance.VERSION_LATEST_RELEASE;
+            instance.name = "Latest Release";
+        }, "latest");
     }
 
-    /**
-     * Create a new instance based on a default template.
-     * @return the new instance
-     */
     public static Instance createDefaultInstance() throws IOException {
-        return createInstance((instance)-> {
-            instance.sharedData = true;
+        return createInstance(instance -> {
+            instance.sharedData = false;
             instance.versionId = Instance.VERSION_LATEST_RELEASE;
         }, null);
     }
 
-    /**
-     * Create an instance without attempting to load the instance list first. Only use this
-     * method during initialization.
-     */
-    private static Instance internalCreateInstance(InstanceSetter instanceSetter, String namePrefix) throws IOException{
+    private static Instance internalCreateInstance(InstanceSetter instanceSetter, String namePrefix) throws IOException {
         File root = findNewInstanceRoot(namePrefix);
         FileUtils.ensureDirectory(root);
         Instance instance = new Instance();
         instance.mInstanceRoot = root;
+        instance.createdAtMs = System.currentTimeMillis();
         instanceSetter.setInstanceProperties(instance);
+        instance.sanitize();
         instance.write();
         return instance;
     }
 
-    /**
-     * Create a new instance with defaults set by user
-     * @param instanceSetter setter function called to set user parameters
-     * @param namePrefix a name prefix (for the user to easily distinguish installed instances)
-     * @return the created instance
-     * @throws IOException if directory creation/instance writing fails
-     */
     public static Instance createInstance(InstanceSetter instanceSetter, String namePrefix) throws IOException {
         return internalCreateInstance(instanceSetter, namePrefix);
     }
 
-    /**
-     * Load the currently selected instance. Note that this method must not be used along with any code
-     * which uses getImmutableInstanceList()
-     * @return currently selected instance
-     */
     public static Instance loadSelectedInstance() {
         File selectedInstanceLocation = selectedInstanceLocation();
-        Instance instance = read(selectedInstanceLocation, Instance.class);
-        if(instance == null) return null;
+        Instance instance = readWithRecovery(selectedInstanceLocation, Instance.class);
+        if (instance == null) return null;
         instance.sanitize();
         return instance;
     }
 
-    /**
-     * Rename the provided instance directory. This will apply the new name only if it's unique.
-     * If no name provided - using bare UUID. If a name conflict - newName as prefix + UUID.
-     * @param instance Instance
-     * @param newName New instance name
-     */
     public static void renameInstanceDirectory(Instance instance, String newName) {
-        if(newName == null) return;
-        if(newName.trim().isEmpty())
-            newName = String.valueOf(UUID.randomUUID());
-        else
-            newName = FileUtils.escapeFileName(newName);
-        File targetDirectory = new File(sInstancePath, newName);
-        if(targetDirectory.exists())
-            targetDirectory = findNewInstanceRoot(newName);
-        String oldName = instance.mInstanceRoot.getName();
-        if(!instance.mInstanceRoot.renameTo(targetDirectory))
-            throw new RuntimeException("Failed to rename instance!");
+        if (instance == null || instance.mInstanceRoot == null || newName == null) return;
+        String cleaned = newName.trim().isEmpty()
+                ? String.valueOf(UUID.randomUUID())
+                : FileUtils.escapeFileName(newName.trim());
+        if (cleaned.isEmpty() || ".".equals(cleaned) || "..".equals(cleaned)) {
+            cleaned = String.valueOf(UUID.randomUUID());
+        }
+        File currentCanonical = instance.mInstanceRoot;
+        if (cleaned.equals(currentCanonical.getName())) return;
+        File targetDirectory = new File(sInstancePath, cleaned);
+        if (targetDirectory.exists()) {
+            targetDirectory = findNewInstanceRoot(cleaned);
+        }
+        String oldName = currentCanonical.getName();
+        if (!currentCanonical.renameTo(targetDirectory)) {
+            throw new RuntimeException("Failed to rename instance directory");
+        }
         instance.mInstanceRoot = targetDirectory;
-        if(oldName.equals(LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_INSTANCE, "")))
+        if (LauncherPreferences.DEFAULT_PREF != null
+                && oldName.equals(LauncherPreferences.DEFAULT_PREF.getString(LauncherPreferences.PREF_KEY_CURRENT_INSTANCE, ""))) {
             setSelectedInstance(instance);
+        }
     }
 }

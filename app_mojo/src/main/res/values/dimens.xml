@@ -31,4 +31,18 @@
     <dimen name="fragment_padding_medium">@dimen/_10sdp</dimen>
     <!-- Misc paddings -->
     <dimen name="profile_editor_image_padding">@dimen/padding_small</dimen>
+
+    <!-- Zyrox 2.0 Liquid Glass Design System Tokens -->
+    <dimen name="zyrox_space_xs">4dp</dimen>
+    <dimen name="zyrox_space_sm">8dp</dimen>
+    <dimen name="zyrox_space_md">12dp</dimen>
+    <dimen name="zyrox_space_lg">16dp</dimen>
+    <dimen name="zyrox_space_xl">24dp</dimen>
+    <dimen name="zyrox_radius_sm">9dp</dimen>
+    <dimen name="zyrox_radius_md">11.5dp</dimen>
+    <dimen name="zyrox_radius_lg">14dp</dimen>
+    <dimen name="zyrox_radius_xl">18dp</dimen>
+    <dimen name="zyrox_stroke_outer">1.5dp</dimen>
+    <dimen name="zyrox_stroke_inner">0.9dp</dimen>
+    <dimen name="zyrox_touch_min">40dp</dimen>
 </resources>

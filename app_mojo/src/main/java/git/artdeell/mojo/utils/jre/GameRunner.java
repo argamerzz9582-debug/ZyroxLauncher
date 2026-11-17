@@ -17,7 +17,10 @@ import git.artdeell.mojo.game.GameActivity;
 import git.artdeell.mojo.game.renderer.def.Renderers;
 import git.artdeell.mojo.game.renderer.impl.GLESRenderSpec;
 import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceManager;
 import git.artdeell.mojo.metadata.MojangVersionProvider;
+import git.artdeell.mojo.security.LogRedactor;
+import git.artdeell.mojo.servers.ServerListManager;
 import git.artdeell.mojo.utils.DownloadUtils;
 import git.artdeell.mojo.utils.lifecycle.LifecycleAwareAlertDialog;
 import git.artdeell.mojo.multirt.MultiRTUtils;
@@ -166,10 +169,11 @@ public class GameRunner {
             localeString = R.string.memory_warning_msg;
         }
 
-        if(LauncherPreferences.PREF_RAM_ALLOCATION > freeDeviceMemory && (showAddressMemoryWarning || LauncherPreferences.PREF_SHOW_MEMORY_WARNING_DIALOG)) {
+        final int effectiveRamMb = instance.getEffectiveRamAllocationMb();
+        if(effectiveRamMb > freeDeviceMemory && (showAddressMemoryWarning || LauncherPreferences.PREF_SHOW_MEMORY_WARNING_DIALOG)) {
             int finalDeviceMemory = freeDeviceMemory;
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) -> {
-                builder.setMessage(activity.getString(localeString, finalDeviceMemory, LauncherPreferences.PREF_RAM_ALLOCATION))
+                builder.setMessage(activity.getString(localeString, finalDeviceMemory, effectiveRamMb))
                         .setPositiveButton(android.R.string.ok, (d, w) -> {
                         });
 
@@ -236,6 +240,7 @@ public class GameRunner {
             if(showDialog(activity, R.string.ltw_4x_msaa_warning_msg)) return;
         }
 
+        GameActivity.reportLoadingStage(R.string.zyrox_loading_runtime);
         int requiredJavaVersion = MojangVersionProvider.resolveRequiredJavaVersion(versionInfo);
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
@@ -243,6 +248,19 @@ public class GameRunner {
         // Pre-process specific files
         disableSplash(gamedir);
         List<String> launchArgs = getMoJsonClientArgs(account, versionInfo, gamedir);
+
+        // Optional user-requested Server Manager quick-connect launch flags
+        String quickConnectServer = ServerListManager.consumePendingQuickConnect();
+        if (quickConnectServer != null) {
+            try {
+                Date relDate = DateUtils.getOriginalReleaseDate(versionInfo);
+                // --quickPlayMultiplayer was introduced in Minecraft 1.20 (released 2023-06-07)
+                boolean modernQuickPlay = relDate != null && !DateUtils.dateBefore(relDate, 2023, 5, 6);
+                ServerListManager.appendQuickConnectArgs(launchArgs, quickConnectServer, modernQuickPlay);
+            } catch (Exception e) {
+                Log.w("GameRunner", "Skipping invalid quick-connect server target: " + e.getMessage());
+            }
+        }
 
         // Select the appropriate openGL version
         OldVersionsUtils.selectOpenGlVersion(versionInfo);
@@ -299,7 +317,8 @@ public class GameRunner {
 
         Map<String, String> versionEnvMap = versionInfo.environment;
 
-        // TODO: this should be decoupled from GameRunner completely
+        GameActivity.reportLoadingStage(R.string.zyrox_loading_renderer);
+        // Setup renderer and native JVM environment
         gameRenderer.setupEnvironment(activity);
         JREUtils.setGameEnvironment(activity, versionEnvMap);
         JREUtils.chdir(instance.getGameDirectory().getAbsolutePath());
@@ -311,16 +330,18 @@ public class GameRunner {
         javaArgList.add("-Dorg.lwjgl.opengl.libname=libGLMojo.so");
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
 
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg,LauncherPreferences.PREF_RAM_ALLOCATION), Toast.LENGTH_SHORT).show());
+        InstanceManager.recordLaunchAttempt(instance);
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, effectiveRamMb), Toast.LENGTH_SHORT).show());
 
-        Log.i("GameRunner", "Running with "+ launchArgs.toString());
+        // SECURITY: Always redact auth tokens, sessions, and UUIDs before logging client args
+        Log.i("GameRunner", "Running with " + LogRedactor.redactArgs(launchArgs));
 
         String mainClass = versionInfo.mainClass;
 
         try {
             GameActivity.reportLoadingStage(R.string.zyrox_loading_starting);
             JavaRunner.nativeSetupExit(activity);
-            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs);
+            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, effectiveRamMb);
         }catch (VMLoadException e) {
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
                 builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});

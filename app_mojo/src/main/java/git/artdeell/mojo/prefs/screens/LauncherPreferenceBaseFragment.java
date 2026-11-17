@@ -63,7 +63,7 @@ public abstract class LauncherPreferenceBaseFragment extends PreferenceFragmentC
     @Override
     public void onSharedPreferenceChanged(SharedPreferences p, String s) {
         LauncherPreferences.loadPreferences(getContext());
-        if ("zyroxAnimatedBg".equals(s)) {
+        if ("zyroxAnimatedBg".equals(s) || "zyroxReducedMotion".equals(s) || "zyroxLowEffects".equals(s)) {
             ExtraCore.setValue(ExtraConstants.REFRESH_BG_VIDEO, true);
         }
     }

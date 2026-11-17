@@ -41,7 +41,8 @@ public class LauncherPreferenceFragment extends Fragment {
             new CategoryItem(R.string.zyrox_cat_controls, R.drawable.ic_px_gamepad, LauncherPreferenceControlFragment.class),
             new CategoryItem(R.string.zyrox_cat_java, R.drawable.ic_px_ram, LauncherPreferenceJavaFragment.class),
             new CategoryItem(R.string.zyrox_cat_misc, R.drawable.ic_px_alt_sliders, LauncherPreferenceMiscellaneousFragment.class),
-            new CategoryItem(R.string.zyrox_cat_experimental, R.drawable.ic_px_experiment, LauncherPreferenceExperimentalFragment.class)
+            new CategoryItem(R.string.zyrox_cat_experimental, R.drawable.ic_px_experiment, LauncherPreferenceExperimentalFragment.class),
+            new CategoryItem(R.string.zyrox_cat_security, R.drawable.ic_px_verify_hash, git.artdeell.mojo.fragments.AboutSecurityFragment.class)
     };
 
     private int mSelectedTab = 0;

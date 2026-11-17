@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Zyrox Global Design Tokens — Ultra-Transparent Luminous Crystal Glass -->
+    <!-- Zyrox 2.0 Global Design Tokens — Obsidian Glass + Signature Liquid Glass Buttons -->
     <color name="zyrox_bg_base">#0D0A08</color>
     <color name="zyrox_bg_overlay">#800D0A08</color>
     <color name="zyrox_overlay_dim">#330A0807</color>
@@ -8,58 +8,70 @@
     <color name="zyrox_vignette_mid">#240A0807</color>
     <color name="zyrox_vignette_inner">#050A0807</color>
 
-    <!-- Optical Crystal Glass Surfaces (True Live-Shader Transparency) -->
-    <color name="zyrox_glass_dock">#280D0A08</color>
-    <color name="zyrox_glass_primary">#48120D0A</color>
-    <color name="zyrox_glass_elevated">#D6140F0C</color>
-    <color name="zyrox_glass_card">#2B140F0C</color>
-    <color name="zyrox_glass_card_hover">#52221710</color>
-    <color name="zyrox_glass_input">#2E120D0A</color>
-    <color name="zyrox_glass_subpanel">#240D0A08</color>
-    <color name="zyrox_glass_specular">#18FFF9F2</color>
-    <color name="zyrox_glass_border">#3BFFB874</color>
-    <color name="zyrox_glass_border_mid">#61FFB874</color>
-    <color name="zyrox_glass_border_strong">#B8FFC482</color>
-    <color name="zyrox_divider">#2BFFB874</color>
+    <!-- Optical Crystal Glass Surfaces -->
+    <color name="zyrox_glass_dock">#2C0E1014</color>
+    <color name="zyrox_glass_primary">#4C111419</color>
+    <color name="zyrox_glass_elevated">#DC12151B</color>
+    <color name="zyrox_glass_card">#3013161C</color>
+    <color name="zyrox_glass_card_hover">#541D2430</color>
+    <color name="zyrox_glass_input">#3212151A</color>
+    <color name="zyrox_glass_subpanel">#280E1014</color>
+    <color name="zyrox_glass_specular">#22FAFCFF</color>
+    <color name="zyrox_glass_border">#48E4EBF2</color>
+    <color name="zyrox_glass_border_mid">#78EEF4FA</color>
+    <color name="zyrox_glass_border_strong">#CCF8FBFF</color>
+    <color name="zyrox_divider">#30E4EBF2</color>
 
-    <!-- Warm Golden-Amber & Champagne Accents -->
-    <color name="zyrox_amber">#FFA154</color>
-    <color name="zyrox_amber_bright">#F97316</color>
-    <color name="zyrox_amber_hover">#FFB36B</color>
-    <color name="zyrox_amber_deep">#C2410C</color>
-    <color name="zyrox_amber_stroke">#FFD29D</color>
-    <color name="zyrox_amber_glow">#55FF9234</color>
-    <color name="zyrox_amber_tint">#30FF9442</color>
-    <color name="zyrox_amber_badge_bg">#26FF9442</color>
+    <!-- Signature Zyrox Liquid Glass Button Tokens -->
+    <color name="zyrox_lg_text">#FAFCFF</color>
+    <color name="zyrox_lg_text_muted">#DDE5EF</color>
+    <color name="zyrox_lg_rim">#F0FFFFFF</color>
+    <color name="zyrox_lg_inner_rim">#72F4F8FB</color>
+    <color name="zyrox_lg_fill">#8EB1B8C2</color>
+    <color name="zyrox_lg_pressed">#9EB0BCCB</color>
+    <color name="zyrox_lg_ice_accent">#C9D7E4</color>
+    <color name="zyrox_lg_shadow">#621E2733</color>
 
-    <!-- High-Clarity Crystal Text Hierarchy (crisp over translucent live backgrounds) -->
-    <color name="zyrox_text_primary">#FFF9F2</color>
-    <color name="zyrox_text_secondary">#F0E9E2</color>
-    <color name="zyrox_text_subtle">#D4CBC2</color>
-    <color name="zyrox_text_muted">#ADA298</color>
+    <!-- Preserved Brand & Status Tokens -->
+    <color name="zyrox_amber">#E6EEF8</color>
+    <color name="zyrox_amber_bright">#C9D7E4</color>
+    <color name="zyrox_amber_hover">#F2F7FC</color>
+    <color name="zyrox_amber_deep">#8EA2B8</color>
+    <color name="zyrox_amber_stroke">#FAFCFF</color>
+    <color name="zyrox_amber_glow">#55C9D7E4</color>
+    <color name="zyrox_amber_tint">#34C9D7E4</color>
+    <color name="zyrox_amber_badge_bg">#2EC9D7E4</color>
 
-    <!-- Terminal & Status -->
-    <color name="zyrox_terminal_bg">#090706</color>
-    <color name="zyrox_terminal_glass">#C7090706</color>
-    <color name="zyrox_danger">#F87171</color>
-    <color name="zyrox_danger_tint">#26EF4444</color>
-    <color name="zyrox_danger_pressed">#4AEF4444</color>
-    <color name="zyrox_success">#4ADE80</color>
-    <color name="zyrox_success_tint">#2622C55E</color>
+    <!-- High-Clarity Crystal Text Hierarchy -->
+    <color name="zyrox_text_primary">#FAFCFF</color>
+    <color name="zyrox_text_secondary">#E8EEF5</color>
+    <color name="zyrox_text_subtle">#C8D2DE</color>
+    <color name="zyrox_text_muted">#9EABBA</color>
 
-    <!-- Legacy MojoLauncher Color Mappings (themed to Zyrox Crystal Glass) -->
-    <color name="control_button_color">#4D120D0A</color>
-    <color name="control_button_pressed_color">#80F97316</color>
+    <!-- Terminal & Semantic Status -->
+    <color name="zyrox_terminal_bg">#080A0D</color>
+    <color name="zyrox_terminal_glass">#CC080A0D</color>
+    <color name="zyrox_danger">#FCA5A5</color>
+    <color name="zyrox_danger_tint">#28EF4444</color>
+    <color name="zyrox_danger_pressed">#4CEF4444</color>
+    <color name="zyrox_success">#86EFAC</color>
+    <color name="zyrox_success_tint">#2822C55E</color>
+    <color name="zyrox_warning">#FDE68A</color>
+    <color name="zyrox_info">#BAE6FD</color>
 
-    <color name="minebutton_color">#FFA154</color>
-    <color name="minebutton_secondary">#33221A15</color>
+    <!-- Legacy MojoLauncher Color Mappings (Unified Liquid Glass) -->
+    <color name="control_button_color">#8EB1B8C2</color>
+    <color name="control_button_pressed_color">#9EB0BCCB</color>
+
+    <color name="minebutton_color">#FAFCFF</color>
+    <color name="minebutton_secondary">#6EB1B8C2</color>
     <color name="background_app">#0D0A08</color>
     <color name="divider">@color/zyrox_divider</color>
-    <color name="background_overlay">#8C120D0A</color>
+    <color name="background_overlay">#8C101318</color>
     <color name="background_status_bar">#00000000</color>
-    <color name="background_bottom_bar">#66120D0A</color>
-    <color name="icon_outline_color">#FFF9F2</color>
+    <color name="background_bottom_bar">#66101318</color>
+    <color name="icon_outline_color">#FAFCFF</color>
 
-    <color name="primary_text">#FFF9F2</color>
-    <color name="secondary_text">#F0E9E2</color>
+    <color name="primary_text">#FAFCFF</color>
+    <color name="secondary_text">#E8EEF5</color>
 </resources>

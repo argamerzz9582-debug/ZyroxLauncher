@@ -1,7 +1,6 @@
 package com.kdt.mcgui;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -15,7 +14,12 @@ import androidx.core.content.res.ResourcesCompat;
 
 import fr.spse.extended_view.ExtendedButton;
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.prefs.LauncherPreferences;
+import git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable;
 
+/**
+ * Zyrox 2.0 Liquid Glass quick-action menu tile button.
+ */
 public class LauncherMenuButton extends ExtendedButton {
 
     public LauncherMenuButton(@NonNull Context context) {
@@ -40,16 +44,16 @@ public class LauncherMenuButton extends ExtendedButton {
         setPaddingRelative(padH, 0, padH, 0);
         setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         setAllCaps(true);
-        setLetterSpacing(0.05f);
+        setLetterSpacing(0.035f);
         setSingleLine(true);
         setEllipsize(TextUtils.TruncateAt.END);
-        setTextColor(Color.parseColor("#FFF9F2"));
-        setShadowLayer(4f, 0f, 1.2f, 0xBF090705);
+        setTextColor(ZyroxLiquidGlassDrawable.GLYPH_SNOW_WHITE);
+        setShadowLayer(3.5f, 0f, 1.0f, ZyroxLiquidGlassDrawable.GLYPH_SHADOW_COLOR);
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
 
-        Typeface pixelFont = ResourcesCompat.getFont(getContext(), R.font.minecraft_ten);
-        if (pixelFont != null) {
-            setTypeface(pixelFont);
+        Typeface boldFont = ResourcesCompat.getFont(getContext(), R.font.noto_sans_bold);
+        if (boldFont != null) {
+            setTypeface(boldFont, Typeface.BOLD);
         }
 
         int[] sizes = getExtendedViewData().getSizeCompounds();
@@ -60,12 +64,12 @@ public class LauncherMenuButton extends ExtendedButton {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (isEnabled()) {
+        if (isEnabled() && !LauncherPreferences.isReducedMotionEnabled(getContext())) {
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
-                animate().scaleX(0.965f).scaleY(0.965f).setDuration(90L).start();
+                animate().scaleX(0.97f).scaleY(0.97f).setDuration(80L).start();
             } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                animate().scaleX(1f).scaleY(1f).setDuration(130L).start();
+                animate().scaleX(1f).scaleY(1f).setDuration(125L).start();
             }
         }
         return super.onTouchEvent(event);

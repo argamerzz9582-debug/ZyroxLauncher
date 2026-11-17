@@ -410,7 +410,7 @@
             android:layout_marginBottom="8dp"
             android:background="@color/zyrox_divider" />
 
-        <!-- Bottom Sticky Bar inside Right Pane: Red DELETE outline on left, Glowing Amber SAVE on right -->
+        <!-- Bottom Sticky Bar inside Right Pane: DELETE | STUDIO TOOLS | SAVE -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="40dp"
@@ -419,16 +419,30 @@
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/vprof_editor_delete_button"
-                android:layout_width="130dp"
+                android:layout_width="105dp"
                 android:layout_height="match_parent"
                 android:background="@drawable/btn_zyrox_danger"
                 android:text="@string/zyrox_delete_instance"
-                android:textColor="@color/zyrox_danger"
-                android:textSize="11.5sp"
-                android:letterSpacing="0.06"
+                android:textColor="@color/zyrox_lg_text"
+                android:textSize="10.5sp"
+                android:letterSpacing="0.04"
                 android:stateListAnimator="@null"
-                android:fontFamily="@font/minecraft_pixel"
-                app:fontFamily="@font/minecraft_pixel" />
+                android:fontFamily="@font/noto_sans_bold"
+                app:fontFamily="@font/noto_sans_bold" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/vprof_editor_studio_tools_button"
+                android:layout_width="124dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:text="@string/zyrox_studio_tools"
+                android:textColor="@color/zyrox_lg_text"
+                android:textSize="10sp"
+                android:letterSpacing="0.04"
+                android:stateListAnimator="@null"
+                android:fontFamily="@font/noto_sans_bold"
+                app:fontFamily="@font/noto_sans_bold" />
 
             <Space
                 android:layout_width="0dp"
@@ -437,15 +451,15 @@
 
             <com.kdt.mcgui.MineButton
                 android:id="@+id/vprof_editor_save_button"
-                android:layout_width="190dp"
+                android:layout_width="165dp"
                 android:layout_height="match_parent"
                 android:background="@drawable/btn_zyrox_play"
                 android:text="@string/zyrox_save_instance"
-                android:textColor="@color/zyrox_text_primary"
-                android:textSize="12sp"
-                android:letterSpacing="0.08"
-                android:fontFamily="@font/minecraft_pixel"
-                app:fontFamily="@font/minecraft_pixel" />
+                android:textColor="@color/zyrox_lg_text"
+                android:textSize="11sp"
+                android:letterSpacing="0.05"
+                android:fontFamily="@font/noto_sans_bold"
+                app:fontFamily="@font/noto_sans_bold" />
         </LinearLayout>
     </LinearLayout>
 
