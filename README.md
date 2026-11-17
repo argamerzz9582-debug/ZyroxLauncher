@@ -15,8 +15,7 @@ Get the latest security-hardened, RSA-4096 v1/v2/v3 signed production builds dir
 
 - **[ZyroxLauncher-full-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-full-release.apk)** — Complete install-and-play signed APK with bundled OpenJDK runtime (**Recommended**)
 - **[ZyroxLauncher-noruntime-release.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-noruntime-release.apk)** — Compact signed APK (import your own `.tar.xz` JRE runtime)
-- **[ZyroxLauncher-full-release.aab](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/ZyroxLauncher-full-release.aab)** — Signed Android App Bundle for Google Play Console
-- **[All Releases & SHA-256 Checksums](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases)**
+- **[All Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases)**
 
 ## Highlights
 - Runs Minecraft: Java Edition across classic, modern release, and snapshot versions on Android with Forge, Fabric, NeoForge, Quilt, Modrinth (`.mrpack`), and CurseForge modpack support.
