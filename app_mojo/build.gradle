@@ -12,20 +12,12 @@ static def getDateSeconds() {
     if (System.getenv("GITHUB_ACTIONS") == "true") {
         return Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
     } else {
-        return 172005
+        return 172006
     }
 }
 
 def getVersionName = {
-    def currentBranch = grgit.branch.current()
-    def latestCommit = grgit.log(maxCommits: 1)
-    def dateToday = getDate()
-    if(currentBranch == null || latestCommit == null) {
-        return "1.0.1-${dateToday}"
-    }else {
-        def commitAbbreviation = latestCommit.abbreviatedId
-        return "1.0.1-${dateToday}-${commitAbbreviation}"
-    }
+    return "1.0.3"
 }
 
 def getCFApiKey = {
@@ -53,6 +45,12 @@ android {
 
     lintOptions {
         abortOnError false
+    }
+
+    testOptions {
+        unitTests {
+            returnDefaultValues = true
+        }
     }
 
     def releaseKeystorePath = System.getenv("ZYROX_KEYSTORE_PATH")
@@ -349,4 +347,6 @@ dependencies {
     // implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.7.0'
 
     implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    testImplementation 'junit:junit:4.13.2'
 }

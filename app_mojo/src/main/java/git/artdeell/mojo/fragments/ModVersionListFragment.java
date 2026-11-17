@@ -66,11 +66,16 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
         super.onStop();
     }
 
+    private volatile boolean mForceNextRefresh = false;
+
     @Override
     public void run() {
+        boolean force = mForceNextRefresh;
+        mForceNextRefresh = false;
         try {
-            T versions = loadVersionList();
+            T versions = loadVersionList(force);
             Tools.runOnUiThread(()->{
+                if (!isAdded()) return;
                 if(versions != null) {
                     mExpandableListView.setAdapter(createAdapter(versions, mInflater));
                 }else{
@@ -80,7 +85,7 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
             });
         }catch (IOException e) {
             Tools.runOnUiThread(()-> {
-                if (getContext() != null) {
+                if (isAdded() && getContext() != null) {
                     Tools.showError(getContext(), e);
                     mRetryView.setVisibility(View.VISIBLE);
                     mProgressBar.setVisibility(View.GONE);
@@ -91,6 +96,7 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
 
     @Override
     public void onClick(View view) {
+        mForceNextRefresh = true;
         mRetryView.setVisibility(View.GONE);
         mProgressBar.setVisibility(View.VISIBLE);
         new Thread(this).start();
@@ -112,11 +118,12 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
     @Override
     public void onDownloadFinished(File downloadedFile) {
         Tools.runOnUiThread(()->{
-            Context context = requireContext();
-            getTaskProxy().detachListener();
+            ModloaderListenerProxy proxy = getTaskProxy();
+            if (proxy != null) proxy.detachListener();
             setTaskProxy(null);
+            if (!isAdded()) return;
+            Context context = requireContext();
             mExpandableListView.setEnabled(true);
-            // Read the comment in FabricInstallFragment.onDownloadFinished() to see how this works
             getParentFragmentManager().popBackStackImmediate();
             onDownloadFinished(context, downloadedFile);
         });
@@ -125,9 +132,11 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
     @Override
     public void onDataNotAvailable() {
         Tools.runOnUiThread(()->{
-            Context context = requireContext();
-            getTaskProxy().detachListener();
+            ModloaderListenerProxy proxy = getTaskProxy();
+            if (proxy != null) proxy.detachListener();
             setTaskProxy(null);
+            if (!isAdded()) return;
+            Context context = requireContext();
             mExpandableListView.setEnabled(true);
             Tools.dialog(context,
                     context.getString(R.string.global_error),
@@ -138,9 +147,11 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
     @Override
     public void onDownloadError(Exception e) {
         Tools.runOnUiThread(()->{
-            Context context = requireContext();
-            getTaskProxy().detachListener();
+            ModloaderListenerProxy proxy = getTaskProxy();
+            if (proxy != null) proxy.detachListener();
             setTaskProxy(null);
+            if (!isAdded()) return;
+            Context context = requireContext();
             mExpandableListView.setEnabled(true);
             Tools.showError(context, e);
         });
@@ -158,6 +169,10 @@ public abstract class ModVersionListFragment<T> extends Fragment implements Runn
     public abstract int getNoDataMsg();
 
     public abstract T loadVersionList() throws IOException;
+
+    public T loadVersionList(boolean forceRefresh) throws IOException {
+        return loadVersionList();
+    }
 
     public abstract ExpandableListAdapter createAdapter(T versionList, LayoutInflater layoutInflater);
     public abstract Runnable createDownloadTask(Object selectedVersion, ModloaderListenerProxy listenerProxy);

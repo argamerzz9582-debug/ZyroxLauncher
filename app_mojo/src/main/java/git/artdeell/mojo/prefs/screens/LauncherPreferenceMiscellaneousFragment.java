@@ -29,6 +29,10 @@ import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
+import git.artdeell.mojo.tasks.AsyncVersionList;
+import git.artdeell.mojo.extra.ExtraConstants;
+import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.tasks.DataMigrator;
 import git.artdeell.mojo.ui.ZyroxShaderBackgroundView;
 
@@ -148,11 +152,14 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
             if (!ProgressLayout.ensureNoOngoingTasks(getContext())) return true;
             MojoApplication.sExecutorService.submit(() -> {
                 try {
+                    VersionMetadataRepository.getInstance().clearAllCaches();
                     FileUtils.deleteDirectory(new File(Tools.DIR_CACHE, "string_cache"));
                 } catch (IOException e) {
                     Tools.showErrorRemote(getLauncherActivity(), R.string.preference_metadata_clear_fail, e);
                     return;
                 }
+                new AsyncVersionList().getVersionList(
+                        versions -> ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, versions));
                 Tools.runOnUiThread(() -> {
                     if (getLauncherActivity() != null) {
                         Toast.makeText(getLauncherActivity(), R.string.preference_metadata_clear_complete, Toast.LENGTH_LONG).show();

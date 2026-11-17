@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 public class FabricVersion {
     public String version;
     public boolean stable;
+    public boolean recommended;
 
     public static class LoaderDescriptor extends FabricVersion {
         public FabricVersion loader;

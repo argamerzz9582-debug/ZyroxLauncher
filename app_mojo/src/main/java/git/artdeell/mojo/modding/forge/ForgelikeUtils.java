@@ -1,96 +1,96 @@
 package git.artdeell.mojo.modding.forge;
 
-import android.util.Log;
-
-import git.artdeell.mojo.Tools;
-import git.artdeell.mojo.instances.InstanceInstaller;
-import git.artdeell.mojo.modding.ComparableVersionString;
-import git.artdeell.mojo.utils.DownloadUtils;
-
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.StringReader;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
+import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.instances.InstanceInstaller;
+import git.artdeell.mojo.metadata.ForgeMetadataProvider;
+import git.artdeell.mojo.metadata.NeoForgeMetadataProvider;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
+import git.artdeell.mojo.utils.FileUtils;
 
+/**
+ * Adapter bridging existing Forge and NeoForge installation screens &amp; modpack installers onto
+ * {@link ForgeMetadataProvider} and {@link NeoForgeMetadataProvider}. Preserves the existing
+ * {@code InstanceInstaller} GUI installer workflow while supporting classic {@code 1.x.y} and
+ * year-based {@code 26.x+} Minecraft releases, recommended builds, and exact compatibility checks.
+ */
 public abstract class ForgelikeUtils {
     public static final ForgelikeUtils FORGE_UTILS = new ForgeUtils();
     public static final ForgelikeUtils NEOFORGE_UTILS = new NeoforgeUtils();
 
     private final String mName;
     private final String mCachePrefix;
-    private final String mVersionResolver;
     private final String mIconName;
-    private final String mMetadataUrl;
     private final String mInstallerUrl;
     private final boolean mVersionOrderInversed;
 
-    private ForgelikeUtils(String name, String cachePrefix, String iconName, String versionResolver, String metadataUrl, String installerUrl, boolean versionOrderInversed) {
+    private ForgelikeUtils(String name, String cachePrefix, String iconName,
+                           String installerUrl, boolean versionOrderInversed) {
         this.mName = name;
         this.mCachePrefix = cachePrefix;
         this.mIconName = iconName;
-        this.mVersionResolver = versionResolver;
-        this.mMetadataUrl = metadataUrl;
         this.mInstallerUrl = installerUrl;
         this.mVersionOrderInversed = versionOrderInversed;
     }
 
     public List<String> downloadVersions() throws IOException {
-        SAXParser saxParser;
-        try {
-            SAXParserFactory parserFactory = SAXParserFactory.newInstance();
-            saxParser = parserFactory.newSAXParser();
-        } catch (SAXException | ParserConfigurationException e) {
-            e.printStackTrace();
-            // if we cant make a parser we might as well not even try to parse anything
-            return null;
-        }
-        try {
-            //of_test();
-            return DownloadUtils.downloadStringCached(mMetadataUrl, mCachePrefix + "_versions", input -> {
-                try {
-                    ForgelikeVersionListHandler handler = new ForgelikeVersionListHandler();
-                    saxParser.parse(new InputSource(new StringReader(input)), handler);
-                    return handler.getVersions();
-                    // IOException is present here StringReader throws it only if the parser called close()
-                    // sooner than needed, which is a parser issue and not an I/O one
-                } catch (SAXException | IOException e) {
-                    throw new DownloadUtils.ParseException(e);
-                }
-            });
-        } catch (DownloadUtils.ParseException e) {
-            e.printStackTrace();
-            return null;
-        }
+        return downloadVersions(false);
     }
+
+    public abstract List<String> downloadVersions(boolean forceRefresh) throws IOException;
+
+    @NonNull
+    public Map<String, String> downloadRecommendedVersions(boolean forceRefresh) {
+        return Collections.emptyMap();
+    }
+
+    @Nullable
+    public abstract String resolveCompatibleVersion(@NonNull String gameVersion,
+                                                    @NonNull String modLoaderVersion) throws IOException;
+
+    @NonNull
+    protected abstract String downloadInstallerSha1(@NonNull String downloadUrl) throws IOException;
 
     public String getInstallerUrl(String version) {
-        return String.format(mInstallerUrl, version);
+        return String.format(Locale.ROOT, mInstallerUrl, version);
     }
 
+    @Nullable
     public InstanceInstaller createInstaller(String gameVersion, String modLoaderVersion) throws IOException {
-        List<String> versions = downloadVersions();
-        if (versions == null) return null;
-        String versionStart = String.format(mVersionResolver, gameVersion, modLoaderVersion);
-        for (String versionName : versions) {
-            if (!versionName.startsWith(versionStart)) continue;
-            return createInstaller(versionName);
+        if (gameVersion == null || modLoaderVersion == null) return null;
+        String verifiedFullVersion = resolveCompatibleVersion(gameVersion, modLoaderVersion);
+        if (verifiedFullVersion == null) {
+            throw new IOException(mName + " version " + modLoaderVersion
+                    + " is not compatible with Minecraft " + gameVersion);
         }
-        return null;
+        return createInstaller(verifiedFullVersion);
     }
 
     public InstanceInstaller createInstaller(String fullVersion) throws IOException {
-        String downloadUrl = getInstallerUrl(fullVersion);
-        String hash = DownloadUtils.downloadString(downloadUrl + ".sha1");
-        File installerLocation = new File(Tools.DIR_CACHE, mCachePrefix + "-installer-" + fullVersion + ".jar");
+        if (fullVersion == null || fullVersion.trim().isEmpty() || shouldSkipVersion(fullVersion)) {
+            throw new IOException("Invalid " + mName + " installer version: " + fullVersion);
+        }
+        String cleanVersion = fullVersion.trim();
+        String downloadUrl = getInstallerUrl(cleanVersion);
+        String hash = downloadInstallerSha1(downloadUrl);
+        String safeFileName = FileUtils.escapeFileName(mCachePrefix + "-installer-" + cleanVersion + ".jar");
+        File installerLocation = new File(Tools.DIR_CACHE, safeFileName);
         InstanceInstaller instanceInstaller = new InstanceInstaller();
-        instanceInstaller.commandLineArgs = List.of("-Duser.language=en", "-Duser.country=US", "-javaagent:"+Tools.DIR_DATA+"/forge_installer/forge_installer.jar");
+        instanceInstaller.commandLineArgs = Arrays.asList(
+                "-Duser.language=en",
+                "-Duser.country=US",
+                "-javaagent:" + Tools.DIR_DATA + "/forge_installer/forge_installer.jar"
+        );
         instanceInstaller.installerJar = installerLocation.getAbsolutePath();
         instanceInstaller.installerSha1 = hash;
         instanceInstaller.installerDownloadUrl = downloadUrl;
@@ -105,6 +105,7 @@ public abstract class ForgelikeUtils {
         return mIconName;
     }
 
+    @Nullable
     public abstract String processVersionString(String version);
 
     public abstract boolean shouldSkipVersion(String version);
@@ -113,65 +114,95 @@ public abstract class ForgelikeUtils {
         return mVersionOrderInversed;
     }
 
-    private static String getMcVersionForNeoVersion(String neoVersion) {
-        // I feel like it's necessary to explain the NeoForge versioning format
-        // basically, what it does is it trims the major version from minecrafts version
-        // e.g.: 1.20.1 -> 20.1, and then appends its own "patch" version to that
-        // e.g.: 20.1 -> 20.1.8, which means the version string includes both, the minecraft
-        // and the loader version at once
-        try {
-            int firstIndex = neoVersion.indexOf('.');
-            int secondIndex = neoVersion.indexOf('.', firstIndex + 1);
-            if (firstIndex == -1 || secondIndex == -1) {
-                Log.e("NeoforgeUtils", "Failed to parse neoforge version: " + neoVersion + "; not enough '.' found");
-            }
-            return "1." + neoVersion.substring(0, secondIndex);
-        } catch (StringIndexOutOfBoundsException e) {
-            Log.e("NeoforgeUtils", "Failed to parse neoforge version: " + neoVersion, e);
-            return neoVersion;
-        }
-    }
-
     private static class ForgeUtils extends ForgelikeUtils {
         public ForgeUtils() {
             super(
-                    "Forge", "forge", "forge", "%1$s-%2$s",
-                    "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml",
-                    "https://maven.minecraftforge.net/net/minecraftforge/forge/%1$s/forge-%1$s-installer.jar",
+                    "Forge",
+                    "forge",
+                    "forge",
+                    ForgeMetadataProvider.OFFICIAL_FORGE_INSTALLER_URL_FMT,
                     false
             );
         }
 
         @Override
+        public List<String> downloadVersions(boolean forceRefresh) throws IOException {
+            return VersionMetadataRepository.getInstance().getForgeProvider().getVersions(forceRefresh);
+        }
+
+        @NonNull
+        @Override
+        public Map<String, String> downloadRecommendedVersions(boolean forceRefresh) {
+            return VersionMetadataRepository.getInstance().getForgeProvider().getRecommendedLoaderMap(forceRefresh);
+        }
+
+        @Nullable
+        @Override
+        public String resolveCompatibleVersion(@NonNull String gameVersion,
+                                               @NonNull String modLoaderVersion) throws IOException {
+            return VersionMetadataRepository.getInstance()
+                    .getForgeProvider()
+                    .resolveCompatibleFullVersion(gameVersion, modLoaderVersion);
+        }
+
+        @NonNull
+        @Override
+        protected String downloadInstallerSha1(@NonNull String downloadUrl) throws IOException {
+            return VersionMetadataRepository.getInstance().getForgeProvider().fetchInstallerSha1(downloadUrl);
+        }
+
+        @Nullable
+        @Override
         public String processVersionString(String version) {
-            int dashIndex = version.indexOf("-");
-            return version.substring(0, dashIndex);
+            return ForgeMetadataProvider.extractMinecraftVersion(version);
         }
 
         @Override
         public boolean shouldSkipVersion(String version) {
-            return false;
+            return ForgeMetadataProvider.extractMinecraftVersion(version) == null;
         }
     }
 
     private static class NeoforgeUtils extends ForgelikeUtils {
         public NeoforgeUtils() {
             super(
-                    "NeoForge", "neoforge", "neoforge", "%2$s",
-                    "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml",
-                    "https://maven.neoforged.net/releases/net/neoforged/neoforge/%1$s/neoforge-%1$s-installer.jar",
+                    "NeoForge",
+                    "neoforge",
+                    "neoforge",
+                    NeoForgeMetadataProvider.OFFICIAL_NEOFORGE_INSTALLER_URL_FMT,
                     true
             );
         }
 
         @Override
+        public List<String> downloadVersions(boolean forceRefresh) throws IOException {
+            return VersionMetadataRepository.getInstance().getNeoForgeProvider().getVersions(forceRefresh);
+        }
+
+        @Nullable
+        @Override
+        public String resolveCompatibleVersion(@NonNull String gameVersion,
+                                               @NonNull String modLoaderVersion) throws IOException {
+            return VersionMetadataRepository.getInstance()
+                    .getNeoForgeProvider()
+                    .resolveCompatibleFullVersion(gameVersion, modLoaderVersion);
+        }
+
+        @NonNull
+        @Override
+        protected String downloadInstallerSha1(@NonNull String downloadUrl) throws IOException {
+            return VersionMetadataRepository.getInstance().getNeoForgeProvider().fetchInstallerSha1(downloadUrl);
+        }
+
+        @Nullable
+        @Override
         public String processVersionString(String version) {
-            return ComparableVersionString.parse(getMcVersionForNeoVersion(version)).getProper();
+            return NeoForgeMetadataProvider.extractMinecraftVersion(version);
         }
 
         @Override
         public boolean shouldSkipVersion(String version) {
-            return version.startsWith("0");
+            return NeoForgeMetadataProvider.shouldSkipVersion(version);
         }
     }
 }

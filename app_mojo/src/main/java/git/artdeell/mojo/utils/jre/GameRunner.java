@@ -13,9 +13,11 @@ import git.artdeell.mojo.JVersionList;
 import git.artdeell.mojo.Logger;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.authenticator.accounts.Account;
+import git.artdeell.mojo.game.GameActivity;
 import git.artdeell.mojo.game.renderer.def.Renderers;
 import git.artdeell.mojo.game.renderer.impl.GLESRenderSpec;
 import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.metadata.MojangVersionProvider;
 import git.artdeell.mojo.utils.DownloadUtils;
 import git.artdeell.mojo.utils.lifecycle.LifecycleAwareAlertDialog;
 import git.artdeell.mojo.multirt.MultiRTUtils;
@@ -187,6 +189,7 @@ public class GameRunner {
                 }
             }
         File gamedir = instance.getGameDirectory();
+        GameActivity.reportLoadingStage(R.string.zyrox_loading_resources);
         JVersionList.Version versionInfo = Tools.getVersionInfo(versionId);
         // We don't need the library list, the asset index, client download info for the code below
         versionInfo.libraries = null;
@@ -233,8 +236,7 @@ public class GameRunner {
             if(showDialog(activity, R.string.ltw_4x_msaa_warning_msg)) return;
         }
 
-        int requiredJavaVersion = 8;
-        if(versionInfo.javaVersion != null) requiredJavaVersion = versionInfo.javaVersion.majorVersion;
+        int requiredJavaVersion = MojangVersionProvider.resolveRequiredJavaVersion(versionInfo);
 
         Runtime runtime = MultiRTUtils.forceReread(pickRuntime(instance, requiredJavaVersion));
 
@@ -316,6 +318,7 @@ public class GameRunner {
         String mainClass = versionInfo.mainClass;
 
         try {
+            GameActivity.reportLoadingStage(R.string.zyrox_loading_starting);
             JavaRunner.nativeSetupExit(activity);
             JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs);
         }catch (VMLoadException e) {

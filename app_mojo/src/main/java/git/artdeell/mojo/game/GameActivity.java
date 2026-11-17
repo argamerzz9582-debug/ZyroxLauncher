@@ -37,6 +37,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.StringRes;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -71,6 +72,7 @@ import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.prefs.QuickSettingSideDialog;
 import git.artdeell.mojo.services.GameService;
 import git.artdeell.mojo.tasks.AsyncAssetManager;
+import git.artdeell.mojo.ui.MinecraftLoadingLandscapeView;
 import git.artdeell.mojo.utils.JREUtils;
 import git.artdeell.mojo.utils.MCOptionUtils;
 import git.artdeell.mojo.authenticator.accounts.Account;
@@ -98,6 +100,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
     private View mLoadingScreen;
+    private MinecraftLoadingLandscapeView mLoadingLandscape;
+    private TextView mLoadingStatusText;
+    private View mLoadingWarningText;
+    private boolean mLoadingScreenHiding = false;
+    private static volatile int sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
+    private final Runnable mWindowWaitStatusRunnable = () -> setLoadingStatus(R.string.loading_screen_title);
+    private final Runnable mProlongedWaitHintRunnable = () -> {
+        if (mLoadingWarningText != null && mLoadingScreen != null && !mLoadingScreenHiding) {
+            mLoadingWarningText.setVisibility(View.VISIBLE);
+        }
+    };
     private GameRenderer mGameRenderer;
 
     Instance instance;
@@ -323,6 +336,69 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mDrawerPullButton = findViewById(R.id.drawer_button);
         mHotbarView = findViewById(R.id.hotbar_view);
         mLoadingScreen = findViewById(R.id.main_loading_screen);
+        if (mLoadingScreen != null) {
+            mLoadingLandscape = mLoadingScreen.findViewById(R.id.main_loading_landscape);
+            mLoadingStatusText = mLoadingScreen.findViewById(R.id.main_loading_screen_text);
+            mLoadingWarningText = mLoadingScreen.findViewById(R.id.main_loading_screen_warning);
+            if (mLoadingWarningText != null) {
+                // Show crash-wait hint only if the JVM stays in window-wait for an extended period
+                mLoadingWarningText.setVisibility(View.INVISIBLE);
+            }
+            if (PLATFORM instanceof DummyBackend) {
+                setLoadingStatus(sCurrentLoadingStatusRes);
+            }
+        }
+    }
+
+    /**
+     * Thread-safe lifecycle hook updating the real launcher stage text shown on the loading screen.
+     * Never shows synthetic percentages or marks startup complete before the game window exists.
+     */
+    public static void reportLoadingStage(@StringRes int stageStringRes) {
+        sCurrentLoadingStatusRes = stageStringRes;
+        ContextExecutor.executeActivity(activity -> {
+            if (activity instanceof GameActivity) {
+                ((GameActivity) activity).onLoadingStageChanged(stageStringRes);
+            }
+        });
+    }
+
+    private void onLoadingStageChanged(@StringRes int stageStringRes) {
+        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
+        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
+        setLoadingStatus(stageStringRes);
+        if (stageStringRes == R.string.zyrox_loading_starting && mLoadingScreen != null && !mLoadingScreenHiding) {
+            // Once JavaRunner.startJvm is running Minecraft's main class, transition naturally to
+            // waiting for the native GLFW/SDL/AWT game window if it hasn't initialized yet.
+            Tools.MAIN_HANDLER.postDelayed(mWindowWaitStatusRunnable, 2200L);
+            Tools.MAIN_HANDLER.postDelayed(mProlongedWaitHintRunnable, 15000L);
+        }
+    }
+
+    private void setLoadingStatus(@StringRes int stageStringRes) {
+        sCurrentLoadingStatusRes = stageStringRes;
+        if (mLoadingStatusText != null && mLoadingScreen != null && !mLoadingScreenHiding) {
+            mLoadingStatusText.setText(stageStringRes);
+        }
+    }
+
+    private void destroyLoadingScreenImmediate() {
+        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
+        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
+        if (mLoadingLandscape != null) {
+            mLoadingLandscape.release();
+            mLoadingLandscape = null;
+        }
+        if (mLoadingScreen != null) {
+            mLoadingScreen.animate().cancel();
+            if (mLoadingScreen.getParent() instanceof ViewGroup) {
+                ((ViewGroup) mLoadingScreen.getParent()).removeView(mLoadingScreen);
+            }
+            mLoadingScreen = null;
+        }
+        mLoadingStatusText = null;
+        mLoadingWarningText = null;
+        mLoadingScreenHiding = false;
     }
 
     @Override
@@ -330,6 +406,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onResume();
         ContextExecutor.setActivity(this);
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
+        if (mLoadingLandscape != null && !mLoadingScreenHiding) {
+            mLoadingLandscape.resumeAnimation();
+        }
         PLATFORM.setHovered(true);
     }
 
@@ -351,17 +430,25 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onStart() {
         super.onStart();
+        if (mLoadingLandscape != null && !mLoadingScreenHiding) {
+            mLoadingLandscape.resumeAnimation();
+        }
         PLATFORM.setVisible(true);
     }
 
     @Override
     protected void onStop() {
+        if (mLoadingLandscape != null) {
+            mLoadingLandscape.pauseAnimation();
+        }
         PLATFORM.setVisible(false);
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        destroyLoadingScreenImmediate();
+        sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -410,12 +497,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     private void runCraft(String versionId, File[] classpath) throws Throwable {
+        reportLoadingStage(R.string.zyrox_loading_preparing);
         Logger.appendToLog("--------- Starting game with Launcher Debug!");
         Tools.printLauncherInfo(versionId, instance.getLaunchArgs(), mGameRenderer.getCurrentRenderer(), this);
         JREUtils.redirectAndPrintJRELog();
-        GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
-        //Note that we actually stall in the above function, even if the game crashes. But let's be safe.
-        Tools.runOnUiThread(()-> mServiceBinder.isActive = false);
+        try {
+            GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
+        } finally {
+            // Ensure loading animation stops cleanly if launch exits early or fails.
+            Tools.runOnUiThread(() -> {
+                if (mLoadingLandscape != null) mLoadingLandscape.pauseAnimation();
+                if (mServiceBinder != null) mServiceBinder.isActive = false;
+            });
+        }
     }
 
     private void dialogSendCustomKey() {
@@ -523,15 +617,23 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     public void hideLoadingScreen(){
-        if(mLoadingScreen == null) return;
-        ((TextView) mLoadingScreen.findViewById(R.id.main_loading_screen_text)).setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
+        if (mLoadingScreen == null || mLoadingScreenHiding) return;
+        mLoadingScreenHiding = true;
+        Tools.MAIN_HANDLER.removeCallbacks(mWindowWaitStatusRunnable);
+        Tools.MAIN_HANDLER.removeCallbacks(mProlongedWaitHintRunnable);
+        if (mLoadingLandscape != null) {
+            mLoadingLandscape.pauseAnimation();
+        }
+        if (mLoadingWarningText != null) {
+            mLoadingWarningText.setVisibility(View.INVISIBLE);
+        }
+        if (mLoadingStatusText != null) {
+            mLoadingStatusText.setText(getString(R.string.loading_screen_booted, PLATFORM.backendName()));
+        }
         mLoadingScreen.animate()
                 .alpha(0f)
-                .setDuration(300)
-                .withEndAction(() -> {
-                    ((ViewGroup) mLoadingScreen.getParent()).removeView(mLoadingScreen);
-                    mLoadingScreen = null;
-                })
+                .setDuration(280L)
+                .withEndAction(this::destroyLoadingScreenImmediate)
                 .start();
     }
 

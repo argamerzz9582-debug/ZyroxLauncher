@@ -1,53 +1,54 @@
 package git.artdeell.mojo.tasks;
 
-import static git.artdeell.mojo.MojoApplication.sExecutorService;
+import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import git.artdeell.mojo.JVersionList;
 import git.artdeell.mojo.Tools;
-import git.artdeell.mojo.prefs.LauncherPreferences;
-import git.artdeell.mojo.utils.DownloadUtils;
+import git.artdeell.mojo.metadata.LocalMetadataCache;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
 
-import java.io.IOException;
-
-/** Class getting the version list, and that's all really */
+/**
+ * Adapter bridging legacy launcher startup callers to {@link VersionMetadataRepository}.
+ * Immediately delivers locally cached Minecraft versions and refreshes in the background against
+ * Mojang's official {@code version_manifest_v2.json} with ETag conditional caching and offline fallback.
+ */
 public class AsyncVersionList {
-    private static final int MAX_RETRIES = 5;
-
-    private static JVersionList parseList(String input) throws DownloadUtils.ParseException{
-        try {
-            return Tools.GLOBAL_GSON.fromJson(input, JVersionList.class);
-        }catch (Exception e) {
-            throw new DownloadUtils.ParseException(e);
-        }
-    }
-
-    private void getVersionListAsync(VersionDoneListener versionDoneListener, int retries) {
-        try {
-            JVersionList versionList = DownloadUtils.downloadStringCached(
-                    LauncherPreferences.PREF_VERSION_REPOS,
-                    "version_list",
-                    AsyncVersionList::parseList
-            );
-            if(versionDoneListener != null) versionDoneListener.onVersionDone(versionList);
-        }catch (IOException | DownloadUtils.ParseException e) {
-            if(retries < MAX_RETRIES) {
-                getVersionListAsync(versionDoneListener, retries + 1);
-            } else {
-                versionDoneListener.onVersionDone(null);
-                Tools.showErrorRemote(e);
-            }
-        }
-    }
+    private static final String TAG = "AsyncVersionList";
 
     public void getVersionList(@Nullable VersionDoneListener listener) {
-        sExecutorService.execute(() -> getVersionListAsync(listener, 0));
+        VersionMetadataRepository.getInstance().syncMinecraftVersionsOnStartup(
+                new VersionMetadataRepository.CatalogCallback() {
+                    @Override
+                    public void onCatalogAvailable(@NonNull JVersionList catalog,
+                                                   @NonNull LocalMetadataCache.SyncSource source,
+                                                   boolean changed) {
+                        if (listener != null) {
+                            listener.onVersionDone(catalog);
+                        }
+                    }
+
+                    @Override
+                    public void onSyncError(@NonNull Exception error, boolean hasCachedCatalog) {
+                        if (hasCachedCatalog) {
+                            // Offline or transient network issue with valid cached versions — keep working silently.
+                            Log.w(TAG, "Background version manifest sync failed; retaining cached catalog", error);
+                            return;
+                        }
+                        Log.e(TAG, "Initial version manifest sync failed with no cached catalog", error);
+                        if (listener != null) {
+                            listener.onVersionDone(null);
+                        }
+                        Tools.showErrorRemote(error);
+                    }
+                }
+        );
     }
 
     /** Basic listener, acting as a callback */
-    public interface VersionDoneListener{
+    public interface VersionDoneListener {
         void onVersionDone(JVersionList versions);
     }
-
 }

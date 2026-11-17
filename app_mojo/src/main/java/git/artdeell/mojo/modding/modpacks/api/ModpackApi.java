@@ -56,7 +56,8 @@ public interface ModpackApi {
         MojoApplication.sExecutorService.execute(() -> {
             try {
                 installModpack(modDetail, selectedVersion);
-            }catch (IOException e) {
+            } catch (IOException e) {
+                ProgressLayout.clearProgress(ProgressLayout.INSTALL_MODPACK);
                 Tools.showErrorRemote(context, R.string.modpack_install_download_failed, e);
             }
         });

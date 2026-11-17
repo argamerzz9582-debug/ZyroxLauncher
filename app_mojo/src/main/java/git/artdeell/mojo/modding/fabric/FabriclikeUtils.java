@@ -1,126 +1,140 @@
 package git.artdeell.mojo.modding.fabric;
 
-import com.google.gson.JsonSyntaxException;
-
-import git.artdeell.mojo.Tools;
-import git.artdeell.mojo.utils.DownloadUtils;
-import git.artdeell.mojo.utils.FileUtils;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 
+import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.metadata.FabricMetadataProvider;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
+import git.artdeell.mojo.utils.DownloadUtils;
+import git.artdeell.mojo.utils.FileUtils;
+
+/**
+ * Adapter connecting existing Fabric, Quilt, and Legacy Fabric installer flows to
+ * {@link VersionMetadataRepository}'s {@link FabricMetadataProvider} and
+ * {@link git.artdeell.mojo.metadata.QuiltMetadataProvider}.
+ */
 public class FabriclikeUtils {
+    private enum Kind {
+        FABRIC,
+        QUILT,
+        LEGACY_FABRIC
+    }
 
-    public static final FabriclikeUtils FABRIC_UTILS = new FabriclikeUtils("https://meta.fabricmc.net/v2", "fabric", "Fabric", "fabric");
-    public static final FabriclikeUtils QUILT_UTILS = new FabriclikeUtils("https://meta.quiltmc.org/v3", "quilt", "Quilt", "quilt");
-    public static final FabriclikeUtils LEGACY_FABRIC_UTILS = new FabriclikeUtils("https://meta.legacyfabric.net/v2", "legacy_fabric", "Legacy Fabric", "fabric");
-    private static final String LOADER_METADATA_URL = "%s/versions/loader/%s";
-    private static final String GAME_METADATA_URL = "%s/versions/game";
+    public static final FabriclikeUtils FABRIC_UTILS =
+            new FabriclikeUtils(Kind.FABRIC, "Fabric", "fabric");
+    public static final FabriclikeUtils QUILT_UTILS =
+            new FabriclikeUtils(Kind.QUILT, "Quilt", "quilt");
+    public static final FabriclikeUtils LEGACY_FABRIC_UTILS =
+            new FabriclikeUtils(Kind.LEGACY_FABRIC, "Legacy Fabric", "fabric");
 
-    private static final String JSON_DOWNLOAD_URL = "%s/versions/loader/%s/%s/profile/json";
-
-    private final String mApiUrl;
-    private final String mCachePrefix;
+    private final Kind mKind;
     private final String mName;
     private final String mIconName;
 
-    private FabriclikeUtils(String mApiUrl, String cachePrefix, String mName, String iconName) {
-        this.mApiUrl = mApiUrl;
-        this.mCachePrefix = cachePrefix;
+    private FabriclikeUtils(@NonNull Kind kind, @NonNull String name, @NonNull String iconName) {
+        this.mKind = kind;
+        this.mName = name;
         this.mIconName = iconName;
-        this.mName = mName;
     }
 
-    public FabricVersion[] downloadGameVersions() throws IOException{
-        try {
-            return DownloadUtils.downloadStringCached(String.format(GAME_METADATA_URL, mApiUrl), mCachePrefix+"_game_versions",
-                    FabriclikeUtils::deserializeRawVersions
-            );
-        }catch (DownloadUtils.ParseException ignored) {}
-        return null;
-    }
-
-    public FabricVersion[] downloadLoaderVersions(String gameVersion) throws IOException{
-        try {
-            String urlEncodedGameVersion = URLEncoder.encode(gameVersion, "UTF-8");
-            return DownloadUtils.downloadStringCached(String.format(LOADER_METADATA_URL, mApiUrl, urlEncodedGameVersion),
-                    mCachePrefix+"_loader_versions."+urlEncodedGameVersion,
-                    (input)->{ try {
-                        return deserializeLoaderVersions(input);
-                    }catch (JSONException e) {
-                        throw new DownloadUtils.ParseException(e);
-                    }});
-
-        }catch (DownloadUtils.ParseException e) {
-            e.printStackTrace();
+    @NonNull
+    public FabricMetadataProvider getProvider() {
+        VersionMetadataRepository repo = VersionMetadataRepository.getInstance();
+        switch (mKind) {
+            case QUILT:
+                return repo.getQuiltProvider();
+            case LEGACY_FABRIC:
+                return repo.getLegacyFabricProvider();
+            case FABRIC:
+            default:
+                return repo.getFabricProvider();
         }
-        return null;
+    }
+
+    @Nullable
+    public FabricVersion[] downloadGameVersions() throws IOException {
+        return downloadGameVersions(false);
+    }
+
+    @Nullable
+    public FabricVersion[] downloadGameVersions(boolean forceRefresh) throws IOException {
+        try {
+            return getProvider().getGameVersions(forceRefresh);
+        } catch (DownloadUtils.ParseException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public FabricVersion[] downloadLoaderVersions(String gameVersion) throws IOException {
+        return downloadLoaderVersions(gameVersion, false);
+    }
+
+    @Nullable
+    public FabricVersion[] downloadLoaderVersions(String gameVersion, boolean forceRefresh) throws IOException {
+        if (gameVersion == null || gameVersion.trim().isEmpty()) return null;
+        try {
+            return getProvider().getLoaderVersions(gameVersion, forceRefresh);
+        } catch (DownloadUtils.ParseException | IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public FabricVersion getRecommendedLoaderVersion(String gameVersion) throws IOException {
+        if (gameVersion == null || gameVersion.trim().isEmpty()) return null;
+        try {
+            return getProvider().getRecommendedLoaderVersion(gameVersion);
+        } catch (DownloadUtils.ParseException | IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     public String createJsonDownloadUrl(String gameVersion, String loaderVersion) {
-        try {
-            gameVersion = URLEncoder.encode(gameVersion, "UTF-8");
-            loaderVersion = URLEncoder.encode(loaderVersion, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-        return String.format(JSON_DOWNLOAD_URL, mApiUrl, gameVersion, loaderVersion);
+        return getProvider().buildProfileJsonUrl(gameVersion, loaderVersion);
     }
 
     public String getName() {
         return mName;
     }
+
     public String getIconName() {
         return mIconName;
     }
 
+    /**
+     * Verifies {@code (gameVersion, loaderVersion)} compatibility against official loader metadata,
+     * downloads and validates the resulting profile JSON, and installs it under
+     * {@code versions/<versionId>/<versionId>.json}.
+     */
+    @Nullable
     public String install(String gameVersion, String loaderVersion) throws IOException {
-        String fabricJson = DownloadUtils.downloadString(createJsonDownloadUrl(gameVersion, loaderVersion));
-        String versionId;
-        try {
-            JSONObject fabricJsonObject = new JSONObject(fabricJson);
-            versionId = fabricJsonObject.getString("id");
-        }catch (JSONException e) {
-            e.printStackTrace();
-            return null;
+        if (gameVersion == null || gameVersion.trim().isEmpty()
+                || loaderVersion == null || loaderVersion.trim().isEmpty()) {
+            throw new IOException("Missing " + mName + " game or loader version");
         }
-        File versionJsonDir = new File(Tools.DIR_HOME_VERSION, versionId);
-        File versionJsonFile = new File(versionJsonDir, versionId+".json");
-        FileUtils.ensureDirectory(versionJsonDir);
-        Tools.write(versionJsonFile, fabricJson);
-        return versionId;
-    }
-
-    private static FabricVersion[] deserializeLoaderVersions(String input) throws JSONException {
-        JSONArray jsonArray = new JSONArray(input);
-        FabricVersion[] fabricVersions = new FabricVersion[jsonArray.length()];
-        for(int i = 0; i < jsonArray.length(); i++) {
-            JSONObject jsonObject = jsonArray.getJSONObject(i).getJSONObject("loader");
-            FabricVersion fabricVersion = new FabricVersion();
-            fabricVersion.version = jsonObject.getString("version");
-            //Quilt has a skill issue and does not say which versions are stable or not
-            if(jsonObject.has("stable")) {
-                fabricVersion.stable = jsonObject.getBoolean("stable");
-            } else {
-                fabricVersion.stable = !fabricVersion.version.contains("beta");
+        FabricMetadataProvider provider = getProvider();
+        // Verify compatibility via official loader catalog (with one refresh for brand-new builds)
+        FabricVersion[] compatible = downloadLoaderVersions(gameVersion, false);
+        if (!FabricMetadataProvider.containsVersion(compatible, loaderVersion.trim())) {
+            compatible = downloadLoaderVersions(gameVersion, true);
+            if (compatible != null && !FabricMetadataProvider.containsVersion(compatible, loaderVersion.trim())) {
+                throw new IOException(mName + " loader " + loaderVersion
+                        + " is not compatible with Minecraft " + gameVersion);
             }
-            fabricVersions[i] = fabricVersion;
         }
-        return fabricVersions;
-    }
 
-    private static FabricVersion[] deserializeRawVersions(String jsonArrayIn) throws DownloadUtils.ParseException {
-        try {
-            return Tools.GLOBAL_GSON.fromJson(jsonArrayIn, FabricVersion[].class);
-        }catch (JsonSyntaxException e) {
-            e.printStackTrace();
-            throw new DownloadUtils.ParseException(null);
-        }
+        FabricMetadataProvider.ValidatedProfile profile =
+                provider.fetchValidatedProfile(gameVersion, loaderVersion);
+        File versionJsonDir = FileUtils.resolveInsideDirectory(
+                new File(Tools.DIR_HOME_VERSION), profile.versionId);
+        File versionJsonFile = new File(versionJsonDir, profile.versionId + ".json");
+        FileUtils.ensureDirectory(versionJsonDir);
+        Tools.write(versionJsonFile, profile.rawJson);
+        return profile.versionId;
     }
 }

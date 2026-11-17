@@ -9,6 +9,7 @@ import com.kdt.mcgui.ProgressLayout;
 
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.Instances;
+import git.artdeell.mojo.metadata.MojangVersionProvider;
 import git.artdeell.mojo.multirt.MultiRTUtils;
 import git.artdeell.mojo.multirt.Runtime;
 import git.artdeell.mojo.progresskeeper.DownloaderProgressWrapper;
@@ -150,9 +151,8 @@ public class NewJREUtil {
 
     public static void installNewJreIfNeeded(AssetManager assetManager, JVersionList.Version versionInfo) throws IOException, RuntimeSelectionException {
         //Now we have the reliable information to check if our runtime settings are good enough
-        if (versionInfo.javaVersion == null || "jre-legacy".equalsIgnoreCase(versionInfo.javaVersion.component)) return;
-
-        int gameRequiredVersion = versionInfo.javaVersion.majorVersion;
+        int gameRequiredVersion = MojangVersionProvider.resolveRequiredJavaVersion(versionInfo);
+        if (gameRequiredVersion <= 8) return;
 
         Instance instance = Instances.loadSelectedInstance();
         String profileRuntime = Tools.getSelectedRuntime(instance);
