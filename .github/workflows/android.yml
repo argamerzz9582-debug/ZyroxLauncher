@@ -201,14 +201,46 @@ jobs:
         run: mkdir -p out
 
       - name: Run Automated Metadata, Loader & Cache Unit Tests
-        run: gradle :app_mojo:testFullReleaseUnitTest --info
+        run: |
+          set -o pipefail
+          if ! gradle :app_mojo:testFullReleaseUnitTest --stacktrace 2>&1 | tee /tmp/gradle-test.log; then
+            python3 - <<'PY'
+          lines = open("/tmp/gradle-test.log", errors="ignore").read().splitlines()
+          err = [l for l in lines if ("error:" in l or "FAILED" in l or "Exception" in l or "Caused by:" in l or "AssertionError" in l or "at git.artdeell" in l)]
+          snippet = " || ".join((err[-25:] if err else lines[-25:]))[:3500]
+          print(f"::error title=UnitTestFailure::{snippet}")
+          PY
+            exit 1
+          fi
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          total = failed = errors = 0
+          suites = []
+          for xf in sorted(glob.glob("app_mojo/build/test-results/testFullReleaseUnitTest/TEST-*.xml")):
+              r = ET.parse(xf).getroot()
+              t = int(r.get("tests", 0)); f = int(r.get("failures", 0)); e = int(r.get("errors", 0))
+              total += t; failed += f; errors += e
+              suites.append(f"{r.get('name').split('.')[-1]}({t})")
+          print(f"::notice title=UnitTestsPassed::{total} tests passed, {failed} failures, {errors} errors across {', '.join(suites)}")
+          PY
 
       - name: Run Android Lint Static Verification
-        run: gradle :app_mojo:lintFullRelease
+        run: |
+          set -o pipefail
+          if ! gradle :app_mojo:lintFullRelease 2>&1 | tee /tmp/gradle-lint.log; then
+            TAIL="$(tail -n 25 /tmp/gradle-lint.log | tr '\n' ' ' | cut -c1-3000)"
+            echo "::error title=LintFailure::$TAIL"
+            exit 1
+          fi
 
       - name: Build Signed Release APK (Zyrox Launcher.apk)
         run: |
-          gradle :app_mojo:assembleFullRelease
+          set -o pipefail
+          if ! gradle :app_mojo:assembleFullRelease 2>&1 | tee /tmp/gradle-apk.log; then
+            TAIL="$(grep -E 'error:|FAILED|Exception|Caused by:' /tmp/gradle-apk.log | tail -n 25 | tr '\n' ' ' | cut -c1-3000)"
+            echo "::error title=ApkBuildFailure::${TAIL:-$(tail -n 20 /tmp/gradle-apk.log | tr '\n' ' ')}"
+            exit 1
+          fi
           cp app_mojo/build/outputs/apk/full/release/app_mojo-full-release.apk out/Zyrox.Launcher.apk
 
       - name: Build Play Store Release Bundle (.aab)
