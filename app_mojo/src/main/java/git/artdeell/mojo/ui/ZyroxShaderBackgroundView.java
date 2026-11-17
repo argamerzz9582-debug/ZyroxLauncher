@@ -265,7 +265,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
                 mCachedW = w;
                 mCachedH = h;
                 mSunGradient = new RadialGradient(
-                        w * 0.68f, h * 0.34f,
+                        w * 0.34f, h * 0.34f,
                         Math.max(w, h) * 0.55f,
                         new int[]{0x2EFF9E44, 0x12F97316, 0x00000000},
                         new float[]{0f, 0.48f, 1f},

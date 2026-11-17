@@ -130,14 +130,18 @@ public class mcVersionSpinner extends ExtendedTextView {
             @Override
             public void onClick(View v) {
                 if(mPopupWindow == null) getPopupWindow();
-                int popupWidth = Math.max(getWidth(), Math.round(250f * density));
+                View anchor = (getParent() instanceof View && ((View) getParent()).getWidth() > 0)
+                        ? (View) getParent()
+                        : mcVersionSpinner.this;
+                int popupWidth = Math.max(anchor.getWidth(), Math.round(244f * density));
                 mPopupWindow.setWidth(popupWidth);
 
                 if(mPopupWindow.isShowing()){
                     mPopupWindow.dismiss();
                     return;
                 }
-                mPopupWindow.showAsDropDown(mcVersionSpinner.this, 0, offset);
+                int xOffset = anchor.getWidth() > 0 ? (anchor.getWidth() - popupWidth) : 0;
+                mPopupWindow.showAsDropDown(anchor, xOffset, offset);
                 // Post() is required for the layout inflation phase
                 post(() -> mListView.setSelection(mSelectedIndex));
             }
@@ -173,7 +177,7 @@ public class mcVersionSpinner extends ExtendedTextView {
         int defaultPopupHeight = Math.round(210f * getContext().getResources().getDisplayMetrics().density);
         mPopupWindow = new PopupWindow(mListView, defaultPopupWidth, defaultPopupHeight);
         mPopupWindow.setElevation(12);
-        mPopupWindow.setClippingEnabled(false);
+        mPopupWindow.setClippingEnabled(true);
 
         // Block clicking outside of the popup window
         mPopupWindow.setOutsideTouchable(true);

@@ -142,26 +142,26 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Persistent Frosted Glass Account Selector Card docked in Home Hub Left Sidebar
+    <!-- Persistent Frosted Glass Account Selector Card docked in Home Hub RIGHT Control Panel
          (stays mounted in Activity so auth ExtraListeners remain active across fragments) -->
     <LinearLayout
         android:id="@+id/zyrox_account_dock_card"
-        android:layout_width="246dp"
+        android:layout_width="244dp"
         android:layout_height="44dp"
-        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
         android:layout_marginTop="10dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:elevation="6dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintEnd_toEndOf="parent">
 
         <com.kdt.mcgui.AccountSpinner
             android:id="@+id/account_spinner"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:dropDownWidth="246dp"
+            android:dropDownWidth="244dp"
             android:dropDownVerticalOffset="46dp" />
 
         <ImageButton

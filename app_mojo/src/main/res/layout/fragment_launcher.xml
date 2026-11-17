@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Home Hub (Main Dashboard) — Horizontal Left-Docked Command Center -->
+<!-- Zyrox Home Hub (Main Dashboard) — Horizontal Right-Docked Control Panel -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -9,19 +9,19 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent">
 
-    <!-- 1. LEFT SIDEBAR DOCK (270dp fixed width, full height, frosted obsidian + 2dp right amber border) -->
+    <!-- 1. RIGHT CONTROL PANEL DOCK (270dp fixed width, full height, frosted obsidian + 2dp left amber border) -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/zyrox_left_dock"
         android:layout_width="270dp"
         android:layout_height="0dp"
-        android:background="@drawable/bg_zyrox_left_dock"
-        android:paddingStart="12dp"
-        android:paddingEnd="14dp"
+        android:background="@drawable/bg_zyrox_right_dock"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
         android:paddingTop="10dp"
         android:paddingBottom="8dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintEnd_toEndOf="parent">
 
         <!-- Reserved slot for persistent Activity AccountSpinner Card (44dp) -->
         <Space
@@ -107,7 +107,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Scrollable Vertical Pixel-Font Navigation Stack -->
+        <!-- Scrollable Vertical Pixel-Font Control Stack -->
         <ScrollView
             android:id="@+id/zyrox_nav_scroll"
             android:layout_width="0dp"
@@ -248,8 +248,8 @@
             android:id="@+id/tv_zyrox_watermark"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:gravity="start|center_vertical"
-            android:paddingStart="6dp"
+            android:gravity="end|center_vertical"
+            android:paddingEnd="4dp"
             android:text="@string/zyrox_engine_watermark"
             android:textColor="@color/zyrox_text_muted"
             android:textSize="8.5sp"
@@ -262,7 +262,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 2. CENTER HERO BRAND ZONE (top-aligned, leaving center-bottom open for animated shader scene) -->
+    <!-- 2. CENTER HERO BRAND ZONE (centered across open shader viewport to the left of the right dock) -->
     <LinearLayout
         android:id="@+id/zyrox_hero_brand"
         android:layout_width="wrap_content"
@@ -271,8 +271,8 @@
         android:orientation="vertical"
         android:gravity="center_horizontal"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toEndOf="@id/zyrox_left_dock"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/zyrox_left_dock">
 
         <TextView
             android:id="@+id/tv_zyrox_hero_title"
@@ -313,18 +313,18 @@
             android:background="@color/zyrox_glass_border_strong" />
     </LinearLayout>
 
-    <!-- 3. BOTTOM-RIGHT UPDATES / CHANGELOG GLASS CARD (240dp) -->
+    <!-- 3. BOTTOM-LEFT UPDATES / CHANGELOG GLASS CARD (244dp, clear of the right control panel) -->
     <LinearLayout
         android:id="@+id/zyrox_updates_card"
         android:layout_width="244dp"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
         android:layout_marginBottom="14dp"
         android:orientation="vertical"
         android:background="@drawable/bg_zyrox_glass_card_soft"
         android:padding="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintStart_toStartOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
