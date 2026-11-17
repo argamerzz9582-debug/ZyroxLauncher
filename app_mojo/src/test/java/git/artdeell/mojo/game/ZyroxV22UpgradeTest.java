@@ -72,9 +72,14 @@ public class ZyroxV22UpgradeTest {
 
         GameLaunchProgressTracker.ProgressSnapshot s7 = tracker.onLogOutput(
                 "[Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas\n",
-                t0 + 19_000L);
-        assertTrue("Atlas upload must reach near-completion", s7.percent >= 88);
-        assertFalse("ETA formatter produces human-readable label", s7.etaText.isEmpty());
+                t0 + 18_000L);
+        assertTrue("Block atlas upload must reach 85%+", s7.percent >= 85);
+
+        GameLaunchProgressTracker.ProgressSnapshot s8 = tracker.onLogOutput(
+                "[Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/gui.png-atlas\n",
+                t0 + 19_500L);
+        assertTrue("GUI atlas upload must reach 94%+", s8.percent >= 94);
+        assertFalse("ETA formatter produces human-readable label", s8.etaText.isEmpty());
         assertEquals("~12s left", GameLaunchProgressTracker.formatEta(65, 12));
         assertEquals("Almost ready…", GameLaunchProgressTracker.formatEta(97, 2));
 
