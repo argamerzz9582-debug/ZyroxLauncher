@@ -174,7 +174,12 @@ public class DownloadUtils {
     }
 
     private static boolean verifyFile(File file, String sha1) {
-        return file.exists() && file.isFile() && HashUtils.compareSHA1(file, sha1);
+        if (!file.exists() || !file.isFile()) return false;
+        try {
+            return HashUtils.compareSHA1(file, sha1);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public static void ensureSha1(File outputFile, @Nullable String sha1, DownloadFunction downloadFunction)
