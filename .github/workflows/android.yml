@@ -73,9 +73,9 @@ jobs:
           # 3. Workflow self-audit: never cache keystores/passwords or generate random release keys
           wf = open(".github/workflows/android.yml").read()
           for bad_wf, desc in (
-              (".zyrox-signing", "cached keystore directory"),
-              ("zyrox-release.pass", "cached plaintext keystore password"),
-              ("-genkeypair", "ephemeral CI keystore generation"),
+              (".zyrox" + "-signing", "cached keystore directory"),
+              ("zyrox-release" + ".pass", "cached plaintext keystore password"),
+              ("-gen" + "keypair", "ephemeral CI keystore generation"),
           ):
               if bad_wf in wf:
                   failures.append(f"Workflow supply-chain violation ({desc}): {bad_wf}")
