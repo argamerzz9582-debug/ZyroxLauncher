@@ -10,7 +10,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import git.artdeell.mojo.ui.ZyroxGifDecoder;
 import git.artdeell.mojo.utils.ArchiveSecurity;
 
 /**
@@ -162,6 +166,114 @@ public class MojangSplashAndLoadingScreenTest {
             assertFalse(rel + " must not contain 'stuck here' warning text",
                     xml.toLowerCase().contains("stuck here"));
         }
+    }
+
+    @Test
+    public void decodesHomeAndLoadingGifsIntoSeamlessZeroBufferLoops() throws Exception {
+        // 1. Verify Home screen cherry-blossom gazebo GIF (800x450, 44 frames @ 50ms)
+        verifySeamlessGifAsset("src/main/res/raw/zyrox_home_scene.gif", 800, 450, 44, 50);
+
+        // 2. Verify Loading screen cherry-blossom pond GIF (640x360, 38 frames @ 40ms)
+        verifySeamlessGifAsset("src/main/res/raw/zyrox_loading_scene.gif", 640, 360, 38, 40);
+    }
+
+    private static void verifySeamlessGifAsset(String relPath,
+                                               int expectedW,
+                                               int expectedH,
+                                               int expectedFrames,
+                                               int expectedDelayMs) throws Exception {
+        File gifFile = resolveModuleFile(relPath);
+        assertTrue(relPath + " must exist", gifFile.isFile());
+        byte[] gifBytes;
+        try (FileInputStream in = new FileInputStream(gifFile)) {
+            gifBytes = ArchiveSecurity.readBytesBounded(in, 8 * 1024 * 1024);
+        }
+
+        ZyroxGifDecoder.GifMetadata meta = ZyroxGifDecoder.inspectMetadata(gifBytes);
+        assertTrue("Metadata must parse for " + relPath, meta != null);
+        assertEquals(expectedW, meta.width);
+        assertEquals(expectedH, meta.height);
+        assertEquals(expectedFrames, meta.frameCount);
+        assertEquals(expectedDelayMs, meta.medianDelayMs);
+
+        // Decode raw (unblended) at 2x downsample to confirm baseline hard-cut discontinuity
+        ZyroxGifDecoder.SeamlessSequence<short[]> rawSeq = ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, 2, false, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
+        assertTrue(rawSeq != null);
+        assertEquals(expectedFrames, rawSeq.frames.size());
+        double rawWrap = meanRgbDiff565(rawSeq.frames.get(rawSeq.frames.size() - 1), rawSeq.frames.get(0));
+
+        // Decode C¹-continuous seamless loop at full 1x native resolution & verify preview parity
+        AtomicInteger previewCount = new AtomicInteger();
+        final short[][] previewHolder = new short[1][];
+        ZyroxGifDecoder.SeamlessSequence<short[]> seamless = ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, 1, true, null,
+                (w, h, px) -> Arrays.copyOf(px, px.length),
+                (preview, w, h) -> {
+                    previewCount.incrementAndGet();
+                    previewHolder[0] = preview;
+                });
+        assertTrue("Seamless sequence must decode cleanly for " + relPath, seamless != null);
+        assertEquals(expectedW, seamless.width);
+        assertEquals(expectedH, seamless.height);
+        assertEquals(expectedDelayMs * 1_000_000L, seamless.frameDurationNs);
+        assertEquals("Preview callback fires exactly once", 1, previewCount.get());
+        assertTrue("Preview frame matches seamless frame 0 identically (zero startup snap)",
+                Arrays.equals(previewHolder[0], seamless.frames.get(0)));
+
+        List<short[]> frames = seamless.frames;
+        int m = frames.size();
+        assertTrue("Seamless loop retains healthy frame count", m >= 20 && m < expectedFrames);
+
+        // Every frame must contain real illuminated scene pixels (never blank/corrupt LZW output)
+        for (int i = 0; i < m; i++) {
+            short[] f = frames.get(i);
+            assertEquals(expectedW * expectedH, f.length);
+            long lumaSum = 0L;
+            int samples = 0;
+            for (int p = 0; p < f.length; p += 97) {
+                int argb = ZyroxGifDecoder.unpackRgb565(f[p]);
+                int r = (argb >>> 16) & 0xFF;
+                int g = (argb >>> 8) & 0xFF;
+                int b = argb & 0xFF;
+                lumaSum += (r * 77 + g * 150 + b * 29) >> 8;
+                samples++;
+            }
+            long avgLuma = lumaSum / samples;
+            assertTrue(relPath + " frame " + i + " must be bright & valid (luma=" + avgLuma + ")",
+                    avgLuma >= 45 && avgLuma <= 230);
+        }
+
+        // Verify seamless wrap (frame[M-1] -> frame[0]) eliminates the 3.5-4.0x hard cut!
+        double stepSum = 0.0;
+        for (int i = 0; i < m - 1; i++) {
+            stepSum += meanRgbDiff565(frames.get(i), frames.get(i + 1));
+        }
+        double avgStep = stepSum / (m - 1);
+        double seamlessWrap = meanRgbDiff565(frames.get(m - 1), frames.get(0));
+        assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must beat raw cut (" + rawWrap + ") by >2x",
+                seamlessWrap < rawWrap * 0.50);
+        assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must match normal step (" + avgStep + ")",
+                seamlessWrap <= avgStep * 1.35);
+
+        // Verify pre-cancelled flag aborts cleanly with zero work
+        AtomicBoolean cancelled = new AtomicBoolean(true);
+        assertTrue(ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, 1, true, cancelled, (w, h, px) -> px, null) == null);
+    }
+
+    private static double meanRgbDiff565(short[] a, short[] b) {
+        long diff = 0L;
+        int samples = 0;
+        for (int i = 0; i < a.length; i += 13) {
+            int ca = ZyroxGifDecoder.unpackRgb565(a[i]);
+            int cb = ZyroxGifDecoder.unpackRgb565(b[i]);
+            diff += Math.abs(((ca >>> 16) & 0xFF) - ((cb >>> 16) & 0xFF));
+            diff += Math.abs(((ca >>> 8) & 0xFF) - ((cb >>> 8) & 0xFF));
+            diff += Math.abs((ca & 0xFF) - (cb & 0xFF));
+            samples += 3;
+        }
+        return (double) diff / (double) samples;
     }
 
     private static File resolveModuleFile(String rel) {

@@ -449,6 +449,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected void onStop() {
+        if (mShaderBackground != null) {
+            mShaderBackground.onStop();
+        }
         android.hardware.display.DisplayManager dm =
                 (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null) {
@@ -460,6 +463,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected void onDestroy() {
+        if (mShaderBackground != null) {
+            mShaderBackground.onDestroy();
+        }
         super.onDestroy();
         mProgressLayout.cleanUpObservers();
         ProgressKeeper.removeTaskCountListener(mProgressLayout);
