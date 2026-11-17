@@ -280,11 +280,12 @@ jobs:
               cert_sha256 = ""
               cert_key = ""
               for line in s_out.splitlines():
-                  if "Signer #1 certificate DN:" in line:
+                  low = line.lower()
+                  if "certificate dn:" in low and not cert_dn:
                       cert_dn = line.split(":", 1)[1].strip()
-                  elif "Signer #1 certificate SHA-256 digest:" in line:
+                  elif "certificate sha-256 digest:" in low and not cert_sha256:
                       cert_sha256 = line.split(":", 1)[1].strip()
-                  elif "Signer #1 key algorithm:" in line or "Signer #1 certificate key:" in line:
+                  elif ("key algorithm:" in low or "certificate key:" in low) and not cert_key:
                       cert_key = line.strip()
 
               # 3. Verify compiled manifest badging: package ID, targetSdk 36, non-debuggable, non-testOnly
