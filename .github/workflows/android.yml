@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+      ZYROX_SECRET_KS_PRESENT: ${{ secrets.ZYROX_KEYSTORE_BASE64 != '' && 'true' || 'false' }}
+      ZYROX_PLAY_SA_PRESENT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' && 'true' || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,7 +132,7 @@ jobs:
           java-version: '17'
 
       - name: Restore managed release signing store
-        if: ${{ secrets.ZYROX_KEYSTORE_BASE64 == '' }}
+        if: env.ZYROX_SECRET_KS_PRESENT != 'true'
         uses: actions/cache@v4
         with:
           path: ~/.zyrox-signing
@@ -342,7 +344,7 @@ jobs:
             out/SIGNING_CERTIFICATE_SHA256.txt
 
       - name: Upload to Google Play Console (Internal Track)
-        if: github.ref_name == 'v3_openjdk' && secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != ''
+        if: github.ref_name == 'v3_openjdk' && env.ZYROX_PLAY_SA_PRESENT == 'true'
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
