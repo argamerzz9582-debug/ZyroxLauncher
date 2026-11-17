@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Blossom Capsule Filter Chip -->
+<!-- Zyrox Starlight Blossom Capsule Filter Chip -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#52FFE4F2" android:endColor="#38F4A2CA" />
-            <stroke android:width="1.2dp" android:color="#FAFFF7FB" />
+            <gradient android:angle="270" android:startColor="#52E5F0FE" android:endColor="#389ABFF4" />
+            <stroke android:width="1.2dp" android:color="#FAF7FAFF" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#4AFFE0F0" android:endColor="#30F298C3" />
-            <stroke android:width="1.15dp" android:color="#F4FFF5FA" />
+            <gradient android:angle="270" android:startColor="#4AE1EEFE" android:endColor="#3090B9F2" />
+            <stroke android:width="1.15dp" android:color="#F4F5F9FF" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#20FFF2F8" android:endColor="#12FAD4E8" />
-            <stroke android:width="0.9dp" android:color="#6CFCE8F3" />
+            <gradient android:angle="270" android:startColor="#20F2F8FF" android:endColor="#12D5E5F9" />
+            <stroke android:width="0.9dp" android:color="#6CE8F1FB" />
             <corners android:radius="999dp" />
         </shape>
     </item>

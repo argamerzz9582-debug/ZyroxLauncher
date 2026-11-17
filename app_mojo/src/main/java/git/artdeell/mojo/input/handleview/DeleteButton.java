@@ -37,7 +37,9 @@ public class DeleteButton extends Button implements ActionButtonInterface {
     @Override
     public void onClick() {
         if(mCurrentlySelectedButton == null) return;
-
+        if (mCurrentlySelectedButton.getControlLayoutParent() != null) {
+            mCurrentlySelectedButton.getControlLayoutParent().pushUndoSnapshot();
+        }
         mCurrentlySelectedButton.removeButton();
     }
 }

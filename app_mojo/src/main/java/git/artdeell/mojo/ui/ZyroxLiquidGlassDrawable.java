@@ -37,39 +37,39 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     /** Default legacy control background color treated as standard ultra-clear Liquid Glass. */
     public static final int LEGACY_DEFAULT_CONTROL_BG = 0x4D000000;
 
-    // Ultra-sheer Sakura Rose-Quartz optical Liquid Glass tokens (maximum visibility, crisp edges)
-    public static final int NORMAL_HALO_TOP = 0x24120919;
-    public static final int NORMAL_HALO_BOTTOM = 0x36100816;
-    public static final int PRESSED_HALO_TOP = 0x4CF9C8E2;
-    public static final int PRESSED_HALO_BOTTOM = 0x3CF29EC8;
+    // Ultra-sheer Starlight Sapphire-Crystal optical Liquid Glass tokens (~94% clear, crisp edges)
+    public static final int NORMAL_HALO_TOP = 0x2409101E;
+    public static final int NORMAL_HALO_BOTTOM = 0x36070C18;
+    public static final int PRESSED_HALO_TOP = 0x4CB8D8FF;
+    public static final int PRESSED_HALO_BOTTOM = 0x3C7CB0FF;
 
-    public static final int NORMAL_BODY_TOP = 0x1EFFF6FA;
-    public static final int NORMAL_BODY_MID = 0x09FCEBF4;
-    public static final int NORMAL_BODY_BOTTOM = 0x16FADAE9;
+    public static final int NORMAL_BODY_TOP = 0x1EF4F9FF;
+    public static final int NORMAL_BODY_MID = 0x09E8F2FF;
+    public static final int NORMAL_BODY_BOTTOM = 0x16D6E8FF;
 
-    public static final int PRESSED_BODY_TOP = 0x40FFE6F3;
-    public static final int PRESSED_BODY_MID = 0x24F5A8CE;
-    public static final int PRESSED_BODY_BOTTOM = 0x36F9C4E0;
+    public static final int PRESSED_BODY_TOP = 0x40E2F0FF;
+    public static final int PRESSED_BODY_MID = 0x2488B8FF;
+    public static final int PRESSED_BODY_BOTTOM = 0x36B4D4FF;
 
-    public static final int TOGGLED_BODY_TOP = 0x36FFDDF0;
-    public static final int TOGGLED_BODY_MID = 0x1CF49CC6;
-    public static final int TOGGLED_BODY_BOTTOM = 0x2CF8BBD9;
+    public static final int TOGGLED_BODY_TOP = 0x36D8ECFF;
+    public static final int TOGGLED_BODY_MID = 0x1C74AAFF;
+    public static final int TOGGLED_BODY_BOTTOM = 0x2CA4C8FF;
 
-    public static final int OUTER_RIM_TOP = 0xD8FFF8FC;
-    public static final int OUTER_RIM_MID = 0x42FCE6F2;
-    public static final int OUTER_RIM_BOTTOM = 0xA8FFECF6;
+    public static final int OUTER_RIM_TOP = 0xD8F6FAFF;
+    public static final int OUTER_RIM_MID = 0x42DCEBFF;
+    public static final int OUTER_RIM_BOTTOM = 0xA8E8F3FF;
 
     public static final int INNER_RIM_TOP = 0x3EFFFFFF;
-    public static final int INNER_RIM_BOTTOM = 0x28FCE2F0;
+    public static final int INNER_RIM_BOTTOM = 0x28D8EAFF;
 
     public static final int TOP_SPECULAR_BAR = 0x8CFFFFFF;
     public static final int TOP_SPECULAR_BAR_PRESSED = 0xD0FFFFFF;
-    public static final int BOTTOM_CAUSTIC_BAR = 0x4AFFE4F2;
-    public static final int BOTTOM_CAUSTIC_BAR_PRESSED = 0x80FFD8EC;
-    public static final int SIDE_MICRO_GLEAM = 0x3AFFF5FA;
-    public static final int GLYPH_SNOW_WHITE = 0xF2FFFAFD;
+    public static final int BOTTOM_CAUSTIC_BAR = 0x4ADCEBFF;
+    public static final int BOTTOM_CAUSTIC_BAR_PRESSED = 0x80FFE09E;
+    public static final int SIDE_MICRO_GLEAM = 0x3AF2F8FF;
+    public static final int GLYPH_SNOW_WHITE = 0xF2F8FBFF;
     public static final int GLYPH_PRESSED_WHITE = 0xFFFFFFFF;
-    public static final int GLYPH_SHADOW_COLOR = 0x8A120918;
+    public static final int GLYPH_SHADOW_COLOR = 0x8A070C18;
 
     private final float mDensity;
     private final boolean mHudSurfaceMode;

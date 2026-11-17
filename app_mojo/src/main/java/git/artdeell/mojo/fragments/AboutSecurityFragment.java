@@ -128,11 +128,17 @@ public class AboutSecurityFragment extends Fragment {
         LinearLayout actRow = new LinearLayout(ctx);
         actRow.setOrientation(LinearLayout.HORIZONTAL);
 
+        Button btnCheckUpd = ZyroxStudioUi.createPrimaryButton(ctx, "Check Updates");
+        btnCheckUpd.setOnClickListener(v ->
+                git.artdeell.mojo.updater.AppUpdateChecker.checkNowInteractive(requireContext()));
+        actRow.addView(btnCheckUpd, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), 0));
+
         Button btnCopySha = ZyroxStudioUi.createSecondaryButton(ctx, "Copy Cert SHA-256", true);
         btnCopySha.setOnClickListener(v -> copyText("zyrox_cert_sha256", report.certSha256Colon,
                 "Copied signing certificate SHA-256 to clipboard"));
         actRow.addView(btnCopySha, ZyroxStudioUi.spacedParam(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), 0));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
         Button btnReleases = ZyroxStudioUi.createSecondaryButton(ctx, "Official Releases", true);
         btnReleases.setOnClickListener(v -> Tools.openURL(requireActivity(), AppTrustVerifier.OFFICIAL_RELEASES_URL));
@@ -206,6 +212,12 @@ public class AboutSecurityFragment extends Fragment {
             renderGraphicsTab();
         });
         row.addView(btnHud, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
+
+        Button btnPkgStore = ZyroxStudioUi.createPrimaryButton(ctx, "JRE / Turnip");
+        btnPkgStore.setOnClickListener(v ->
+                git.artdeell.mojo.downloader.RuntimeDriverStoreDialog.showHub(requireContext(), this::renderGraphicsTab));
+        row.addView(btnPkgStore, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
         diagCard.addView(row, rLp);

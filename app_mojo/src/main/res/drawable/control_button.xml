@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Ultra-Clear Sakura Pearl In-Game Touch Control Drawable -->
+<!-- Zyrox Ultra-Clear Starlight Pearl In-Game Touch Control Drawable -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <layer-list>
@@ -7,10 +7,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#42FFE6F3"
-                        android:centerColor="#26F5A8CE"
-                        android:endColor="#36F9C4E0" />
-                    <stroke android:width="1.3dp" android:color="#F6FFF7FB" />
+                        android:startColor="#42E7F1FE"
+                        android:centerColor="#26A0C3F5"
+                        android:endColor="#36BBD5F9" />
+                    <stroke android:width="1.3dp" android:color="#F6F7FAFF" />
                     <corners android:radius="12dp" />
                 </shape>
             </item>
@@ -26,10 +26,10 @@
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#1EFFF5FA"
-                android:centerColor="#09FCE8F3"
-                android:endColor="#16FAD8EA" />
-            <stroke android:width="1.15dp" android:color="#D4FFF5FA" />
+                android:startColor="#1EF5F9FF"
+                android:centerColor="#09E8F1FB"
+                android:endColor="#16D9E7F9" />
+            <stroke android:width="1.15dp" android:color="#D4F5F9FF" />
             <corners android:radius="12dp" />
         </shape>
     </item>

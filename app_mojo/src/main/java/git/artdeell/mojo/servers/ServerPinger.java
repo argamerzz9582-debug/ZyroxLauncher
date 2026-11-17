@@ -33,6 +33,7 @@ public final class ServerPinger {
         public final boolean online;
         public final long latencyMs;
         @NonNull public final String motd;
+        @NonNull public final String formattedMotd;
         public final int onlinePlayers;
         public final int maxPlayers;
         @NonNull public final String versionName;
@@ -47,9 +48,23 @@ public final class ServerPinger {
                           @NonNull String versionName,
                           @Nullable String faviconBase64,
                           @Nullable String errorMessage) {
+            this(online, latencyMs, motd, motd, onlinePlayers, maxPlayers,
+                    versionName, faviconBase64, errorMessage);
+        }
+
+        public PingResult(boolean online,
+                          long latencyMs,
+                          @NonNull String motd,
+                          @NonNull String formattedMotd,
+                          int onlinePlayers,
+                          int maxPlayers,
+                          @NonNull String versionName,
+                          @Nullable String faviconBase64,
+                          @Nullable String errorMessage) {
             this.online = online;
             this.latencyMs = latencyMs;
             this.motd = motd;
+            this.formattedMotd = formattedMotd;
             this.onlinePlayers = onlinePlayers;
             this.maxPlayers = maxPlayers;
             this.versionName = versionName;
@@ -174,10 +189,12 @@ public final class ServerPinger {
                 if (p.has("max") && p.get("max").isJsonPrimitive()) max = p.get("max").getAsInt();
             }
             String motd = "";
+            String formattedMotd = "";
             if (root.has("description")) {
                 StringBuilder sb = new StringBuilder();
                 flattenChatComponent(root.get("description"), sb, 0);
-                motd = stripSectionCodes(sb.toString()).replaceAll("\\s+", " ").trim();
+                formattedMotd = sb.toString().replace("\r", "").replaceAll("[ \\t]+", " ").trim();
+                motd = stripSectionCodes(formattedMotd).replaceAll("\\s+", " ").trim();
             }
             String favicon = null;
             if (root.has("favicon") && root.get("favicon").isJsonPrimitive()) {
@@ -187,7 +204,7 @@ public final class ServerPinger {
                     favicon = rawIcon.substring(prefix.length()).replace("\n", "").trim();
                 }
             }
-            return new PingResult(true, latencyMs, motd, online, max, versionName, favicon, null);
+            return new PingResult(true, latencyMs, motd, formattedMotd, online, max, versionName, favicon, null);
         } catch (Exception e) {
             return offline("Malformed server status response");
         }
@@ -196,7 +213,7 @@ public final class ServerPinger {
     private static void flattenChatComponent(@Nullable JsonElement el,
                                              @NonNull StringBuilder out,
                                              int depth) {
-        if (el == null || el.isJsonNull() || depth > 12 || out.length() > 512) return;
+        if (el == null || el.isJsonNull() || depth > 12 || out.length() > 640) return;
         if (el.isJsonPrimitive()) {
             out.append(el.getAsString());
             return;
@@ -210,12 +227,42 @@ public final class ServerPinger {
         }
         if (el.isJsonObject()) {
             JsonObject obj = el.getAsJsonObject();
+            if (obj.has("color") && obj.get("color").isJsonPrimitive()) {
+                String code = mapNamedMcColor(obj.get("color").getAsString());
+                if (code != null) out.append(code);
+            }
+            if (obj.has("bold") && obj.get("bold").isJsonPrimitive() && obj.get("bold").getAsBoolean()) {
+                out.append("§l");
+            }
             if (obj.has("text") && obj.get("text").isJsonPrimitive()) {
                 out.append(obj.get("text").getAsString());
             }
             if (obj.has("extra") && obj.get("extra").isJsonArray()) {
                 flattenChatComponent(obj.get("extra"), out, depth + 1);
             }
+        }
+    }
+
+    @Nullable
+    private static String mapNamedMcColor(@NonNull String name) {
+        switch (name.toLowerCase(java.util.Locale.ROOT)) {
+            case "black": return "§0";
+            case "dark_blue": return "§1";
+            case "dark_green": return "§2";
+            case "dark_aqua": return "§3";
+            case "dark_red": return "§4";
+            case "dark_purple": return "§5";
+            case "gold": return "§6";
+            case "gray": return "§7";
+            case "dark_gray": return "§8";
+            case "blue": return "§9";
+            case "green": return "§a";
+            case "aqua": return "§b";
+            case "red": return "§c";
+            case "light_purple": return "§d";
+            case "yellow": return "§e";
+            case "white": return "§f";
+            default: return null;
         }
     }
 

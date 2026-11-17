@@ -111,7 +111,7 @@ JNIEXPORT void JNICALL Java_git_artdeell_mojo_Logger_appendToLog(JNIEnv *env, __
     (*env)->GetStringUTFRegion(env, text, 0, (*env)->GetStringLength(env, text), newChars);
     newChars[appendStringLength] = '\n';
     newChars[appendStringLength+1] = 0;
-    if(recordBuffer(newChars, appendStringLength+1) && logListener != NULL) {
+    if(recordBuffer(newChars, appendStringLength+1) && logListener != NULL && logger_onEventLogged != NULL) {
         (*env)->CallVoidMethod(env, logListener, logger_onEventLogged, text);
     }
 }

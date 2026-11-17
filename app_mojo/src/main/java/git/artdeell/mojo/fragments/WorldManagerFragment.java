@@ -74,6 +74,11 @@ public class WorldManagerFragment extends Fragment {
         mHeaderSummary = ZyroxStudioUi.createSubtitle(ctx, "Scanning instance saves...");
         bar.addView(mHeaderSummary, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        Button btnShots = ZyroxStudioUi.createPrimaryButton(ctx, "Screenshots");
+        btnShots.setOnClickListener(v -> Tools.swapFragment(
+                requireActivity(), ScreenshotGalleryFragment.class, ScreenshotGalleryFragment.TAG, null));
+        bar.addView(btnShots, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
+
         Button btnImport = ZyroxStudioUi.createSecondaryButton(ctx, "Import ZIP", true);
         btnImport.setOnClickListener(v -> mImportWorldLauncher.launch(new String[]{"application/zip", "application/octet-stream"}));
         bar.addView(btnImport, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));

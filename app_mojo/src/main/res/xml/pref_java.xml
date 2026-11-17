@@ -12,6 +12,15 @@
             android:summary="@string/multirt_subtitle"
             android:title="@string/multirt_title"/>
 
+        <androidx.preference.ListPreference
+            android:defaultValue="auto"
+            android:icon="@drawable/ic_px_zap"
+            android:key="zyroxOptimizerMode"
+            android:entries="@array/zyrox_optimizer_mode_names"
+            android:entryValues="@array/zyrox_optimizer_mode_values"
+            android:title="@string/zyrox_pref_optimizer_title"
+            android:summary="@string/zyrox_pref_optimizer_summary" />
+
         <androidx.preference.EditTextPreference
             android:dialogTitle="@string/mcl_setting_title_javaargs"
             android:icon="@drawable/ic_px_console"

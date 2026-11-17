@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Rose-Quartz Liquid Glass Primary CTA Button (Hero PLAY & Primary Actions) -->
+<!-- Zyrox Starlight Sapphire-Crystal Liquid Glass Primary CTA Button (Hero PLAY & Primary Actions) -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Disabled -->
@@ -7,21 +7,21 @@
         <layer-list>
             <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
                 <shape android:shape="rectangle">
-                    <solid android:color="#1AF2DCE8" />
-                    <stroke android:width="1dp" android:color="#4CFFF2F8" />
+                    <solid android:color="#1ADDE6F1" />
+                    <stroke android:width="1dp" android:color="#4CF2F8FF" />
                     <corners android:radius="15dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
 
-    <!-- Pressed: Radiant Cherry-Blossom Rose-Quartz Refraction Bloom -->
+    <!-- Pressed: Radiant Starlight Sapphire-Crystal Refraction Bloom -->
     <item android:state_pressed="true">
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#34F7B8D8" />
-                    <stroke android:width="1dp" android:color="#8EFBD4E8" />
+                    <solid android:color="#34B0CDF7" />
+                    <stroke android:width="1dp" android:color="#8ED5E5FA" />
                     <corners android:radius="16dp" />
                 </shape>
             </item>
@@ -29,17 +29,17 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#66FFE0F0"
-                        android:centerColor="#46F49AC4"
-                        android:endColor="#5AF8B8D8" />
-                    <stroke android:width="1.5dp" android:color="#FFFFFAFD" />
+                        android:startColor="#66E1EEFE"
+                        android:centerColor="#4692BBF4"
+                        android:endColor="#5AAFCEF8" />
+                    <stroke android:width="1.5dp" android:color="#FFFAFCFF" />
                     <corners android:radius="14.8dp" />
                 </shape>
             </item>
             <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.9dp" android:color="#78FFF2F8" />
+                    <stroke android:width="0.9dp" android:color="#78F2F8FF" />
                     <corners android:radius="12.5dp" />
                 </shape>
             </item>
@@ -51,7 +51,7 @@
             </item>
             <item android:left="24dp" android:bottom="4dp" android:right="24dp" android:height="1.6dp" android:gravity="bottom">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FAD4E8" android:centerColor="#98FFD6EC" android:endColor="#00FAD4E8" />
+                    <gradient android:angle="0" android:startColor="#00D5E5F9" android:centerColor="#98D7E8FE" android:endColor="#00D5E5F9" />
                     <corners android:radius="1.5dp" />
                 </shape>
             </item>
@@ -63,56 +63,56 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#2CF8C4DF" />
-                    <stroke android:width="1.8dp" android:color="#FFFFFAFD" />
+                    <solid android:color="#2CBBD5F8" />
+                    <stroke android:width="1.8dp" android:color="#FFFAFCFF" />
                     <corners android:radius="16dp" />
                 </shape>
             </item>
             <item android:left="1.6dp" android:top="1.6dp" android:right="1.6dp" android:bottom="1.6dp">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#4CFFE8F4" android:centerColor="#32F5A8CE" android:endColor="#44F9C4E0" />
-                    <stroke android:width="1.3dp" android:color="#F6FFF7FB" />
+                    <gradient android:angle="270" android:startColor="#4CE9F2FE" android:centerColor="#32A0C3F5" android:endColor="#44BBD5F9" />
+                    <stroke android:width="1.3dp" android:color="#F6F7FAFF" />
                     <corners android:radius="14.4dp" />
                 </shape>
             </item>
         </layer-list>
     </item>
 
-    <!-- Default: Sculpted Sakura Rose-Quartz Hero Liquid Glass -->
+    <!-- Default: Sculpted Starlight Sapphire-Crystal Hero Liquid Glass -->
     <item>
         <layer-list>
-            <!-- 1. Hairline twilight-plum optical contour for instant clarity over bright sky -->
+            <!-- 1. Hairline midnight-indigo optical contour for instant clarity over bright sky -->
             <item>
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke android:width="1dp" android:color="#3E140B1C" />
+                    <stroke android:width="1dp" android:color="#3E090F1C" />
                     <corners android:radius="16dp" />
                 </shape>
             </item>
-            <!-- 2. Translucent rose-quartz crystal body + luminous sakura-pearl bevel -->
+            <!-- 2. Translucent sapphire-crystal crystal body + luminous starlight-ice bevel -->
             <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#48FFE6F3"
-                        android:centerColor="#2CF297C3"
-                        android:endColor="#3EF7BAD8" />
-                    <stroke android:width="1.4dp" android:color="#F2FFF5FA" />
+                        android:startColor="#48E7F1FE"
+                        android:centerColor="#2C8FB8F2"
+                        android:endColor="#3EB2CEF7" />
+                    <stroke android:width="1.4dp" android:color="#F2F5F9FF" />
                     <corners android:radius="15dp" />
                 </shape>
             </item>
-            <!-- 3. Upper curved convex sakura-pearl skylight dome -->
+            <!-- 3. Upper curved convex starlight-ice skylight dome -->
             <item android:left="2.2dp" android:top="2.2dp" android:right="2.2dp" android:height="17dp" android:gravity="top">
                 <shape android:shape="rectangle">
                     <gradient android:angle="270" android:startColor="#38FFFFFF" android:endColor="#00FFFFFF" />
                     <corners android:topLeftRadius="13.5dp" android:topRightRadius="13.5dp" />
                 </shape>
             </item>
-            <!-- 4. Concentric inner rose-quartz meniscus ring -->
+            <!-- 4. Concentric inner sapphire-crystal meniscus ring -->
             <item android:left="3.5dp" android:top="3.5dp" android:right="3.5dp" android:bottom="3.5dp">
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.85dp" android:color="#5EFFEBF5" />
+                    <stroke android:width="0.85dp" android:color="#5EEBF4FE" />
                     <corners android:radius="12.5dp" />
                 </shape>
             </item>
@@ -123,10 +123,10 @@
                     <corners android:radius="1.5dp" />
                 </shape>
             </item>
-            <!-- 6. Bottom sakura lake caustic reflection -->
-            <item android:left="24dp" android:bottom="3.8dp" android:right="24dp" android:height="1.5dp" android:gravity="bottom">
+            <!-- 6. Bottom warm firefly-gold lake caustic reflection -->
+            <item android:left="24dp" android:bottom="3.8dp" android:right="24dp" android:height="1.6dp" android:gravity="bottom">
                 <shape android:shape="rectangle">
-                    <gradient android:angle="0" android:startColor="#00FBD4E8" android:centerColor="#7CFFDAEE" android:endColor="#00FBD4E8" />
+                    <gradient android:angle="0" android:startColor="#00FFD685" android:centerColor="#92FFE09E" android:endColor="#00FFD685" />
                     <corners android:radius="1.5dp" />
                 </shape>
             </item>

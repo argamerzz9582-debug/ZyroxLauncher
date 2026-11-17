@@ -11,9 +11,9 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag to publish (e.g. v2.1.0)"
+        description: "Release tag to publish (e.g. v2.2.0)"
         required: false
-        default: "v2.1.0"
+        default: "v2.2.0"
         type: string
 
 # Default least-privilege token across all jobs; only publish-release escalates to contents:write.
@@ -485,7 +485,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${INPUT_TAG:-v2.1.0}"
+            TAG="${INPUT_TAG:-v2.2.0}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
             echo "::error title=InvalidReleaseTag::Refusing invalid tag format: $TAG"
@@ -493,16 +493,17 @@ jobs:
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           {
-            echo "## Zyrox Launcher ${TAG} — Sakura Crystal Edition"
+            echo "## Zyrox Launcher ${TAG} — Starlight Firefly Edition"
             echo ""
-            echo "### What's New in 2.1.0"
-            echo "- **New Sakura Crystal App Logo & Adaptive Icon Suite:** Sculpted 3D rose-quartz Liquid Glass voxel \`Z\` emblem with pale cherry-wood bevels, pixel cherry blossoms, shimmering pond ripples, full \`mdpi–xxxhdpi\` adaptive + round icons, and Android 13–16 Material You monochrome icon support."
-            echo "- **Sakura Bloom × Optical Liquid Glass UI Theme:** Cohesive twilight-plum frosted docks, rose-quartz hero \`PLAY\` CTA, sakura-pearl buttons, progress bars, switches, filter chips, studio modals, Cherry Blossom instance emblem, Sakura hero crest, and live cherry-blossom backdrop preview inside the Touch Controls editor — while keeping in-game touch controls ~94% optically clear."
-            echo "- **Seamless Zero-Buffer Animated Home & Loading Scenes:** Replaced the legacy Home shader/ember animation with the full-bleed Cherry Blossom lakeside gazebo scene (\`zyrox_home_scene.gif\`) and built the new \`ZyroxGifDecoder\` + \`ZyroxSeamlessGifView\` engine powering both Home and Loading screens with zero end-of-loop freeze, C¹ cosine cross-dissolve loop continuity, 60/90/120 Hz VSYNC sub-frame blending, and automatic RAM release when Minecraft launches."
-            echo "- **App-Wide Audit, Memory-Leak Fixes & Polish:** Eliminated \`AccountSpinner\` static listener & \`LauncherActivity\` permission-launcher leaks, guarded out-of-bounds account selection, moved \`WorldManager\` icon decoding off the main thread with bounded sampling & bitmap recycling, fixed \`DownloadCenter\` trailing queue completion updates and paused-queue resume state, synchronized portrait/landscape layouts 1:1, and completed TalkBack accessibility descriptions."
+            echo "### What's New in 2.2.0"
+            echo "- **Starlight Firefly & Crimson-Amber Dawn Animated Scenes + Matching Logo & Theme:** New seamless zero-buffer Starlit Firefly lakeside Home scene (\`zyrox_home_scene.gif\`), Starlit Sunrise lakeside Loading scene (\`zyrox_loading_scene.gif\`), custom \`.gif\` & \`.mp4\` animated backdrop picker, sculpted 3D Starlight Firefly Liquid Glass \`Z\` adaptive + round + monochrome launcher icon suite, and cohesive midnight-indigo × sapphire × golden-firefly Liquid Glass UI — keeping in-game touch controls ~94% optically clear."
+            echo "- **Log-Driven Loading Screen Progress Bar & Smart ETA:** Real-time Liquid Glass startup HUD driven directly by live JVM, Fabric/Quilt/NeoForge/Forge, Mixin, LWJGL/Vulkan, and Minecraft asset log milestones with per-instance learned countdown ETA until Mojang splash handoff."
+            echo "- **Deep Game Optimizer & Android 15/16 16 KB Native Alignment:** Adaptive low-pause G1GC JVM tuning, 90/120/144 Hz display mode boost, low-RAM LMK heap guard, 1-tap \`options.txt\` performance presets (*Competitive Max FPS*, *Balanced Smooth*, *Shader Ready*) with atomic backup/rollback, and native \`-Wl,-z,max-page-size=16384\` 16 KB ELF alignment."
+            echo "- **All-in-One Content Store, 1-Click FPS Boost & Batch Mod Updater:** Dedicated *Modpacks | Mods | Shaders | Resources* tabs with SHA-1 verified direct install & auto-dependency resolution, 1-Click FPS Boost Pack (*Sodium / Embeddium, Lithium, FerriteCore, Entity Culling, ImmediatelyFast, Fabric API, Iris*), and 1-Tap Batch Mod Updater with automatic rollback."
+            echo "- **In-App Runtime & Driver Store, Pro Controls & Studio Upgrades:** Built-in HTTPS OpenJDK (JRE 8/17/21) & Adreno Turnip Vulkan driver downloader; 4 built-in HUD layout presets, 16-step Undo/Redo, 8dp Snap-to-Grid, button duplicate, tap haptics, bezel edge-touch guard, gyro deadzone, floating Quick-Command/Macro wheel, and sparkline FPS HUD; Screenshots Gallery Studio, live server favicons & colored MOTDs, interactive 360° 3D Skin + Cape preview, per-instance playtime tracking, and GitHub release update checker."
             echo ""
             echo "### Download & Upgrade"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.0.x\` / \`v1.0.x\`)."
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
             echo ""
             echo "### Signing & SHA-256 Verification"
             echo '```'

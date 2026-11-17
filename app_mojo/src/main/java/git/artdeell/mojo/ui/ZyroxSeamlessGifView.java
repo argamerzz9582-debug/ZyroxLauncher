@@ -53,6 +53,8 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     @RawRes
     private volatile int mGifResId = 0;
     @Nullable
+    private volatile java.io.File mGifFile = null;
+    @Nullable
     private ZyroxGifDecoder.SeamlessSequence<Bitmap> mSequence;
     @Nullable
     private Bitmap mPreviewBitmap;
@@ -92,13 +94,31 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     /** Binds a bundled {@code res/raw} animated GIF scene and starts asynchronous pre-decoding. */
     public void setGifResource(@RawRes int rawResId) {
         if (mReleased || rawResId == 0) return;
-        if (mGifResId == rawResId && (mSequence != null || mDecoding)) {
+        if (mGifFile == null && mGifResId == rawResId && (mSequence != null || mDecoding)) {
             syncChoreographer();
             return;
         }
         cancelInFlightDecode();
         recycleAllOnUiThread();
+        mGifFile = null;
         mGifResId = rawResId;
+        mPlayheadNs = 0L;
+        mLastFrameTimeNs = 0L;
+        ensureDecodedAsync();
+    }
+
+    /** Binds a user-imported custom {@code .gif} backdrop file (up to 24 MB) for seamless looping. */
+    public void setGifFile(@Nullable java.io.File gifFile) {
+        if (mReleased || gifFile == null || !gifFile.isFile()) return;
+        if (mGifFile != null && mGifFile.equals(gifFile)
+                && (mSequence != null || mDecoding)) {
+            syncChoreographer();
+            return;
+        }
+        cancelInFlightDecode();
+        recycleAllOnUiThread();
+        mGifFile = gifFile;
+        mGifResId = -Math.max(1, Math.abs(gifFile.getAbsolutePath().hashCode() ^ (int) gifFile.lastModified()));
         mPlayheadNs = 0L;
         mLastFrameTimeNs = 0L;
         ensureDecodedAsync();
@@ -158,11 +178,12 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         if (mReleased || mDecoding || mSequence != null || mGifResId == 0) return;
         final Context appCtx = getContext().getApplicationContext();
         final int targetRes = mGifResId;
+        final java.io.File targetFile = mGifFile;
         final AtomicBoolean cancelFlag = new AtomicBoolean(false);
         mActiveDecodeCancel = cancelFlag;
         mDecoding = true;
 
-        Thread worker = new Thread(() -> decodeWorker(appCtx, targetRes, cancelFlag),
+        Thread worker = new Thread(() -> decodeWorker(appCtx, targetRes, targetFile, cancelFlag),
                 "ZyroxSeamlessGif");
         worker.setDaemon(true);
         worker.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
@@ -170,9 +191,12 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     }
 
     private void decodeWorker(@NonNull Context appCtx,
-                              @RawRes int resId,
+                              int resId,
+                              @Nullable java.io.File customFile,
                               @NonNull AtomicBoolean cancelFlag) {
-        byte[] gifBytes = readRawBytes(appCtx, resId, cancelFlag);
+        byte[] gifBytes = customFile != null
+                ? readFileBytes(customFile, cancelFlag)
+                : readRawBytes(appCtx, resId, cancelFlag);
         if (gifBytes == null || cancelFlag.get()) {
             postDecodeFinished(resId, cancelFlag, null, null);
             return;
@@ -322,13 +346,38 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
                 long estimatedBytes = (long) meta.width * meta.height * 2L * Math.max(1, cycleFrames);
                 Runtime rt = Runtime.getRuntime();
                 long maxHeap = rt.maxMemory();
-                if (maxHeap > 0 && maxHeap < 160L * 1024L * 1024L && estimatedBytes > 16L * 1024L * 1024L) {
+                if (estimatedBytes > 26L * 1024L * 1024L
+                        || (maxHeap > 0 && maxHeap < 160L * 1024L * 1024L && estimatedBytes > 16L * 1024L * 1024L)) {
                     return 2;
                 }
             }
         } catch (Throwable ignored) {
         }
         return 1;
+    }
+
+    private static final long MAX_CUSTOM_GIF_BYTES = 24L * 1024L * 1024L;
+
+    @Nullable
+    private static byte[] readFileBytes(@NonNull java.io.File file,
+                                        @NonNull AtomicBoolean cancelFlag) {
+        long len = file.length();
+        if (len <= 16 || len > MAX_CUSTOM_GIF_BYTES || !file.canRead()) return null;
+        try (InputStream in = new java.io.FileInputStream(file)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream((int) Math.min(len, 8 * 1024 * 1024));
+            byte[] buf = new byte[32768];
+            long total = 0;
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                if (cancelFlag.get()) return null;
+                total += n;
+                if (total > MAX_CUSTOM_GIF_BYTES) return null;
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     @Nullable

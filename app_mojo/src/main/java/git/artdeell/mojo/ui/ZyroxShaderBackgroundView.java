@@ -34,6 +34,7 @@ import git.artdeell.mojo.prefs.LauncherPreferences;
  */
 public class ZyroxShaderBackgroundView extends FrameLayout {
     public static final String CUSTOM_VIDEO_FILENAME = "zyrox_bg.mp4";
+    public static final String CUSTOM_GIF_FILENAME = "zyrox_bg.gif";
 
     private ZyroxSeamlessGifView mHomeGifView;
     private VideoView mVideoView;
@@ -58,12 +59,12 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     }
 
     private void init(@NonNull Context context) {
-        setBackgroundColor(Color.parseColor("#130C1A"));
+        setBackgroundColor(Color.parseColor("#0A101E"));
         setClipChildren(true);
         setClipToPadding(false);
         setPadding(0, 0, 0, 0);
 
-        // Layer 1: Seamless, zero-buffer full-bleed cherry-blossom gazebo GIF (default Home scene)
+        // Layer 1: Seamless, zero-buffer full-bleed Starlight Firefly lakeside GIF (default Home scene)
         mHomeGifView = new ZyroxSeamlessGifView(context);
         mHomeGifView.setGifResource(R.raw.zyrox_home_scene);
         addView(mHomeGifView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -108,9 +109,25 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         return null;
     }
 
+    @Nullable
+    private File resolveCustomGifFile() {
+        try {
+            if (Tools.DIR_GAME_HOME != null) {
+                File customGif = new File(Tools.DIR_GAME_HOME, CUSTOM_GIF_FILENAME);
+                if (customGif.isFile() && customGif.canRead()
+                        && customGif.length() > 16 && customGif.length() <= 24L * 1024L * 1024L) {
+                    return customGif;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     public void refreshBackgroundState() {
         boolean animated = LauncherPreferences.PREF_ZYROX_ANIMATED_BG;
-        Uri customVideoUri = animated ? resolveCustomVideoUri() : null;
+        File customGif = resolveCustomGifFile();
+        Uri customVideoUri = (animated && customGif == null) ? resolveCustomVideoUri() : null;
 
         if (customVideoUri != null && mResumed) {
             mHomeGifView.pauseAnimation();
@@ -119,7 +136,11 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         } else {
             stopVideo();
             mHomeGifView.setVisibility(View.VISIBLE);
-            mHomeGifView.setGifResource(R.raw.zyrox_home_scene);
+            if (customGif != null) {
+                mHomeGifView.setGifFile(customGif);
+            } else {
+                mHomeGifView.setGifResource(R.raw.zyrox_home_scene);
+            }
             if (animated && mResumed) {
                 mHomeGifView.resumeAnimation();
             } else {

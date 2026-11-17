@@ -56,10 +56,10 @@ public class LoggerView extends ConstraintLayout {
                 (compoundButton, isChecked) -> {
                     mLogTextView.setVisibility(isChecked ? VISIBLE : GONE);
                     if (isChecked) {
-                        Logger.setLogListener(mLogListener);
+                        Logger.addLogListener(mLogListener);
                     } else {
                         mLogTextView.setText("");
-                        Logger.setLogListener(null);
+                        Logger.removeLogListener(mLogListener);
                     }
                 });
         mLogToggle.setChecked(false);

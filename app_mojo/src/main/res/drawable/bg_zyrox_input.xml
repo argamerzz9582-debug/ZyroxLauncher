@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Pearl Crystal Input, Spinner & Studio Item Surface -->
+<!-- Zyrox Starlight Pearl Crystal Input, Spinner & Studio Item Surface -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#48FFE4F2" android:endColor="#30F5A8CE" />
-            <stroke android:width="1.25dp" android:color="#F4FFF5FA" />
+            <gradient android:angle="270" android:startColor="#48E5F0FE" android:endColor="#30A0C3F5" />
+            <stroke android:width="1.25dp" android:color="#F4F5F9FF" />
             <corners android:radius="13dp" />
         </shape>
     </item>
 
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#38FFEBF5" android:endColor="#24F8C4DF" />
-            <stroke android:width="1.45dp" android:color="#FAFFF7FB" />
+            <gradient android:angle="270" android:startColor="#38EBF4FE" android:endColor="#24BBD5F8" />
+            <stroke android:width="1.45dp" android:color="#FAF7FAFF" />
             <corners android:radius="13dp" />
         </shape>
     </item>
@@ -22,7 +22,7 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#2E160D20" />
+                    <solid android:color="#2E0B1120" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
@@ -30,10 +30,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#24FFF4FA"
-                        android:centerColor="#0EFCE6F2"
-                        android:endColor="#1AFAD2E7" />
-                    <stroke android:width="1.05dp" android:color="#B2FFEAF5" />
+                        android:startColor="#24F4F9FF"
+                        android:centerColor="#0EE7F0FB"
+                        android:endColor="#1AD3E3F9" />
+                    <stroke android:width="1.05dp" android:color="#B2EBF3FE" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>

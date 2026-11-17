@@ -107,21 +107,24 @@ public class GyroControl implements SensorEventListener, PlatformGrabListener {
 
         int width = GameView.getWindowWidth();
         int height = GameView.getWindowHeight();
+        float dzScale = Math.max(0.15f, LauncherPreferences.PREF_ZYROX_GYRO_DEADZONE);
+        double multiThreshold = MULTI_AXIS_LOW_PASS_THRESHOLD * dzScale;
+        double singleThreshold = SINGLE_AXIS_LOW_PASS_THRESHOLD * dzScale;
 
-        if(absX + absY > MULTI_AXIS_LOW_PASS_THRESHOLD) {
+        if(absX + absY > multiThreshold) {
             Platform.cursorX -= ((mSwapXY ? mStoredY : mStoredX) * xFactor) * width;
             Platform.cursorY += ((mSwapXY ? mStoredX : mStoredY) * yFactor) * height;
             mStoredX = 0;
             mStoredY = 0;
             updatePosition = true;
         } else {
-            if(Math.abs(mStoredX) > SINGLE_AXIS_LOW_PASS_THRESHOLD){
+            if(Math.abs(mStoredX) > singleThreshold){
                 Platform.cursorX -= ((mSwapXY ? mStoredY : mStoredX) * xFactor) * width;
                 mStoredX = 0;
                 updatePosition = true;
             }
 
-            if(Math.abs(mStoredY) > SINGLE_AXIS_LOW_PASS_THRESHOLD) {
+            if(Math.abs(mStoredY) > singleThreshold) {
                 Platform.cursorY += ((mSwapXY ? mStoredX : mStoredY) * yFactor) * height;
                 mStoredY = 0;
                 updatePosition = true;

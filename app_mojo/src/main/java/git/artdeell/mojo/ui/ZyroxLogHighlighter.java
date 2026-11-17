@@ -14,9 +14,9 @@ import java.util.Locale;
 public final class ZyroxLogHighlighter {
     public static final int COLOR_ERROR = 0xFFFB7185;
     public static final int COLOR_TRACE = 0xFFFDA4AF;
-    public static final int COLOR_WARN = 0xFFFCD34D;
-    public static final int COLOR_HEADER = 0xFFF9A8D4;
-    public static final int COLOR_INFO = 0xFFF0E4EE;
+    public static final int COLOR_WARN = 0xFFFFD685;
+    public static final int COLOR_HEADER = 0xFF98C2FF;
+    public static final int COLOR_INFO = 0xFFE4EEFF;
 
     private ZyroxLogHighlighter() {}
 

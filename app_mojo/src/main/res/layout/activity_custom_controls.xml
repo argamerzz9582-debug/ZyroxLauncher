@@ -132,9 +132,65 @@
                     android:background="@color/zyrox_divider" />
 
                 <TextView
+                    android:id="@+id/btn_hud_presets"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="9dp"
+                    android:background="@drawable/btn_zyrox_secondary"
+                    android:text="@string/zyrox_hud_presets"
+                    android:textColor="@color/zyrox_firefly_gold"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+
+                <TextView
+                    android:id="@+id/btn_hud_undo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="5dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="8dp"
+                    android:background="@drawable/btn_zyrox_secondary"
+                    android:text="@string/zyrox_hud_undo"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+
+                <TextView
+                    android:id="@+id/btn_hud_redo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="5dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="8dp"
+                    android:background="@drawable/btn_zyrox_secondary"
+                    android:text="@string/zyrox_hud_redo"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+
+                <TextView
+                    android:id="@+id/btn_hud_snap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="5dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="8dp"
+                    android:background="@drawable/btn_zyrox_secondary"
+                    android:text="@string/zyrox_hud_snap_on"
+                    android:textColor="@color/zyrox_amber"
+                    android:textSize="9.5sp"
+                    android:fontFamily="@font/minecraft_pixel"
+                    app:fontFamily="@font/minecraft_pixel" />
+
+                <TextView
                     android:id="@+id/btn_hud_load"
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
+                    android:layout_marginStart="5dp"
                     android:gravity="center"
                     android:paddingHorizontal="9dp"
                     android:background="@drawable/btn_zyrox_secondary"

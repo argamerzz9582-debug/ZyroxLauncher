@@ -178,6 +178,26 @@ public class ServerManagerFragment extends Fragment {
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
 
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+
+            android.widget.ImageView iconView = new android.widget.ImageView(ctx);
+            int iconSz = ZyroxStudioUi.dp(ctx, 40);
+            iconView.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+            iconView.setBackgroundResource(R.drawable.bg_zyrox_glass_card_soft);
+            android.graphics.Bitmap favBmp = decodeServerFavicon(s.iconBase64);
+            if (favBmp != null) {
+                iconView.setImageBitmap(favBmp);
+            } else {
+                iconView.setImageResource(R.drawable.ic_zyrox_grass_block);
+                int ip = ZyroxStudioUi.dp(ctx, 7);
+                iconView.setPadding(ip, ip, ip, ip);
+            }
+            LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(iconSz, iconSz);
+            icLp.setMarginEnd(ZyroxStudioUi.dp(ctx, 9));
+            row.addView(iconView, icLp);
+
             LinearLayout info = new LinearLayout(ctx);
             info.setOrientation(LinearLayout.VERTICAL);
             LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -187,16 +207,21 @@ public class ServerManagerFragment extends Fragment {
                     + (s.group.isEmpty() ? "" : "  [" + s.group + "]");
             info.addView(ZyroxStudioUi.createTitle(ctx, title));
 
-            StringBuilder detail = new StringBuilder(s.address);
+            android.text.SpannableStringBuilder richSub = new android.text.SpannableStringBuilder(s.address);
             if (s.lastPingMs >= 0 && s.lastOnline) {
-                detail.append(" • ONLINE ").append(s.lastPingMs).append("ms");
-                if (s.lastPlayers != null) detail.append(" • ").append(s.lastPlayers).append(" players");
-                if (s.lastVersion != null && !s.lastVersion.isEmpty()) detail.append(" • ").append(s.lastVersion);
-                if (s.lastMotd != null && !s.lastMotd.isEmpty()) detail.append("\n").append(s.lastMotd);
+                richSub.append(" • ONLINE ").append(String.valueOf(s.lastPingMs)).append("ms");
+                if (s.lastPlayers != null) richSub.append(" • ").append(s.lastPlayers).append(" players");
+                if (s.lastVersion != null && !s.lastVersion.isEmpty()) richSub.append(" • ").append(s.lastVersion);
+                if (s.lastMotd != null && !s.lastMotd.isEmpty()) {
+                    richSub.append("\n");
+                    appendMinecraftFormatted(richSub, s.lastMotd);
+                }
             } else if (s.lastMotd != null) {
-                detail.append(" • ").append(s.lastMotd);
+                richSub.append(" • ");
+                appendMinecraftFormatted(richSub, s.lastMotd);
             }
-            TextView sub = ZyroxStudioUi.createSubtitle(ctx, detail.toString());
+            TextView sub = ZyroxStudioUi.createSubtitle(ctx, "");
+            sub.setText(richSub);
             info.addView(sub);
             info.setOnClickListener(v -> copyAddress(s.address));
             row.addView(info, iLp);
@@ -301,7 +326,7 @@ public class ServerManagerFragment extends Fragment {
                     server.lastPlayers = (res.onlinePlayers >= 0 && res.maxPlayers >= 0)
                             ? (res.onlinePlayers + "/" + res.maxPlayers) : null;
                     server.lastVersion = res.versionName;
-                    server.lastMotd = res.motd;
+                    server.lastMotd = !res.formattedMotd.isEmpty() ? res.formattedMotd : res.motd;
                     if (res.faviconBase64 != null) server.iconBase64 = res.faviconBase64;
                 } else {
                     server.lastMotd = "Offline (" + (res.errorMessage != null ? res.errorMessage : "unreachable") + ")";
@@ -371,5 +396,87 @@ public class ServerManagerFragment extends Fragment {
                 });
             }
         });
+    }
+
+    @Nullable
+    private static android.graphics.Bitmap decodeServerFavicon(@Nullable String base64) {
+        if (base64 == null || base64.isEmpty() || base64.length() > 192 * 1024) return null;
+        try {
+            byte[] raw = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+            opts.inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888;
+            return android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.length, opts);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** Converts Minecraft {@code §0..§f / §l / §r} formatting codes into crisp colored spans. */
+    private static void appendMinecraftFormatted(@NonNull android.text.SpannableStringBuilder out,
+                                                 @NonNull String motd) {
+        Integer currentColor = null;
+        boolean bold = false;
+        int spanStart = out.length();
+        for (int i = 0; i < motd.length(); i++) {
+            char c = motd.charAt(i);
+            if (c == '§' && i + 1 < motd.length()) {
+                int spanEnd = out.length();
+                applyMcSpan(out, spanStart, spanEnd, currentColor, bold);
+                char code = Character.toLowerCase(motd.charAt(++i));
+                if (code == 'l') {
+                    bold = true;
+                } else if (code == 'r') {
+                    currentColor = null;
+                    bold = false;
+                } else {
+                    Integer mapped = mcCodeToColor(code);
+                    if (mapped != null) {
+                        currentColor = mapped;
+                        bold = false;
+                    }
+                }
+                spanStart = out.length();
+            } else {
+                out.append(c);
+            }
+        }
+        applyMcSpan(out, spanStart, out.length(), currentColor, bold);
+    }
+
+    private static void applyMcSpan(@NonNull android.text.SpannableStringBuilder out,
+                                    int start, int end,
+                                    @Nullable Integer color, boolean bold) {
+        if (end <= start) return;
+        if (color != null) {
+            out.setSpan(new android.text.style.ForegroundColorSpan(color),
+                    start, end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        if (bold) {
+            out.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    start, end, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+    }
+
+    @Nullable
+    private static Integer mcCodeToColor(char code) {
+        switch (code) {
+            case '0': return 0xFF7A869A;
+            case '1': return 0xFF4C7BFF;
+            case '2': return 0xFF42C87A;
+            case '3': return 0xFF4AD0D8;
+            case '4': return 0xFFE55353;
+            case '5': return 0xFFC278FF;
+            case '6': return 0xFFFFB84D;
+            case '7': return 0xFFC2D2EC;
+            case '8': return 0xFF8DA2BE;
+            case '9': return 0xFF82B4FF;
+            case 'a': return 0xFF75F0A8;
+            case 'b': return 0xFF7EE8FF;
+            case 'c': return 0xFFFF7B7B;
+            case 'd': return 0xFFFF9EE5;
+            case 'e': return 0xFFFFE57F;
+            case 'f': return 0xFFF8FBFF;
+            default: return null;
+        }
     }
 }

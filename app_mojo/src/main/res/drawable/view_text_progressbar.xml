@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Blossom Liquid Glass Task & Download Progress Bar -->
+<!-- Zyrox Starlight Blossom Liquid Glass Task & Download Progress Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@android:id/background">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#28FFF2F8"
-                android:endColor="#18F5D4E5" />
-            <stroke android:width="1dp" android:color="#92FFEAF5" />
+                android:startColor="#28F2F8FF"
+                android:endColor="#18CCDDF4" />
+            <stroke android:width="1dp" android:color="#92EBF3FE" />
             <corners android:radius="999dp" />
         </shape>
     </item>
@@ -16,9 +16,9 @@
             <shape android:shape="rectangle">
                 <gradient
                     android:angle="0"
-                    android:startColor="#5CF08CB9"
-                    android:centerColor="#7AF7BAD8"
-                    android:endColor="#98FFE4F2"
+                    android:startColor="#5C84B1F0"
+                    android:centerColor="#7AB2CEF7"
+                    android:endColor="#98E5F0FE"
                     android:type="linear" />
                 <corners android:radius="999dp" />
             </shape>

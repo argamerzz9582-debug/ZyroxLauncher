@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
-    <!-- Global Zyrox 2.0 Shell & Brand -->
+    <!-- Global Zyrox 2.2 Starlight Firefly Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
-    <string name="zyrox_brand_subtitle">SAKURA  •  LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX SAKURA v2.1.0</string>
+    <string name="zyrox_brand_subtitle">STARLIGHT  •  LAUNCHER</string>
+    <string name="zyrox_engine_watermark">ZYROX STARLIGHT v2.2.0</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
     <!-- Navigation Stack (Home Hub — Liquid Glass Command Center) -->
-    <string name="zyrox_nav_modpacks">MOD STORE</string>
+    <string name="zyrox_nav_modpacks">STORE</string>
     <string name="zyrox_nav_instances">INSTANCES</string>
     <string name="zyrox_nav_mods">MODS &amp; PACKS</string>
     <string name="zyrox_nav_worlds">WORLDS</string>
@@ -22,8 +22,8 @@
     <string name="zyrox_nav_downloads">QUEUE</string>
     <string name="zyrox_nav_security">TRUST</string>
 
-    <!-- Real 7-Stage Game Launch Loading Lifecycle -->
-    <string name="zyrox_loading_preparing">Validating installation…</string>
+    <!-- Real Log-Driven Game Launch Loading Lifecycle -->
+    <string name="zyrox_loading_preparing">Initializing Java VM &amp; renderer…</string>
     <string name="zyrox_loading_resources">Verifying game assets &amp; libraries…</string>
     <string name="zyrox_loading_runtime">Preparing Java runtime…</string>
     <string name="zyrox_loading_renderer">Preparing graphics renderer &amp; environment…</string>
@@ -40,12 +40,12 @@
     <!-- Page Titles -->
     <string name="zyrox_title_instance_studio">INSTANCE STUDIO</string>
     <string name="zyrox_title_create_instance">NEW INSTANCE STUDIO</string>
-    <string name="zyrox_title_mod_store">MODRINTH &amp; CURSEFORGE STORE</string>
+    <string name="zyrox_title_mod_store">ALL-IN-ONE CONTENT STORE</string>
     <string name="zyrox_title_content_manager">MODS, PACKS, SHADERS &amp; CONFIGS</string>
     <string name="zyrox_title_worlds">WORLD MANAGER &amp; BACKUPS</string>
     <string name="zyrox_title_servers">MULTIPLAYER SERVER MANAGER</string>
-    <string name="zyrox_title_skins">SKIN STUDIO &amp; LIBRARY</string>
-    <string name="zyrox_title_downloads">DOWNLOAD &amp; CACHE CENTER</string>
+    <string name="zyrox_title_skins">3D SKIN &amp; CAPE STUDIO</string>
+    <string name="zyrox_title_downloads">DOWNLOAD, RUNTIME &amp; DRIVER CENTER</string>
     <string name="zyrox_title_security">SECURITY, GRAPHICS &amp; PROFILES</string>
     <string name="zyrox_title_control_center">ZYROX CONTROL CENTER</string>
     <string name="zyrox_title_account_vault">ZYROX ACCOUNT VAULT</string>
@@ -58,7 +58,7 @@
     <string name="zyrox_title_crash_report">ZYROX CRASH REPORT</string>
     <string name="zyrox_title_jar_installer">ZYROX RUNTIME &amp; JAR INSTALLER</string>
 
-    <!-- Instance & Profile Studio 2.0 -->
+    <!-- Instance & Profile Studio 2.2 -->
     <string name="zyrox_new_instance">+ NEW INSTANCE</string>
     <string name="zyrox_new_short">+ NEW</string>
     <string name="zyrox_studio_tools">STUDIO TOOLS</string>
@@ -73,9 +73,20 @@
     <string name="zyrox_renderer_hint_zink">Desktop OpenGL via Vulkan — suited for compatible shaders &amp; modern modpacks</string>
     <string name="zyrox_renderer_hint_freedreno">Adreno Turnip/KGSL Vulkan driver path — tailored for supported Snapdragon GPUs</string>
 
-    <!-- Modrinth & CurseForge Store -->
-    <string name="zyrox_search_mods_hint">Search mods, modpacks, shaders...</string>
+    <!-- All-in-One Modrinth & CurseForge Store + 1-Click FPS Boost -->
+    <string name="zyrox_search_mods_hint">Search modpacks, mods, shaders, resource packs…</string>
     <string name="zyrox_import_mrpack">IMPORT PACK</string>
+    <string name="zyrox_store_tab_modpacks">MODPACKS</string>
+    <string name="zyrox_store_tab_mods">MODS</string>
+    <string name="zyrox_store_tab_shaders">SHADERS</string>
+    <string name="zyrox_store_tab_resources">RESOURCES</string>
+    <string name="zyrox_store_fps_boost">FPS BOOST</string>
+    <string name="zyrox_fps_boost_installing">Installing FPS Boost mods…</string>
+    <string name="zyrox_direct_installing">Downloading &amp; verifying content…</string>
+    <string name="zyrox_pkg_downloading">Downloading verified package…</string>
+    <string name="zyrox_jre_download_online">Download OpenJDK Runtime Online (JRE 8 / 17 / 21)</string>
+    <string name="zyrox_turnip_download_online">Download Adreno Turnip Driver Online (Vulkan)</string>
+    <string name="zyrox_pkg_import_local">Import Archive from Device Storage</string>
     <string name="zyrox_platform_all">ALL</string>
     <string name="zyrox_platform_modrinth">MODRINTH</string>
     <string name="zyrox_platform_curseforge">CURSEFORGE</string>
@@ -90,37 +101,61 @@
     <string name="zyrox_install">INSTALL</string>
     <string name="zyrox_installed">QUEUED</string>
     <string name="zyrox_select_version_title">COMPATIBLE VERSIONS</string>
-    <string name="zyrox_loading_versions">Fetching compatible game versions...</string>
+    <string name="zyrox_loading_versions">Fetching compatible game versions…</string>
 
-    <!-- Settings / Zyrox Control Center / Accessibility / Performance -->
+    <!-- Settings / Zyrox Control Center / Optimizer / Performance -->
     <string name="zyrox_cat_video">VIDEO &amp; RENDERER</string>
     <string name="zyrox_cat_controls">CONTROLS &amp; INPUT</string>
     <string name="zyrox_cat_java">JAVA &amp; MEMORY</string>
     <string name="zyrox_cat_misc">MISCELLANEOUS</string>
     <string name="zyrox_cat_experimental">EXPERIMENTAL</string>
     <string name="zyrox_cat_security">SECURITY &amp; GPU</string>
-    <string name="zyrox_pref_animated_bg_title">Animated Sakura backdrop</string>
-    <string name="zyrox_pref_animated_bg_summary">Play the seamless Cherry Blossom lakeside scene or your custom zyrox_bg.mp4 loop.</string>
+    <string name="zyrox_pref_optimizer_title">Zyrox Game Optimizer</string>
+    <string name="zyrox_pref_optimizer_summary">Tune G1GC low-pause JVM flags, high-Hz display pacing, LMK memory guard, and safe options.txt defaults.</string>
+    <string name="zyrox_pref_animated_bg_title">Animated Starlight backdrop</string>
+    <string name="zyrox_pref_animated_bg_summary">Play the seamless Starlight Firefly lakeside scene or your custom .gif / .mp4 backdrop loop.</string>
     <string name="zyrox_pref_reduced_motion_title">Reduced motion</string>
     <string name="zyrox_pref_reduced_motion_summary">Disable launcher transition animations, parallax movement, and button spring motion.</string>
     <string name="zyrox_pref_low_effects_title">Low visual effects mode</string>
     <string name="zyrox_pref_low_effects_summary">Simplify glass highlights and pause decorative layers for maximum efficiency on low-end devices.</string>
     <string name="zyrox_pref_perf_hud_title">In-game performance HUD</string>
-    <string name="zyrox_pref_perf_hud_summary">Display real measured refresh rate (Hz), frame interval (ms), free RAM, thermal status, and session uptime.</string>
+    <string name="zyrox_pref_perf_hud_summary">Display live FPS sparkline, frame time + worst spike (ms), free RAM, thermal status, and uptime.</string>
     <string name="zyrox_pref_warn_mobile_title">Warn on metered mobile data</string>
     <string name="zyrox_pref_warn_mobile_summary">Notify before running large version, asset, or modpack downloads over cellular data.</string>
     <string name="zyrox_toggle_perf_hud">Toggle Performance HUD</string>
-    <string name="zyrox_pref_select_bg_video_title">Custom background video (.mp4)</string>
-    <string name="zyrox_pref_select_bg_video_summary">Pick a looping Minecraft shader video (muted, center-cropped) or reset to Sakura scene.</string>
-    <string name="zyrox_pref_reset_bg_video_title">Reset Sakura backdrop</string>
-    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Cherry Blossom lakeside animated scene.</string>
+    <string name="zyrox_pref_haptics">Control tap haptic feedback</string>
+    <string name="zyrox_pref_haptics_summary">Subtle crisp tactile tick when pressing virtual Liquid Glass touch controls.</string>
+    <string name="zyrox_pref_edge_guard">Screen bezel edge-touch guard</string>
+    <string name="zyrox_pref_edge_guard_summary">Ignore accidental palm and system back-swipe touches along outer display edges.</string>
+    <string name="zyrox_pref_gyro_deadzone">Gyro aiming deadzone</string>
+    <string name="zyrox_quick_macros">Quick Commands &amp; Macros</string>
+    <string name="zyrox_quick_screenshot">Screenshot (F2)</string>
+    <string name="zyrox_pref_select_bg_video_title">Custom animated backdrop (.gif / .mp4)</string>
+    <string name="zyrox_pref_select_bg_video_summary">Pick a looping GIF or MP4 wallpaper (muted, center-cropped) or reset to Starlight Firefly.</string>
+    <string name="zyrox_pref_reset_bg_video_title">Reset Starlight backdrop</string>
+    <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Starlight Firefly lakeside animated scene.</string>
     <string name="zyrox_ram_status_fmt">Allocated: %1$d MB  •  Free: %2$d MB / %3$d MB Total</string>
+
+    <string-array name="zyrox_optimizer_mode_names">
+        <item>Auto Smart (Low-Pause G1GC + Safe Defaults)</item>
+        <item>Competitive Max FPS (90/120 Hz + Max Throughput)</item>
+        <item>Balanced Smooth (Crisp Visuals + Smooth Frame Pacing)</item>
+        <item>Shader Ready (Tuned for Iris / OptiFine Shaders)</item>
+        <item>Off (Unmodified Vanilla Flags)</item>
+    </string-array>
+    <string-array name="zyrox_optimizer_mode_values">
+        <item>auto</item>
+        <item>max_fps</item>
+        <item>balanced</item>
+        <item>shaders</item>
+        <item>off</item>
+    </string-array>
 
     <!-- Account & Skin Vault -->
     <string name="zyrox_microsoft_login">MICROSOFT LOGIN</string>
     <string name="zyrox_elyby_login">ELY.BY LOGIN</string>
     <string name="zyrox_or_offline">OR OFFLINE / LOCAL PROFILE</string>
-    <string name="zyrox_offline_hint">Enter SteveName...</string>
+    <string name="zyrox_offline_hint">Enter SteveName…</string>
     <string name="zyrox_add_offline">ADD OFFLINE ACCOUNT</string>
     <string name="zyrox_badge_microsoft">PREMIUM ACCOUNT</string>
     <string name="zyrox_badge_elyby">ELY.BY ACCOUNT</string>
@@ -131,11 +166,17 @@
     <string name="zyrox_hud_add_btn">+ BUTTON</string>
     <string name="zyrox_hud_add_drawer">+ DRAWER</string>
     <string name="zyrox_hud_add_joy">+ JOYSTICK</string>
+    <string name="zyrox_hud_presets">PRESETS</string>
+    <string name="zyrox_hud_presets_title">Apply Built-In Control Layout Preset</string>
+    <string name="zyrox_hud_undo">UNDO</string>
+    <string name="zyrox_hud_redo">REDO</string>
+    <string name="zyrox_hud_snap_on">SNAP: ON</string>
+    <string name="zyrox_hud_snap_off">SNAP: OFF</string>
     <string name="zyrox_hud_load">LOAD</string>
     <string name="zyrox_hud_save">SAVE</string>
-    <string name="zyrox_hud_more">PRESETS</string>
+    <string name="zyrox_hud_more">MORE</string>
     <string name="zyrox_hud_exit">EXIT</string>
-    <string name="zyrox_hud_hint">TAP ANY LIQUID GLASS CONTROL TO EDIT OPACITY, SCALE, RADIUS &amp; KEYCODES  •  DRAG TO ALIGN</string>
+    <string name="zyrox_hud_hint">TAP ANY CONTROL TO EDIT OR DUPLICATE  •  PRESETS / UNDO / REDO / 8DP SNAP GRID READY</string>
 
     <!-- Crash Analyzer (Zyrox Guard) & Log Inspector + Installer -->
     <string name="zyrox_safe_mode_apply">SAFE MODE</string>
@@ -148,7 +189,7 @@
     <string name="zyrox_log_copied">Redacted log copied to clipboard</string>
     <string name="zyrox_log_empty">No log entries recorded yet. Launch an instance or installer to capture live JVM &amp; renderer output.</string>
     <string name="zyrox_console_title">ZYROX CONSOLE</string>
-    <string name="zyrox_installer_running">Executing Java Runtime &amp; Mod Installer...</string>
+    <string name="zyrox_installer_running">Executing Java Runtime &amp; Mod Installer…</string>
     <string name="zyrox_toggle_console">CONSOLE</string>
     <string name="zyrox_hide_card">SHOW GUI</string>
 </resources>

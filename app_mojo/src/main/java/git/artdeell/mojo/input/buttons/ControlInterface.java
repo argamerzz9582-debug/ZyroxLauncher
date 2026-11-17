@@ -257,6 +257,11 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
      * @param y Coordinate on the y axis
      */
     default void snapAndAlign(float x, float y) {
+        if (git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_HUD_SNAP_GRID) {
+            float gridStep = Math.max(8f, 8f * getControlView().getResources().getDisplayMetrics().density);
+            x = Math.round(x / gridStep) * gridStep;
+            y = Math.round(y / gridStep) * gridStep;
+        }
         final float MIN_DISTANCE = getSnapDistance();
         String dynamicX = generateDynamicX(x);
         String dynamicY = generateDynamicY(y);
@@ -378,8 +383,11 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
                         break;
 
                     case MotionEvent.ACTION_MOVE:
-                        if (Math.abs(event.getRawX() - downRawX) > 8 || Math.abs(event.getRawY() - downRawY) > 8)
+                        if ((Math.abs(event.getRawX() - downRawX) > 8 || Math.abs(event.getRawY() - downRawY) > 8)
+                                && mCanTriggerLongClick) {
                             mCanTriggerLongClick = false;
+                            getControlLayoutParent().pushUndoSnapshot();
+                        }
                         getControlLayoutParent().adaptPanelPosition();
                         snapAndAlign(
                                 MathUtils.clamp(event.getRawX() - downX, 0, Math.max(0, getControlLayoutParent().getWidth() - view.getWidth())),

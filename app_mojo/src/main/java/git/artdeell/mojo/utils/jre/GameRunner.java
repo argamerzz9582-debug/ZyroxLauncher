@@ -315,6 +315,44 @@ public class GameRunner {
 
         javaArgList.addAll(JREUtils.parseJavaArguments(instance.getLaunchArgs()));
 
+        // Zyrox Mobile Game Optimizer: inject safe low-pause GC/JVM flags & smart first-run options.txt
+        int totalRamMb = Tools.getTotalDeviceMemory(activity);
+        int installedModCount = git.artdeell.mojo.performance.GameOptimizer.countInstalledMods(gamedir);
+        boolean shaderInstalled = git.artdeell.mojo.performance.GameOptimizer.hasShaderModInstalled(gamedir);
+        String optMode = LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE;
+        List<String> zyroxOptFlags = git.artdeell.mojo.performance.GameOptimizer.buildOptimizedJvmFlags(
+                optMode,
+                javaArgList,
+                runtime.javaVersion,
+                effectiveRamMb,
+                freeDeviceMemory,
+                installedModCount,
+                !Architecture.is32BitsDevice());
+        if (!zyroxOptFlags.isEmpty()) {
+            javaArgList.addAll(zyroxOptFlags);
+            Logger.appendToLog("Zyrox Optimizer [" + optMode + "]: applied "
+                    + zyroxOptFlags.size() + " low-pause JVM/GC optimizations (Java "
+                    + runtime.javaVersion + ", mods=" + installedModCount + ")");
+        }
+        if (git.artdeell.mojo.performance.GameOptimizer.applyFirstLaunchOptionsIfNeeded(
+                gamedir, optMode, totalRamMb, 120)) {
+            MCOptionUtils.load(gamedir.getAbsolutePath());
+            Logger.appendToLog("Zyrox Optimizer: initialized mobile-tuned options.txt defaults");
+        }
+        int launchRamMb = effectiveRamMb;
+        if (!git.artdeell.mojo.performance.GameOptimizer.MODE_OFF.equals(
+                git.artdeell.mojo.performance.GameOptimizer.normalizeMode(optMode))
+                && effectiveRamMb > freeDeviceMemory + 256) {
+            int safeClamped = git.artdeell.mojo.performance.GameOptimizer.recommendSafeHeapMb(
+                    effectiveRamMb, totalRamMb, freeDeviceMemory, shaderInstalled,
+                    !Architecture.is32BitsDevice());
+            if (safeClamped < effectiveRamMb && safeClamped >= 768) {
+                Logger.appendToLog("Zyrox Optimizer: adjusted over-allocated heap "
+                        + effectiveRamMb + "MB -> " + safeClamped + "MB to prevent Android LMK crash");
+                launchRamMb = safeClamped;
+            }
+        }
+
         Map<String, String> versionEnvMap = versionInfo.environment;
 
         GameActivity.reportLoadingStage(R.string.zyrox_loading_renderer);
@@ -331,17 +369,19 @@ public class GameRunner {
         javaArgList.add("-Dorg.lwjgl.freetype.libname="+ Tools.NATIVE_LIB_DIR+"/libfreetype.so");
 
         InstanceManager.recordLaunchAttempt(instance);
-        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, effectiveRamMb), Toast.LENGTH_SHORT).show());
+        final int displayRamMb = launchRamMb;
+        activity.runOnUiThread(() -> Toast.makeText(activity, activity.getString(R.string.autoram_info_msg, displayRamMb), Toast.LENGTH_SHORT).show());
 
         // SECURITY: Always redact auth tokens, sessions, and UUIDs before logging client args
         Log.i("GameRunner", "Running with " + LogRedactor.redactArgs(launchArgs));
+        Logger.appendToLog("Running with Minecraft " + versionId + " (" + displayRamMb + " MB heap)");
 
         String mainClass = versionInfo.mainClass;
 
         try {
             GameActivity.reportLoadingStage(R.string.zyrox_loading_starting);
             JavaRunner.nativeSetupExit(activity);
-            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, effectiveRamMb);
+            JavaRunner.startJvm(runtime, javaArgList, launchClassPath, mainClass, launchArgs, launchRamMb);
         }catch (VMLoadException e) {
             LifecycleAwareAlertDialog.DialogCreator dialogCreator = (dialog, builder) ->
                 builder.setMessage(e.toString(activity)).setPositiveButton(android.R.string.ok, (d, w)->{});

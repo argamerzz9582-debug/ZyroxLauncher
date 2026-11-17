@@ -80,6 +80,59 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
         View addJoystick = findViewById(R.id.btn_hud_add_joystick);
         if (addJoystick != null) addJoystick.setOnClickListener(v -> mControlLayout.addJoystickButton(new ControlJoystickData()));
 
+        View presetsBtn = findViewById(R.id.btn_hud_presets);
+        if (presetsBtn != null) {
+            presetsBtn.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(R.string.zyrox_hud_presets_title)
+                    .setItems(git.artdeell.mojo.input.ControlPresetFactory.PRESET_NAMES, (d, which) -> {
+                        mControlLayout.applyPreset(which);
+                        android.widget.Toast.makeText(this,
+                                git.artdeell.mojo.input.ControlPresetFactory.PRESET_NAMES[which],
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show());
+        }
+
+        View undoBtn = findViewById(R.id.btn_hud_undo);
+        if (undoBtn != null) {
+            undoBtn.setOnClickListener(v -> {
+                if (!mControlLayout.undoLayout()) {
+                    android.widget.Toast.makeText(this, "Nothing to undo", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        View redoBtn = findViewById(R.id.btn_hud_redo);
+        if (redoBtn != null) {
+            redoBtn.setOnClickListener(v -> {
+                if (!mControlLayout.redoLayout()) {
+                    android.widget.Toast.makeText(this, "Nothing to redo", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        android.widget.TextView snapBtn = findViewById(R.id.btn_hud_snap);
+        View gridView = findViewById(R.id.zyrox_hud_grid);
+        if (snapBtn != null) {
+            snapBtn.setText(LauncherPreferences.PREF_ZYROX_HUD_SNAP_GRID
+                    ? R.string.zyrox_hud_snap_on : R.string.zyrox_hud_snap_off);
+            if (gridView != null) {
+                gridView.setAlpha(LauncherPreferences.PREF_ZYROX_HUD_SNAP_GRID ? 1f : 0.35f);
+            }
+            snapBtn.setOnClickListener(v -> {
+                boolean next = !LauncherPreferences.PREF_ZYROX_HUD_SNAP_GRID;
+                LauncherPreferences.PREF_ZYROX_HUD_SNAP_GRID = next;
+                if (LauncherPreferences.DEFAULT_PREF != null) {
+                    LauncherPreferences.DEFAULT_PREF.edit().putBoolean("zyroxHudSnapGrid", next).apply();
+                }
+                snapBtn.setText(next ? R.string.zyrox_hud_snap_on : R.string.zyrox_hud_snap_off);
+                if (gridView != null) {
+                    gridView.setAlpha(next ? 1f : 0.35f);
+                }
+            });
+        }
+
         View loadBtn = findViewById(R.id.btn_hud_load);
         if (loadBtn != null) loadBtn.setOnClickListener(v -> mControlLayout.openLoadDialog());
 

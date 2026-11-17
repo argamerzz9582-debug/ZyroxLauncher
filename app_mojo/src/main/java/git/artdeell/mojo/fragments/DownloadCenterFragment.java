@@ -62,6 +62,18 @@ public class DownloadCenterFragment extends Fragment implements DownloadQueueMan
         mSystemHeader = ZyroxStudioUi.createSubtitle(ctx, "Checking download queue & free storage...");
         top.addView(mSystemHeader, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        Button btnPkgStore = ZyroxStudioUi.createPrimaryButton(ctx, "JRE / Turnip");
+        btnPkgStore.setOnClickListener(v ->
+                git.artdeell.mojo.downloader.RuntimeDriverStoreDialog.showHub(requireContext(), null));
+        top.addView(btnPkgStore, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
+        Button btnFpsPack = ZyroxStudioUi.createSecondaryButton(ctx, "FPS Boost", true);
+        btnFpsPack.setOnClickListener(v ->
+                SearchModFragment.promptInstallFpsBoostPack(requireContext(), null));
+        top.addView(btnFpsPack, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
         mBtnPauseResume = ZyroxStudioUi.createSecondaryButton(ctx, "Pause Queue", true);
         mBtnPauseResume.setOnClickListener(v -> {
             DownloadQueueManager mgr = DownloadQueueManager.getInstance();

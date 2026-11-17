@@ -114,6 +114,11 @@ public final class ZyroxStudioUi {
     }
 
     @NonNull
+    public static Button createSecondaryButton(@NonNull Context ctx, @NonNull String label) {
+        return createGlassButton(ctx, label, R.drawable.btn_zyrox_secondary, false);
+    }
+
+    @NonNull
     public static Button createSecondaryButton(@NonNull Context ctx, @NonNull String label, boolean compact) {
         return createGlassButton(ctx, label, R.drawable.btn_zyrox_secondary, compact);
     }
@@ -187,6 +192,37 @@ public final class ZyroxStudioUi {
     }
 
     @NonNull
+    public static EditText createGlassInput(@NonNull Context ctx, @NonNull String hint) {
+        return createGlassSearchInput(ctx, hint);
+    }
+
+    @NonNull
+    public static TextView createSectionLabel(@NonNull Context ctx, @NonNull String text) {
+        TextView tv = new TextView(ctx);
+        tv.setText(text);
+        tv.setTextColor(ContextCompat.getColor(ctx, R.color.zyrox_amber));
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
+        tv.setLetterSpacing(0.06f);
+        tv.setAllCaps(true);
+        Typeface bold = ResourcesCompat.getFont(ctx, R.font.noto_sans_bold);
+        tv.setTypeface(bold != null ? bold : Typeface.DEFAULT_BOLD, Typeface.BOLD);
+        return tv;
+    }
+
+    @NonNull
+    public static TextView createBody(@NonNull Context ctx, @NonNull String text) {
+        return createSubtitle(ctx, text);
+    }
+
+    @NonNull
+    public static LinearLayout.LayoutParams vParam(int topMarginPx) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = topMarginPx;
+        return lp;
+    }
+
+    @NonNull
     public static LinearLayout.LayoutParams spacedParam(int w, int h, int marginStartPx) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
         lp.setMarginStart(marginStartPx);
@@ -194,32 +230,101 @@ public final class ZyroxStudioUi {
     }
 
     /**
-     * Pixel-accurate, zero-filter dual-layer Minecraft skin character preview renderer (front & back
-     * side-by-side) supporting both {@code 64×64} modern Steve/Alex and {@code 64×32} legacy skins.
+     * Interactive 3D touch-rotatable, pixel-crisp dual-layer Minecraft skin character renderer
+     * supporting 360° yaw &amp; pitch drag, Classic (4px Steve) &amp; Slim (3px Alex) arms, full
+     * outer armor/hat/jacket/sleeve/pants layers, and {@code 64×64} + {@code 64×32} skins.
      */
     public static final class SkinCharacterPreviewView extends View {
         private final Paint mPixelPaint = new Paint();
+        private final Paint mShadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint mLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Rect mSrc = new Rect();
-        private final Rect mDst = new Rect();
+        private final android.graphics.Matrix mFaceMatrix = new android.graphics.Matrix();
+        private final android.graphics.Path mFacePath = new android.graphics.Path();
+        private final float[] mSrcPts = new float[8];
+        private final float[] mDstPts = new float[8];
+        private final java.util.ArrayList<FaceQuad> mFaces = new java.util.ArrayList<>(72);
         @Nullable private Bitmap mSkin;
+        @Nullable private Bitmap mCape;
         @NonNull private SkinStudioManager.SkinModel mModel = SkinStudioManager.SkinModel.CLASSIC;
+        private float mYawDeg = -26f;
+        private float mPitchDeg = 12f;
+        private float mLastTouchX;
+        private float mLastTouchY;
+        private boolean mDragged = false;
+
+        private static final class FaceQuad {
+            final int sx, sy, sw, sh;
+            final float x0, y0, x1, y1, x2, y2, x3, y3;
+            final float depthZ;
+            final int shadeAlpha;
+            final boolean overlay;
+
+            FaceQuad(int sx, int sy, int sw, int sh,
+                     float x0, float y0, float x1, float y1,
+                     float x2, float y2, float x3, float y3,
+                     float depthZ, int shadeAlpha, boolean overlay) {
+                this.sx = sx; this.sy = sy; this.sw = sw; this.sh = sh;
+                this.x0 = x0; this.y0 = y0; this.x1 = x1; this.y1 = y1;
+                this.x2 = x2; this.y2 = y2; this.x3 = x3; this.y3 = y3;
+                this.depthZ = depthZ;
+                this.shadeAlpha = shadeAlpha;
+                this.overlay = overlay;
+            }
+        }
 
         public SkinCharacterPreviewView(@NonNull Context context) {
             super(context);
             mPixelPaint.setFilterBitmap(false);
             mPixelPaint.setAntiAlias(false);
             mPixelPaint.setDither(false);
-            mLabelPaint.setColor(0xD8F8E6F1);
+            mLabelPaint.setColor(0xD8E2ECFF);
             mLabelPaint.setTextAlign(Paint.Align.CENTER);
-            mLabelPaint.setTextSize(10f * context.getResources().getDisplayMetrics().density);
+            mLabelPaint.setTextSize(9.5f * context.getResources().getDisplayMetrics().density);
             setBackgroundResource(R.drawable.bg_zyrox_terminal);
+            setClickable(true);
         }
 
         public void setSkin(@Nullable Bitmap bitmap, @NonNull SkinStudioManager.SkinModel model) {
             mSkin = bitmap;
             mModel = model;
             invalidate();
+        }
+
+        public void setCape(@Nullable Bitmap capeBitmap) {
+            mCape = capeBitmap;
+            invalidate();
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    mLastTouchX = event.getX();
+                    mLastTouchY = event.getY();
+                    mDragged = false;
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+                    return true;
+                case android.view.MotionEvent.ACTION_MOVE:
+                    float dx = event.getX() - mLastTouchX;
+                    float dy = event.getY() - mLastTouchY;
+                    if (Math.abs(dx) > 2f || Math.abs(dy) > 2f) mDragged = true;
+                    mYawDeg = (mYawDeg + dx * 0.85f) % 360f;
+                    mPitchDeg = Math.max(-42f, Math.min(42f, mPitchDeg + dy * 0.55f));
+                    mLastTouchX = event.getX();
+                    mLastTouchY = event.getY();
+                    invalidate();
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                    if (!mDragged) {
+                        // Quick tap toggles clean 3D front <-> back showcase angle
+                        mYawDeg = (Math.abs(mYawDeg) < 90f) ? 154f : -26f;
+                        mPitchDeg = 12f;
+                        invalidate();
+                        performClick();
+                    }
+                    return true;
+            }
+            return super.onTouchEvent(event);
         }
 
         @Override
@@ -235,93 +340,195 @@ public final class ZyroxStudioUi {
             }
 
             boolean modern = mSkin.getHeight() >= 64;
-            int armW = (modern && mModel == SkinStudioManager.SkinModel.SLIM) ? 3 : 4;
-            // Character is 32 skin-pixels tall (8 head + 12 body + 12 legs), (8 + 2*armW) wide
-            int unit = Math.max(2, Math.min((h - dp(getContext(), 28)) / 32, (w - dp(getContext(), 28)) / 38));
-            int bodyH = 32 * unit;
-            int topY = Math.max(dp(getContext(), 6), (h - bodyH - dp(getContext(), 14)) / 2);
+            float armW = (modern && mModel == SkinStudioManager.SkinModel.SLIM) ? 3f : 4f;
+            int armTexW = (int) armW;
+            float scale = Math.max(2f, Math.min((h - dp(getContext(), 28)) / 35f,
+                    (w - dp(getContext(), 24)) / 24f));
+            float cx = w * 0.5f;
+            float cy = (h - dp(getContext(), 12)) * 0.5f;
 
-            int frontCenterX = Math.round(w * 0.30f);
-            int backCenterX = Math.round(w * 0.70f);
+            double yaw = Math.toRadians(mYawDeg);
+            double pitch = Math.toRadians(mPitchDeg);
+            float cosY = (float) Math.cos(yaw), sinY = (float) Math.sin(yaw);
+            float cosP = (float) Math.cos(pitch), sinP = (float) Math.sin(pitch);
 
-            drawPose(canvas, frontCenterX, topY, unit, armW, modern, true);
-            drawPose(canvas, backCenterX, topY, unit, armW, modern, false);
+            mFaces.clear();
+            // Model coordinates: X right, Y down (-16 head top .. +16 feet), Z toward viewer
+            // Head (8x8x8) + Hat overlay
+            addBox(0f, -12f, 0f, 8f, 8f, 8f, 0, 0, 8, 8, 8, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            addBox(0f, -12f, 0f, 8.7f, 8.7f, 8.7f, 32, 0, 8, 8, 8, true, cx, cy, scale, cosY, sinY, cosP, sinP);
 
-            float labelY = topY + bodyH + dp(getContext(), 12);
-            canvas.drawText("FRONT", frontCenterX, labelY, mLabelPaint);
-            canvas.drawText("BACK", backCenterX, labelY, mLabelPaint);
-        }
+            // Torso (8x12x4) + Jacket overlay
+            addBox(0f, -2f, 0f, 8f, 12f, 4f, 16, 16, 8, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            if (modern) {
+                addBox(0f, -2f, 0f, 8.45f, 12.45f, 4.45f, 16, 32, 8, 12, 4, true, cx, cy, scale, cosY, sinY, cosP, sinP);
+            }
 
-        private void drawPose(Canvas c, int cx, int topY, int u, int armW, boolean modern, boolean front) {
-            int headX = cx - 4 * u;
-            int torsoX = cx - 4 * u;
-            int torsoY = topY + 8 * u;
-            int legsY = topY + 20 * u;
-            int leftDrawArmX = torsoX - armW * u;
-            int rightDrawArmX = torsoX + 8 * u;
-
-            if (front) {
-                // Head + Hat overlay
-                blit(c, 8, 8, 8, 8, headX, topY, 8 * u, 8 * u);
-                blit(c, 40, 8, 8, 8, headX, topY, 8 * u, 8 * u);
-                // Torso + Jacket overlay
-                blit(c, 20, 20, 8, 12, torsoX, torsoY, 8 * u, 12 * u);
-                if (modern) blit(c, 20, 36, 8, 12, torsoX, torsoY, 8 * u, 12 * u);
-                // Right arm (viewer's left) + Left arm (viewer's right)
-                blit(c, 44, 20, armW, 12, leftDrawArmX, torsoY, armW * u, 12 * u);
-                if (modern) {
-                    blit(c, 44, 36, armW, 12, leftDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, 36, 52, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, 52, 52, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                } else {
-                    blit(c, 44, 20, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                }
-                // Right leg + Left leg
-                blit(c, 4, 20, 4, 12, torsoX, legsY, 4 * u, 12 * u);
-                if (modern) {
-                    blit(c, 4, 36, 4, 12, torsoX, legsY, 4 * u, 12 * u);
-                    blit(c, 20, 52, 4, 12, cx, legsY, 4 * u, 12 * u);
-                    blit(c, 4, 52, 4, 12, cx, legsY, 4 * u, 12 * u);
-                } else {
-                    blit(c, 4, 20, 4, 12, cx, legsY, 4 * u, 12 * u);
-                }
+            // Right arm (viewer's left at yaw=0) & Left arm (viewer's right at yaw=0)
+            float armOffsetX = 4f + armW * 0.5f;
+            addBox(-armOffsetX, -2f, 0f, armW, 12f, 4f, 40, 16, armTexW, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            if (modern) {
+                addBox(-armOffsetX, -2f, 0f, armW + 0.45f, 12.45f, 4.45f, 40, 32, armTexW, 12, 4, true, cx, cy, scale, cosY, sinY, cosP, sinP);
+                addBox(armOffsetX, -2f, 0f, armW, 12f, 4f, 32, 48, armTexW, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+                addBox(armOffsetX, -2f, 0f, armW + 0.45f, 12.45f, 4.45f, 48, 48, armTexW, 12, 4, true, cx, cy, scale, cosY, sinY, cosP, sinP);
             } else {
-                // Head back + Hat back
-                blit(c, 24, 8, 8, 8, headX, topY, 8 * u, 8 * u);
-                blit(c, 56, 8, 8, 8, headX, topY, 8 * u, 8 * u);
-                // Torso back + Jacket back
-                blit(c, 32, 20, 8, 12, torsoX, torsoY, 8 * u, 12 * u);
-                if (modern) blit(c, 32, 36, 8, 12, torsoX, torsoY, 8 * u, 12 * u);
-                // Arms back
-                int rArmBackX = 48 + armW;
-                if (modern) {
-                    int lArmBackX = 40 + armW;
-                    blit(c, lArmBackX, 52, armW, 12, leftDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, lArmBackX + 16, 52, armW, 12, leftDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, rArmBackX, 20, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, rArmBackX, 36, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                } else {
-                    blit(c, rArmBackX, 20, armW, 12, leftDrawArmX, torsoY, armW * u, 12 * u);
-                    blit(c, rArmBackX, 20, armW, 12, rightDrawArmX, torsoY, armW * u, 12 * u);
-                }
-                // Legs back
-                if (modern) {
-                    blit(c, 28, 52, 4, 12, torsoX, legsY, 4 * u, 12 * u);
-                    blit(c, 12, 52, 4, 12, torsoX, legsY, 4 * u, 12 * u);
-                    blit(c, 12, 20, 4, 12, cx, legsY, 4 * u, 12 * u);
-                    blit(c, 12, 36, 4, 12, cx, legsY, 4 * u, 12 * u);
-                } else {
-                    blit(c, 12, 20, 4, 12, torsoX, legsY, 4 * u, 12 * u);
-                    blit(c, 12, 20, 4, 12, cx, legsY, 4 * u, 12 * u);
+                addBox(armOffsetX, -2f, 0f, armW, 12f, 4f, 40, 16, armTexW, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            }
+
+            // Right leg & Left leg
+            addBox(-2f, 10f, 0f, 4f, 12f, 4f, 0, 16, 4, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            if (modern) {
+                addBox(-2f, 10f, 0f, 4.4f, 12.4f, 4.4f, 0, 32, 4, 12, 4, true, cx, cy, scale, cosY, sinY, cosP, sinP);
+                addBox(2f, 10f, 0f, 4f, 12f, 4f, 16, 48, 4, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+                addBox(2f, 10f, 0f, 4.4f, 12.4f, 4.4f, 0, 48, 4, 12, 4, true, cx, cy, scale, cosY, sinY, cosP, sinP);
+            } else {
+                addBox(2f, 10f, 0f, 4f, 12f, 4f, 0, 16, 4, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
+            }
+
+            java.util.Collections.sort(mFaces, (a, b) -> {
+                int cmp = Float.compare(a.depthZ, b.depthZ);
+                if (cmp != 0) return cmp;
+                return Boolean.compare(a.overlay, b.overlay);
+            });
+
+            for (FaceQuad f : mFaces) {
+                drawFaceQuad(canvas, f);
+            }
+
+            // Optional 3D Cape preview draped cleanly on player's back (UV 1,1..11,17 on 64x32 cape)
+            if (mCape != null && !mCape.isRecycled() && mCape.getWidth() >= 22 && mCape.getHeight() >= 17) {
+                float[] c0 = proj(5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                float[] c1 = proj(-5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                float[] c2 = proj(-5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                float[] c3 = proj(5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                float capeCross = (c1[0] - c0[0]) * (c2[1] - c0[1]) - (c1[1] - c0[1]) * (c2[0] - c0[0]);
+                if (capeCross > 0.5f) {
+                    mSrcPts[0] = 1f;  mSrcPts[1] = 1f;
+                    mSrcPts[2] = 11f; mSrcPts[3] = 1f;
+                    mSrcPts[4] = 11f; mSrcPts[5] = 17f;
+                    mSrcPts[6] = 1f;  mSrcPts[7] = 17f;
+                    mDstPts[0] = c0[0]; mDstPts[1] = c0[1];
+                    mDstPts[2] = c1[0]; mDstPts[3] = c1[1];
+                    mDstPts[4] = c2[0]; mDstPts[5] = c2[1];
+                    mDstPts[6] = c3[0]; mDstPts[7] = c3[1];
+                    if (mFaceMatrix.setPolyToPoly(mSrcPts, 0, mDstPts, 0, 4)) {
+                        mFacePath.reset();
+                        mFacePath.moveTo(c0[0], c0[1]);
+                        mFacePath.lineTo(c1[0], c1[1]);
+                        mFacePath.lineTo(c2[0], c2[1]);
+                        mFacePath.lineTo(c3[0], c3[1]);
+                        mFacePath.close();
+                        int sv = canvas.save();
+                        canvas.clipPath(mFacePath);
+                        canvas.drawBitmap(mCape, mFaceMatrix, mPixelPaint);
+                        canvas.restoreToCount(sv);
+                    }
                 }
             }
+
+            canvas.drawText("3D PREVIEW • DRAG TO ROTATE • TAP TO FLIP", w * 0.5f, h - dp(getContext(), 6), mLabelPaint);
         }
 
-        private void blit(Canvas c, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
-            if (mSkin == null) return;
-            mSrc.set(sx, sy, sx + sw, sy + sh);
-            mDst.set(dx, dy, dx + dw, dy + dh);
-            c.drawBitmap(mSkin, mSrc, mDst, mPixelPaint);
+        private void addBox(float bx, float by, float bz,
+                            float bw, float bh, float bd,
+                            int u, int v, int tw, int th, int td,
+                            boolean overlay,
+                            float cx, float cy, float scale,
+                            float cosY, float sinY, float cosP, float sinP) {
+            float hx = bw * 0.5f, hy = bh * 0.5f, hz = bd * 0.5f;
+            float x0 = bx - hx, x1 = bx + hx;
+            float y0 = by - hy, y1 = by + hy;
+            float z0 = bz - hz, z1 = bz + hz;
+
+            // Front (+Z): u+td, v+td, tw x th
+            emitFace(u + td, v + td, tw, th,
+                    x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1,
+                    0, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Back (-Z): u+2*td+tw, v+td, tw x th
+            emitFace(u + td + tw + td, v + td, tw, th,
+                    x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0,
+                    28, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Right (-X, character right side): u, v+td, td x th
+            emitFace(u, v + td, td, th,
+                    x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0,
+                    38, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Left (+X, character left side): u+td+tw, v+td, td x th
+            emitFace(u + td + tw, v + td, td, th,
+                    x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1,
+                    22, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Top (-Y): u+td, v, tw x td
+            emitFace(u + td, v, tw, td,
+                    x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1,
+                    0, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Bottom (+Y): u+td+tw, v, tw x td
+            emitFace(u + td + tw, v, tw, td,
+                    x0, y1, z1, x1, y1, z1, x1, y1, z0, x0, y1, z0,
+                    58, overlay, cx, cy, scale, cosY, sinY, cosP, sinP);
+        }
+
+        private void emitFace(int sx, int sy, int sw, int sh,
+                              float ax, float ay, float az,
+                              float bx, float by, float bz,
+                              float dx, float dy, float dz,
+                              float ex, float ey, float ez,
+                              int shadeAlpha, boolean overlay,
+                              float cx, float cy, float scale,
+                              float cosY, float sinY, float cosP, float sinP) {
+            float[] p0 = proj(ax, ay, az, cx, cy, scale, cosY, sinY, cosP, sinP);
+            float[] p1 = proj(bx, by, bz, cx, cy, scale, cosY, sinY, cosP, sinP);
+            float[] p2 = proj(dx, dy, dz, cx, cy, scale, cosY, sinY, cosP, sinP);
+            float[] p3 = proj(ex, ey, ez, cx, cy, scale, cosY, sinY, cosP, sinP);
+            // Backface cull for solid core layers; keep front-facing outer layer quads
+            float cross = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]);
+            if (cross <= 0.5f) return;
+            float avgZ = (p0[2] + p1[2] + p2[2] + p3[2]) * 0.25f + (overlay ? 0.12f : 0f);
+            mFaces.add(new FaceQuad(sx, sy, sw, sh,
+                    p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], p3[0], p3[1],
+                    avgZ, shadeAlpha, overlay));
+        }
+
+        private static float[] proj(float x, float y, float z,
+                                    float cx, float cy, float scale,
+                                    float cosY, float sinY, float cosP, float sinP) {
+            float rx = x * cosY + z * sinY;
+            float rz = -x * sinY + z * cosY;
+            float ry = y * cosP + rz * sinP;
+            float fz = -y * sinP + rz * cosP;
+            return new float[]{cx + rx * scale, cy + ry * scale, fz};
+        }
+
+        private void drawFaceQuad(@NonNull Canvas c, @NonNull FaceQuad f) {
+            Bitmap skin = mSkin;
+            if (skin == null || f.sx < 0 || f.sy < 0
+                    || f.sx + f.sw > skin.getWidth() || f.sy + f.sh > skin.getHeight()) {
+                return;
+            }
+            mSrcPts[0] = f.sx;        mSrcPts[1] = f.sy;
+            mSrcPts[2] = f.sx + f.sw; mSrcPts[3] = f.sy;
+            mSrcPts[4] = f.sx + f.sw; mSrcPts[5] = f.sy + f.sh;
+            mSrcPts[6] = f.sx;        mSrcPts[7] = f.sy + f.sh;
+
+            mDstPts[0] = f.x0; mDstPts[1] = f.y0;
+            mDstPts[2] = f.x1; mDstPts[3] = f.y1;
+            mDstPts[4] = f.x2; mDstPts[5] = f.y2;
+            mDstPts[6] = f.x3; mDstPts[7] = f.y3;
+
+            if (!mFaceMatrix.setPolyToPoly(mSrcPts, 0, mDstPts, 0, 4)) return;
+            mFacePath.reset();
+            mFacePath.moveTo(f.x0, f.y0);
+            mFacePath.lineTo(f.x1, f.y1);
+            mFacePath.lineTo(f.x2, f.y2);
+            mFacePath.lineTo(f.x3, f.y3);
+            mFacePath.close();
+
+            int save = c.save();
+            c.clipPath(mFacePath);
+            c.drawBitmap(skin, mFaceMatrix, mPixelPaint);
+            if (!f.overlay && f.shadeAlpha > 0) {
+                mShadePaint.setColor(Color.argb(f.shadeAlpha, 6, 10, 24));
+                c.drawPath(mFacePath, mShadePaint);
+            }
+            c.restoreToCount(save);
         }
     }
 }

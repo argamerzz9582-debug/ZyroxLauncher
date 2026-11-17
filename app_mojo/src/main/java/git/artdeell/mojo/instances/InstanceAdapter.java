@@ -86,19 +86,29 @@ public class InstanceAdapter extends BaseAdapter {
         else if (Instance.VERSION_LATEST_SNAPSHOT.equalsIgnoreCase(versionName))
             versionName = v.getContext().getString(R.string.profiles_latest_snapshot);
 
+        String baseTitle;
         if (versionName == null && profileName != null)
-            extendedTextView.setText(profileName);
+            baseTitle = profileName;
         else if (versionName != null && profileName == null)
-            extendedTextView.setText(versionName);
-        else extendedTextView.setText(String.format("%s - %s", profileName, versionName));
+            baseTitle = versionName;
+        else baseTitle = String.format("%s - %s", profileName, versionName);
 
-        // Set selected background if needed
+        if (displaySelection) {
+            String played = InstancePlaytimeTracker.formatPlaytime(
+                    InstancePlaytimeTracker.getTotalPlaytimeMs(v.getContext(), i));
+            if (!played.isEmpty()) {
+                baseTitle = baseTitle + "  ·  " + played;
+            }
+        }
+        extendedTextView.setText(baseTitle);
+
+        // Set selected background if needed (Starlight Sapphire Liquid Glass)
         if(idx == mSelectionIndex && displaySelection) {
-            extendedTextView.setBackgroundColor(0x34FAD2E7);
-            extendedTextView.setTextColor(0xFFFFFAFD);
+            extendedTextView.setBackgroundColor(0x369CC4FF);
+            extendedTextView.setTextColor(0xFFF8FBFF);
         }else {
             extendedTextView.setBackgroundColor(Color.TRANSPARENT);
-            extendedTextView.setTextColor(0xF5FFFAFD);
+            extendedTextView.setTextColor(0xF5F8FBFF);
         }
     }
 
@@ -106,7 +116,7 @@ public class InstanceAdapter extends BaseAdapter {
         ExtendedTextView extendedTextView = (ExtendedTextView) v;
         extendedTextView.setCompoundDrawablesRelative(extra.icon, null, extendedTextView.getCompoundsDrawables()[2], null);
         extendedTextView.setText(extra.name);
-        extendedTextView.setTextColor(0xFFFBD8EB);
+        extendedTextView.setTextColor(0xFFC4DDFF);
         extendedTextView.setBackgroundColor(Color.TRANSPARENT);
     }
 
