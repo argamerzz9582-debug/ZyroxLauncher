@@ -526,7 +526,7 @@ jobs:
             echo "- **Clean Modular Architecture & Dedicated \`arm64-v8a\` Build:** Eliminated legacy bundled JARs and file-picker dead code in favor of Maven artifacts, decomposed core launcher classes, and packaged as a lean Android 15/16 16 KB page-aligned \`arm64-v8a\` APK."
             echo ""
             echo "### Download & Upgrade"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
             echo ""
             echo "### Signing & SHA-256 Verification"
             echo '```'

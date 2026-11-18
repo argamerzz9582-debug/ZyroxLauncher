@@ -48,7 +48,7 @@ public final class ModrinthContentInstaller {
     public static final String TYPE_RESOURCEPACK = "resourcepack";
 
     private static final String MODRINTH_API = git.artdeell.mojo.metadata.ModPlatformRepository.MODRINTH_API_BASE;
-    private static final String USER_AGENT = "ZyroxLauncher/2.2.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
+    private static final String USER_AGENT = "ZyroxLauncher/2.3.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
     private static final String BACKUP_DIR_NAME = ".zyrox_mod_backup";
     private static final int CONNECT_TIMEOUT_MS = 12_000;
     private static final int READ_TIMEOUT_MS = 25_000;
