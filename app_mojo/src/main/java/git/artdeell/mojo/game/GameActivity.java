@@ -448,6 +448,7 @@ public class GameActivity extends BaseActivity
         flushPlaytimeSession();
         ContextExecutor.clearActivity();
         if (mGyroControl != null) mGyroControl.disable();
+        if (mLoadingController != null) mLoadingController.pauseAnimation();
         if (mHudCoordinator != null) mHudCoordinator.onPause();
         if (Platform.isGrabbing()) {
             CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);

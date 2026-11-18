@@ -36,7 +36,44 @@ import git.artdeell.mojo.skins.SkinStudioManager;
  */
 public final class ZyroxStudioUi {
 
+    @Nullable
+    private static volatile Typeface sDisplayFont;
+    @Nullable
+    private static volatile Typeface sPixelFont;
+
     private ZyroxStudioUi() {
+    }
+
+    /** Returns the process-cached bold display typeface ({@code R.font.noto_sans_bold}) with zero repeat I/O. */
+    @NonNull
+    public static Typeface getDisplayFont(@NonNull Context ctx) {
+        Typeface cached = sDisplayFont;
+        if (cached != null) return cached;
+        try {
+            Typeface loaded = ResourcesCompat.getFont(ctx.getApplicationContext(), R.font.noto_sans_bold);
+            if (loaded != null) {
+                sDisplayFont = loaded;
+                return loaded;
+            }
+        } catch (Throwable ignored) {
+        }
+        return Typeface.DEFAULT_BOLD;
+    }
+
+    /** Returns the process-cached Minecraft headline typeface ({@code R.font.minecraft_ten}) with zero repeat I/O. */
+    @NonNull
+    public static Typeface getPixelFont(@NonNull Context ctx) {
+        Typeface cached = sPixelFont;
+        if (cached != null) return cached;
+        try {
+            Typeface loaded = ResourcesCompat.getFont(ctx.getApplicationContext(), R.font.minecraft_ten);
+            if (loaded != null) {
+                sPixelFont = loaded;
+                return loaded;
+            }
+        } catch (Throwable ignored) {
+        }
+        return getDisplayFont(ctx);
     }
 
     public static int dp(@NonNull Context ctx, float dp) {
@@ -91,18 +128,18 @@ public final class ZyroxStudioUi {
         btn.setBackgroundResource(bgRes);
         btn.setTextColor(ZyroxLiquidGlassDrawable.GLYPH_SNOW_WHITE);
         btn.setShadowLayer(3.5f, 0f, 1.0f, ZyroxLiquidGlassDrawable.GLYPH_SHADOW_COLOR);
-        btn.setLetterSpacing(0.035f);
+        btn.setLetterSpacing(0.025f);
         btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 9.5f : 10.5f);
+        btn.setIncludeFontPadding(false);
         btn.setStateListAnimator(null);
         btn.setElevation(0f);
-        Typeface bold = ResourcesCompat.getFont(ctx, R.font.noto_sans_bold);
-        if (bold != null) btn.setTypeface(bold, Typeface.BOLD);
+        btn.setTypeface(getDisplayFont(ctx), Typeface.BOLD);
         int minH = dp(ctx, compact ? 34 : 38);
         btn.setMinHeight(minH);
         btn.setMinimumHeight(minH);
         btn.setMinWidth(0);
         btn.setMinimumWidth(0);
-        int padH = dp(ctx, compact ? 10 : 14);
+        int padH = dp(ctx, compact ? 9 : 13);
         btn.setPadding(padH, 0, padH, 0);
         btn.setGravity(Gravity.CENTER);
         return btn;
@@ -152,9 +189,7 @@ public final class ZyroxStudioUi {
         tv.setText(text);
         tv.setTextColor(ContextCompat.getColor(ctx, R.color.zyrox_text_primary));
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
-        Typeface bold = ResourcesCompat.getFont(ctx, R.font.noto_sans_bold);
-        if (bold != null) tv.setTypeface(bold, Typeface.BOLD);
-        else tv.setTypeface(Typeface.DEFAULT_BOLD);
+        tv.setTypeface(getDisplayFont(ctx), Typeface.BOLD);
         return tv;
     }
 
@@ -204,8 +239,7 @@ public final class ZyroxStudioUi {
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
         tv.setLetterSpacing(0.06f);
         tv.setAllCaps(true);
-        Typeface bold = ResourcesCompat.getFont(ctx, R.font.noto_sans_bold);
-        tv.setTypeface(bold != null ? bold : Typeface.DEFAULT_BOLD, Typeface.BOLD);
+        tv.setTypeface(getDisplayFont(ctx), Typeface.BOLD);
         return tv;
     }
 
@@ -252,14 +286,27 @@ public final class ZyroxStudioUi {
         private float mLastTouchY;
         private boolean mDragged = false;
 
-        private static final class FaceQuad {
-            final int sx, sy, sw, sh;
-            final float x0, y0, x1, y1, x2, y2, x3, y3;
-            final float depthZ;
-            final int shadeAlpha;
-            final boolean overlay;
+        private static final java.util.Comparator<FaceQuad> FACE_COMPARATOR = (a, b) -> {
+            int cmp = Float.compare(a.depthZ, b.depthZ);
+            if (cmp != 0) return cmp;
+            return Boolean.compare(a.overlay, b.overlay);
+        };
 
-            FaceQuad(int sx, int sy, int sw, int sh,
+        private final java.util.ArrayList<FaceQuad> mFacePool = new java.util.ArrayList<>(72);
+        private int mFacePoolCursor = 0;
+        private final float[] mP0 = new float[3];
+        private final float[] mP1 = new float[3];
+        private final float[] mP2 = new float[3];
+        private final float[] mP3 = new float[3];
+
+        private static final class FaceQuad {
+            int sx, sy, sw, sh;
+            float x0, y0, x1, y1, x2, y2, x3, y3;
+            float depthZ;
+            int shadeAlpha;
+            boolean overlay;
+
+            void set(int sx, int sy, int sw, int sh,
                      float x0, float y0, float x1, float y1,
                      float x2, float y2, float x3, float y3,
                      float depthZ, int shadeAlpha, boolean overlay) {
@@ -353,6 +400,7 @@ public final class ZyroxStudioUi {
             float cosP = (float) Math.cos(pitch), sinP = (float) Math.sin(pitch);
 
             mFaces.clear();
+            mFacePoolCursor = 0;
             // Model coordinates: X right, Y down (-16 head top .. +16 feet), Z toward viewer
             // Head (8x8x8) + Hat overlay
             addBox(0f, -12f, 0f, 8f, 8f, 8f, 0, 0, 8, 8, 8, false, cx, cy, scale, cosY, sinY, cosP, sinP);
@@ -385,38 +433,34 @@ public final class ZyroxStudioUi {
                 addBox(2f, 10f, 0f, 4f, 12f, 4f, 0, 16, 4, 12, 4, false, cx, cy, scale, cosY, sinY, cosP, sinP);
             }
 
-            java.util.Collections.sort(mFaces, (a, b) -> {
-                int cmp = Float.compare(a.depthZ, b.depthZ);
-                if (cmp != 0) return cmp;
-                return Boolean.compare(a.overlay, b.overlay);
-            });
+            java.util.Collections.sort(mFaces, FACE_COMPARATOR);
 
-            for (FaceQuad f : mFaces) {
-                drawFaceQuad(canvas, f);
+            for (int i = 0, n = mFaces.size(); i < n; i++) {
+                drawFaceQuad(canvas, mFaces.get(i));
             }
 
             // Optional 3D Cape preview draped cleanly on player's back (UV 1,1..11,17 on 64x32 cape)
             if (mCape != null && !mCape.isRecycled() && mCape.getWidth() >= 22 && mCape.getHeight() >= 17) {
-                float[] c0 = proj(5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
-                float[] c1 = proj(-5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
-                float[] c2 = proj(-5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
-                float[] c3 = proj(5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
-                float capeCross = (c1[0] - c0[0]) * (c2[1] - c0[1]) - (c1[1] - c0[1]) * (c2[0] - c0[0]);
+                projInto(mP0, 5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                projInto(mP1, -5f, -7.8f, -2.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                projInto(mP2, -5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                projInto(mP3, 5.3f, 8.2f, -3.55f, cx, cy, scale, cosY, sinY, cosP, sinP);
+                float capeCross = (mP1[0] - mP0[0]) * (mP2[1] - mP0[1]) - (mP1[1] - mP0[1]) * (mP2[0] - mP0[0]);
                 if (capeCross > 0.5f) {
                     mSrcPts[0] = 1f;  mSrcPts[1] = 1f;
                     mSrcPts[2] = 11f; mSrcPts[3] = 1f;
                     mSrcPts[4] = 11f; mSrcPts[5] = 17f;
                     mSrcPts[6] = 1f;  mSrcPts[7] = 17f;
-                    mDstPts[0] = c0[0]; mDstPts[1] = c0[1];
-                    mDstPts[2] = c1[0]; mDstPts[3] = c1[1];
-                    mDstPts[4] = c2[0]; mDstPts[5] = c2[1];
-                    mDstPts[6] = c3[0]; mDstPts[7] = c3[1];
+                    mDstPts[0] = mP0[0]; mDstPts[1] = mP0[1];
+                    mDstPts[2] = mP1[0]; mDstPts[3] = mP1[1];
+                    mDstPts[4] = mP2[0]; mDstPts[5] = mP2[1];
+                    mDstPts[6] = mP3[0]; mDstPts[7] = mP3[1];
                     if (mFaceMatrix.setPolyToPoly(mSrcPts, 0, mDstPts, 0, 4)) {
                         mFacePath.reset();
-                        mFacePath.moveTo(c0[0], c0[1]);
-                        mFacePath.lineTo(c1[0], c1[1]);
-                        mFacePath.lineTo(c2[0], c2[1]);
-                        mFacePath.lineTo(c3[0], c3[1]);
+                        mFacePath.moveTo(mP0[0], mP0[1]);
+                        mFacePath.lineTo(mP1[0], mP1[1]);
+                        mFacePath.lineTo(mP2[0], mP2[1]);
+                        mFacePath.lineTo(mP3[0], mP3[1]);
                         mFacePath.close();
                         int sv = canvas.save();
                         canvas.clipPath(mFacePath);
@@ -474,27 +518,38 @@ public final class ZyroxStudioUi {
                               int shadeAlpha, boolean overlay,
                               float cx, float cy, float scale,
                               float cosY, float sinY, float cosP, float sinP) {
-            float[] p0 = proj(ax, ay, az, cx, cy, scale, cosY, sinY, cosP, sinP);
-            float[] p1 = proj(bx, by, bz, cx, cy, scale, cosY, sinY, cosP, sinP);
-            float[] p2 = proj(dx, dy, dz, cx, cy, scale, cosY, sinY, cosP, sinP);
-            float[] p3 = proj(ex, ey, ez, cx, cy, scale, cosY, sinY, cosP, sinP);
+            projInto(mP0, ax, ay, az, cx, cy, scale, cosY, sinY, cosP, sinP);
+            projInto(mP1, bx, by, bz, cx, cy, scale, cosY, sinY, cosP, sinP);
+            projInto(mP2, dx, dy, dz, cx, cy, scale, cosY, sinY, cosP, sinP);
+            projInto(mP3, ex, ey, ez, cx, cy, scale, cosY, sinY, cosP, sinP);
             // Backface cull for solid core layers; keep front-facing outer layer quads
-            float cross = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p1[1] - p0[1]) * (p2[0] - p0[0]);
+            float cross = (mP1[0] - mP0[0]) * (mP2[1] - mP0[1]) - (mP1[1] - mP0[1]) * (mP2[0] - mP0[0]);
             if (cross <= 0.5f) return;
-            float avgZ = (p0[2] + p1[2] + p2[2] + p3[2]) * 0.25f + (overlay ? 0.12f : 0f);
-            mFaces.add(new FaceQuad(sx, sy, sw, sh,
-                    p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], p3[0], p3[1],
-                    avgZ, shadeAlpha, overlay));
+            float avgZ = (mP0[2] + mP1[2] + mP2[2] + mP3[2]) * 0.25f + (overlay ? 0.12f : 0f);
+            FaceQuad quad;
+            if (mFacePoolCursor < mFacePool.size()) {
+                quad = mFacePool.get(mFacePoolCursor);
+            } else {
+                quad = new FaceQuad();
+                mFacePool.add(quad);
+            }
+            mFacePoolCursor++;
+            quad.set(sx, sy, sw, sh,
+                    mP0[0], mP0[1], mP1[0], mP1[1], mP2[0], mP2[1], mP3[0], mP3[1],
+                    avgZ, shadeAlpha, overlay);
+            mFaces.add(quad);
         }
 
-        private static float[] proj(float x, float y, float z,
-                                    float cx, float cy, float scale,
-                                    float cosY, float sinY, float cosP, float sinP) {
+        private static void projInto(float[] out, float x, float y, float z,
+                                     float cx, float cy, float scale,
+                                     float cosY, float sinY, float cosP, float sinP) {
             float rx = x * cosY + z * sinY;
             float rz = -x * sinY + z * cosY;
             float ry = y * cosP + rz * sinP;
             float fz = -y * sinP + rz * cosP;
-            return new float[]{cx + rx * scale, cy + ry * scale, fz};
+            out[0] = cx + rx * scale;
+            out[1] = cy + ry * scale;
+            out[2] = fz;
         }
 
         private void drawFaceQuad(@NonNull Canvas c, @NonNull FaceQuad f) {

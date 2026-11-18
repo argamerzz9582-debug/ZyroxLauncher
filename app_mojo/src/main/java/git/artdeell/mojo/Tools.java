@@ -430,12 +430,27 @@ public final class Tools {
     /** Swap the main fragment with another */
     public static void swapFragment(FragmentActivity fragmentActivity , Class<? extends Fragment> fragmentClass,
                                     @Nullable String fragmentTag, @Nullable Bundle bundle) {
-        // When people tab out, it might happen
-        //TODO handle custom animations
-        fragmentActivity.getSupportFragmentManager().beginTransaction()
-                .setReorderingAllowed(true)
-                .addToBackStack(fragmentClass.getName())
-                .replace(R.id.container_fragment, fragmentClass, bundle, fragmentTag).commit();
+        if (fragmentActivity == null || fragmentActivity.isFinishing()) return;
+        FragmentManager fm = fragmentActivity.getSupportFragmentManager();
+        if (fm.isStateSaved()) return;
+        // Prevent duplicate back-stack pushes on rapid double-tap when no new arguments are passed
+        Fragment current = fm.findFragmentById(R.id.container_fragment);
+        if (bundle == null && current != null && current.getClass() == fragmentClass) {
+            return;
+        }
+        androidx.fragment.app.FragmentTransaction tx = fm.beginTransaction()
+                .setReorderingAllowed(true);
+        if (!LauncherPreferences.isReducedMotionEnabled(fragmentActivity)) {
+            tx.setCustomAnimations(
+                    R.anim.zyrox_frag_enter,
+                    R.anim.zyrox_frag_exit,
+                    R.anim.zyrox_frag_enter,
+                    R.anim.zyrox_frag_exit
+            );
+        }
+        tx.addToBackStack(fragmentClass.getName())
+                .replace(R.id.container_fragment, fragmentClass, bundle, fragmentTag)
+                .commit();
     }
 
     public static void backToMainMenu(FragmentActivity fragmentActivity) {

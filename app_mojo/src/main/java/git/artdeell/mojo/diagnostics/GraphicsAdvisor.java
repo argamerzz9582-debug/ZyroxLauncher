@@ -587,7 +587,7 @@ public final class GraphicsAdvisor {
 
         StringBuilder sb = new StringBuilder(640);
         sb.append("Zyrox Graphics & Device Diagnostics\n");
-        sb.append("───────────────────────────────────\n");
+        sb.append("-----------------------------------\n");
         sb.append("Device Model: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
         sb.append("Android SDK: API ").append(Build.VERSION.SDK_INT)
                 .append(" (Android ").append(Build.VERSION.RELEASE).append(")\n");

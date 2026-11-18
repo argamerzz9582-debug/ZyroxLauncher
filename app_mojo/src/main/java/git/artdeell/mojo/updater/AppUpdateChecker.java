@@ -160,7 +160,7 @@ public final class AppUpdateChecker {
     public static void showUpdateDialog(@NonNull Context ctx, @NonNull ReleaseInfo info) {
         StringBuilder msg = new StringBuilder();
         msg.append("Installed: v").append(BuildConfig.VERSION_NAME)
-                .append("  →  Latest: ").append(info.tagName);
+                .append("  ->  Latest: ").append(info.tagName);
         if (info.apkSizeBytes > 0) {
             msg.append(" (").append(ZyroxStudioUi.formatBytes(info.apkSizeBytes)).append(")");
         }

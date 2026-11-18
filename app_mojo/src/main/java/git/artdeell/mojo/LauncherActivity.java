@@ -333,6 +333,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
 
         getWindow().setBackgroundDrawable(null);
+        requestNativeHighRefreshRate();
         bindViews();
         setupEdgeToEdgeCutoutGuides();
         mRequestPermissionLauncher = this.registerForActivityResult(
@@ -447,6 +448,43 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
         if (current != null) {
             updateGlobalShellForFragment(current);
+        }
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level >= TRIM_MEMORY_UI_HIDDEN && mShaderBackground != null) {
+            mShaderBackground.onStop();
+        }
+    }
+
+    /**
+     * Unlocks native 90Hz / 120Hz / 144Hz / 165Hz UI rendering on high-refresh-rate Android phones
+     * and tablets while strictly preserving native panel resolution (zero resolution mode switch).
+     */
+    private void requestNativeHighRefreshRate() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            android.view.Display display = getWindowManager().getDefaultDisplay();
+            if (display == null) return;
+            android.view.Display.Mode current = display.getMode();
+            android.view.Display.Mode[] modes = display.getSupportedModes();
+            if (current == null || modes == null || modes.length <= 1) return;
+            android.view.Display.Mode best = current;
+            for (android.view.Display.Mode mode : modes) {
+                if (mode.getPhysicalWidth() == current.getPhysicalWidth()
+                        && mode.getPhysicalHeight() == current.getPhysicalHeight()
+                        && mode.getRefreshRate() > best.getRefreshRate() + 0.5f) {
+                    best = mode;
+                }
+            }
+            if (best.getModeId() != current.getModeId()) {
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                lp.preferredDisplayModeId = best.getModeId();
+                getWindow().setAttributes(lp);
+            }
+        } catch (Throwable ignored) {
         }
     }
 

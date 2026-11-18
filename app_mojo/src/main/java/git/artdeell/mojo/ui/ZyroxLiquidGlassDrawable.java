@@ -539,7 +539,9 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
      */
     public static boolean isEligibleForForegroundBlur(@Nullable android.view.View target) {
         if (target == null) return false;
-        if (target instanceof ZyroxSeamlessGifView || target instanceof ZyroxShaderBackgroundView) {
+        if (target instanceof ZyroxSeamlessGifView
+                || target instanceof ZyroxLoopingVideoView
+                || target instanceof ZyroxShaderBackgroundView) {
             return false;
         }
         if (ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP.equals(target.getTag())) {
@@ -556,6 +558,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         for (int i = 0; i < count; i++) {
             android.view.View child = group.getChildAt(i);
             if (child instanceof ZyroxSeamlessGifView
+                    || child instanceof ZyroxLoopingVideoView
                     || child instanceof ZyroxShaderBackgroundView
                     || ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP.equals(child.getTag())) {
                 return true;

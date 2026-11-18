@@ -209,9 +209,11 @@ public final class GameLoadingOverlayController {
         if (LauncherPreferences.isReducedMotionEnabled(mActivity)) {
             destroyImmediate();
         } else {
+            // Pause video decode on final rendered frame so fade-out runs at full GPU refresh rate
+            pauseAnimation();
             mLoadingScreen.animate()
                     .alpha(0f)
-                    .setDuration(320L)
+                    .setDuration(300L)
                     .setInterpolator(new DecelerateInterpolator())
                     .withEndAction(this::destroyImmediate)
                     .start();
@@ -278,9 +280,16 @@ public final class GameLoadingOverlayController {
 
     private void applySnapshotOnUi(@NonNull GameLaunchProgressTracker.ProgressSnapshot snap) {
         if (mLoadingScreen == null) return;
-        if (mLoadingStageText != null) mLoadingStageText.setText(snap.stageText);
-        if (mLoadingEtaText != null) mLoadingEtaText.setText(snap.etaText);
-        if (mLoadingPercentText != null) mLoadingPercentText.setText(snap.percent + "%");
+        if (mLoadingStageText != null && !snap.stageText.contentEquals(mLoadingStageText.getText())) {
+            mLoadingStageText.setText(snap.stageText);
+        }
+        if (mLoadingEtaText != null && !snap.etaText.contentEquals(mLoadingEtaText.getText())) {
+            mLoadingEtaText.setText(snap.etaText);
+        }
+        String pctStr = snap.percent + "%";
+        if (mLoadingPercentText != null && !pctStr.contentEquals(mLoadingPercentText.getText())) {
+            mLoadingPercentText.setText(pctStr);
+        }
         if (mLoadingProgressBar != null) {
             int target = Math.max(mLoadingProgressBar.getProgress(), snap.percent * 10);
             if (LauncherPreferences.isReducedMotionEnabled(mActivity)) {

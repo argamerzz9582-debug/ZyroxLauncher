@@ -325,7 +325,7 @@ public final class ModrinthContentInstaller {
             }
 
             String safeName = sanitizeFileName(rawName, oldJar.getName());
-            if (cb != null) cb.onProgress("Updating " + oldJar.getName() + " → " + safeName + "…");
+            if (cb != null) cb.onProgress("Updating " + oldJar.getName() + " -> " + safeName + "…");
 
             File newJar = new File(modsDir, safeName + ".updating");
             downloadVerified(url, newSha, newJar);

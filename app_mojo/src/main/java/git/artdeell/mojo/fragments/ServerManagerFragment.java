@@ -199,7 +199,7 @@ public class ServerManagerFragment extends Fragment {
             LinearLayout.LayoutParams iLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             iLp.setMarginEnd(ZyroxStudioUi.dp(ctx, 8));
 
-            String title = (s.favorite ? "★ " : "") + s.name
+            String title = (s.favorite ? "[PIN] " : "") + s.name
                     + (s.group.isEmpty() ? "" : "  [" + s.group + "]");
             info.addView(ZyroxStudioUi.createTitle(ctx, title));
 

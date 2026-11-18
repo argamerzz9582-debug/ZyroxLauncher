@@ -592,7 +592,7 @@ public final class ZyroxCrashAnalyzer {
                     }
                 }
                 return new AutoFixResult(true, false,
-                        "Adjusted JVM heap RAM: " + currentHeap + " MB → " + newHeap + " MB.");
+                        "Adjusted JVM heap RAM: " + currentHeap + " MB -> " + newHeap + " MB.");
             }
 
             case SWITCH_JRE_VERSION: {

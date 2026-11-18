@@ -120,9 +120,20 @@ public class AboutSecurityFragment extends Fragment {
         mBodyContainer.removeAllViews();
         AppTrustVerifier.TrustReport report = AppTrustVerifier.inspect(ctx);
 
-        // Card 1: Live APK Signing Fingerprint & Build Authenticity
+        // Card 1: Official Zyrox Brand Crest + Live APK Signing Fingerprint & Build Authenticity
         LinearLayout signCard = ZyroxStudioUi.createItemCard(ctx);
-        signCard.addView(ZyroxStudioUi.createTitle(ctx, "APK Integrity & Signing Certificate"));
+        LinearLayout brandRow = new LinearLayout(ctx);
+        brandRow.setOrientation(LinearLayout.HORIZONTAL);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView logoIv = new android.widget.ImageView(ctx);
+        logoIv.setImageResource(git.artdeell.mojo.R.drawable.ic_zyrox_logo);
+        logoIv.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        int logoSz = ZyroxStudioUi.dp(ctx, 40);
+        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(logoSz, logoSz);
+        logoLp.setMarginEnd(ZyroxStudioUi.dp(ctx, 10));
+        brandRow.addView(logoIv, logoLp);
+        brandRow.addView(ZyroxStudioUi.createTitle(ctx, "Zyrox Launcher • APK Integrity & Signing Certificate"));
+        signCard.addView(brandRow);
         signCard.addView(ZyroxStudioUi.createSubtitle(ctx, report.buildCopyableSummary()));
 
         LinearLayout actRow = new LinearLayout(ctx);
@@ -348,7 +359,7 @@ public class AboutSecurityFragment extends Fragment {
                 sb.append("Controls: ").append(report.totalButtons)
                         .append(" • Schema v").append(report.version).append('\n');
                 if (report.isClean()) {
-                    sb.append("\n✓ Zero keybind conflicts, healthy touch target dimensions, and valid dynamic landscape coordinates.");
+                    sb.append("\n[OK] Zero keybind conflicts, healthy touch target dimensions, and valid dynamic landscape coordinates.");
                 } else {
                     for (String c : report.keybindConflicts) sb.append("\n• Conflict: ").append(c);
                     for (String s : report.smallTargetWarnings) sb.append("\n• Touch size: ").append(s);

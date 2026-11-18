@@ -5,10 +5,13 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
+
 import git.artdeell.mojo.input.ControlData;
 import git.artdeell.mojo.input.ControlDrawerData;
 import git.artdeell.mojo.input.ControlLayout;
 import git.artdeell.mojo.input.handleview.EditControlSideDialog;
+import git.artdeell.mojo.ui.ZyroxControlGlyphRenderer;
 
 import java.util.ArrayList;
 
@@ -31,6 +34,34 @@ public class ControlDrawer extends ControlButton {
         this.parentLayout = layout;
         this.drawerData = drawerData;
         areButtonsVisible = layout.getModifiable();
+        // Re-evaluate glyph now that drawerData.orientation is assigned so unlabeled drawers get a crisp arrow.
+        setProperties(mProperties, false);
+    }
+
+    @NonNull
+    @Override
+    protected ZyroxControlGlyphRenderer.Glyph resolveControlGlyph(@NonNull ControlData properties) {
+        ZyroxControlGlyphRenderer.Glyph explicit = super.resolveControlGlyph(properties);
+        if (explicit != ZyroxControlGlyphRenderer.Glyph.NONE) {
+            return explicit;
+        }
+        String name = properties.name != null ? properties.name.trim() : "";
+        if (name.isEmpty() && drawerData != null && drawerData.orientation != null) {
+            switch (drawerData.orientation) {
+                case UP:
+                    return ZyroxControlGlyphRenderer.Glyph.UP;
+                case DOWN:
+                    return ZyroxControlGlyphRenderer.Glyph.DOWN;
+                case LEFT:
+                    return ZyroxControlGlyphRenderer.Glyph.LEFT;
+                case RIGHT:
+                    return ZyroxControlGlyphRenderer.Glyph.RIGHT;
+                case FREE:
+                default:
+                    return ZyroxControlGlyphRenderer.Glyph.GEAR;
+            }
+        }
+        return ZyroxControlGlyphRenderer.Glyph.NONE;
     }
 
 
