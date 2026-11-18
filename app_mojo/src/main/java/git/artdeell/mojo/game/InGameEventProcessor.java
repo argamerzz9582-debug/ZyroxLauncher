@@ -8,6 +8,10 @@ import git.artdeell.mojo.input.mouse.LeftClickGesture;
 import git.artdeell.mojo.input.mouse.RightClickGesture;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 
+/**
+ * Grabbed 3D camera touch processor with full 120Hz / 144Hz / 240Hz historical {@link MotionEvent}
+ * sample ingestion and velocity-continuous sub-frame interpolation.
+ */
 public class InGameEventProcessor extends TouchEventProcessor {
     private final Handler mGestureHandler = new Handler(Looper.getMainLooper());
     private final double mSensitivity;
@@ -25,25 +29,59 @@ public class InGameEventProcessor extends TouchEventProcessor {
         switch (motionEvent.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 mTracker.startTracking(motionEvent);
-                if(LauncherPreferences.PREF_DISABLE_GESTURES) break;
+                if (LauncherPreferences.PREF_DISABLE_GESTURES) break;
                 mEventTransitioned = false;
                 checkGestures();
                 break;
-            case MotionEvent.ACTION_MOVE:
-                mTracker.trackEvent(motionEvent);
-                float[] motionVector = mTracker.getMotionVector();
-                float deltaX = (float) (motionVector[0] * mSensitivity);
-                float deltaY = (float) (motionVector[1] * mSensitivity);
-                mLeftClickGesture.setMotion(deltaX, deltaY);
-                mRightClickGesture.setMotion(deltaX, deltaY);
-                applyMoveVector(deltaX, deltaY);
-                if(LauncherPreferences.PREF_DISABLE_GESTURES) break;
-                checkGestures();
+
+            case MotionEvent.ACTION_MOVE: {
+                float totalDx = 0f;
+                float totalDy = 0f;
+
+                if (LauncherPreferences.PREF_ZYROX_HIGH_RATE_TOUCH) {
+                    int ptrIdx = mTracker.ensurePointerIndex(motionEvent);
+                    if (ptrIdx >= 0) {
+                        int histCount = motionEvent.getHistorySize();
+                        for (int h = 0; h < histCount; h++) {
+                            long dt = mTracker.trackHistoricalSample(motionEvent, ptrIdx, h);
+                            float[] vec = mTracker.getMotionVector();
+                            float sDx = (float) (vec[0] * mSensitivity);
+                            float sDy = (float) (vec[1] * mSensitivity);
+                            totalDx += sDx;
+                            totalDy += sDy;
+                            applyHighRateMoveSample(sDx, sDy, dt);
+                        }
+                        long prevTime = mTracker.getLastEventTimeMs();
+                        mTracker.trackEvent(motionEvent);
+                        long finalDt = Math.max(0L, motionEvent.getEventTime() - prevTime);
+                        float[] vec = mTracker.getMotionVector();
+                        float fDx = (float) (vec[0] * mSensitivity);
+                        float fDy = (float) (vec[1] * mSensitivity);
+                        totalDx += fDx;
+                        totalDy += fDy;
+                        applyHighRateMoveSample(fDx, fDy, finalDt);
+                    }
+                } else {
+                    mTracker.trackEvent(motionEvent);
+                    float[] vec = mTracker.getMotionVector();
+                    totalDx = (float) (vec[0] * mSensitivity);
+                    totalDy = (float) (vec[1] * mSensitivity);
+                    applyMoveVector(totalDx, totalDy);
+                }
+
+                mLeftClickGesture.setMotion(totalDx, totalDy);
+                mRightClickGesture.setMotion(totalDx, totalDy);
+                if (!LauncherPreferences.PREF_DISABLE_GESTURES) {
+                    checkGestures();
+                }
                 break;
+            }
+
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                mTracker.cancelTracking();
+                prepareForSwitching();
                 cancelGestures(false);
+                break;
         }
         return true;
     }
@@ -56,10 +94,7 @@ public class InGameEventProcessor extends TouchEventProcessor {
 
     private void checkGestures() {
         mLeftClickGesture.inputEvent();
-        // Only register right click events if it's a fresh event stream, not one after a transition.
-        // This is done to avoid problems when people hold the button for just a bit too long after
-        // exiting a menu for example.
-        if(!mEventTransitioned) mRightClickGesture.inputEvent();
+        if (!mEventTransitioned) mRightClickGesture.inputEvent();
     }
 
     private void cancelGestures(boolean isSwitching) {

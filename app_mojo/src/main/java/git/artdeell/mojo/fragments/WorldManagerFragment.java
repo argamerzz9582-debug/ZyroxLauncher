@@ -1,5 +1,7 @@
 package git.artdeell.mojo.fragments;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -9,10 +11,14 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,6 +44,7 @@ import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.ui.ZyroxStudioUi;
 import git.artdeell.mojo.utils.ArchiveSecurity;
+import git.artdeell.mojo.worlds.LevelDatNbtEditor;
 import git.artdeell.mojo.worlds.WorldManager;
 
 /**
@@ -255,6 +262,12 @@ public class WorldManagerFragment extends Fragment {
             meta.addView(ZyroxStudioUi.createSubtitle(ctx, detail));
             row.addView(meta, mLp);
 
+            Button btnNbt = ZyroxStudioUi.createSecondaryButton(ctx, "NBT", true);
+            btnNbt.setEnabled(w.integrity != WorldManager.Integrity.CORRUPT);
+            btnNbt.setOnClickListener(v -> openLevelDatEditor(w));
+            row.addView(btnNbt, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 4)));
+
             Button btnBackup = ZyroxStudioUi.createSecondaryButton(ctx, "Backup", true);
             btnBackup.setOnClickListener(v -> createBackup(w));
             row.addView(btnBackup, ZyroxStudioUi.spacedParam(
@@ -276,6 +289,132 @@ public class WorldManagerFragment extends Fragment {
             card.addView(row);
             mListContainer.addView(card);
         }
+    }
+
+    private void openLevelDatEditor(@NonNull WorldManager.WorldEntry world) {
+        if (!isAdded()) return;
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                LevelDatNbtEditor.LevelDatSummary summary = WorldManager.readWorldLevelDat(world.directory);
+                Tools.runOnUiThread(() -> {
+                    if (isAdded()) showLevelDatDialog(world, summary);
+                });
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> {
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(),
+                                "Cannot read level.dat: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void showLevelDatDialog(@NonNull WorldManager.WorldEntry world,
+                                    @NonNull LevelDatNbtEditor.LevelDatSummary cur) {
+        Context ctx = requireContext();
+        ScrollView scroll = new ScrollView(ctx);
+        LinearLayout form = new LinearLayout(ctx);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = ZyroxStudioUi.dp(ctx, 18);
+        form.setPadding(pad, ZyroxStudioUi.dp(ctx, 10), pad, ZyroxStudioUi.dp(ctx, 6));
+
+        form.addView(ZyroxStudioUi.createSubtitle(ctx, "World Name (LevelName)"));
+        final EditText nameInput = new EditText(ctx);
+        nameInput.setSingleLine(true);
+        nameInput.setText(cur.levelName.isEmpty() ? world.displayName : cur.levelName);
+        form.addView(nameInput);
+
+        form.addView(ZyroxStudioUi.createSubtitle(ctx, "Gamemode (GameType + Player)"));
+        final Spinner gmSpinner = new Spinner(ctx);
+        String[] gmLabels = {"0 • Survival", "1 • Creative", "2 • Adventure", "3 • Spectator"};
+        gmSpinner.setAdapter(new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_dropdown_item, gmLabels));
+        gmSpinner.setSelection(Math.max(0, Math.min(3, cur.gameType)));
+        form.addView(gmSpinner);
+
+        form.addView(ZyroxStudioUi.createSubtitle(ctx, "Difficulty"));
+        final Spinner diffSpinner = new Spinner(ctx);
+        String[] diffLabels = {"0 • Peaceful", "1 • Easy", "2 • Normal", "3 • Hard"};
+        diffSpinner.setAdapter(new ArrayAdapter<>(ctx, android.R.layout.simple_spinner_dropdown_item, diffLabels));
+        diffSpinner.setSelection(Math.max(0, Math.min(3, cur.difficulty)));
+        form.addView(diffSpinner);
+
+        form.addView(ZyroxStudioUi.createSubtitle(ctx, "World Seed (numeric or text)"));
+        LinearLayout seedRow = new LinearLayout(ctx);
+        seedRow.setOrientation(LinearLayout.HORIZONTAL);
+        seedRow.setGravity(Gravity.CENTER_VERTICAL);
+        final String origSeedStr = cur.hasSeed ? String.valueOf(cur.seed) : "";
+        final EditText seedInput = new EditText(ctx);
+        seedInput.setSingleLine(true);
+        seedInput.setHint("World seed");
+        seedInput.setText(origSeedStr);
+        seedRow.addView(seedInput, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button btnCopySeed = ZyroxStudioUi.createSecondaryButton(ctx, "Copy", true);
+        btnCopySeed.setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+            String val = seedInput.getText() != null ? seedInput.getText().toString().trim() : "";
+            if (cm != null && !val.isEmpty()) {
+                cm.setPrimaryClip(ClipData.newPlainText("Minecraft Seed", val));
+                Toast.makeText(ctx, "Copied seed: " + val, Toast.LENGTH_SHORT).show();
+            }
+        });
+        seedRow.addView(btnCopySeed, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 32), ZyroxStudioUi.dp(ctx, 6)));
+        form.addView(seedRow);
+
+        final CheckBox chkCheats = new CheckBox(ctx);
+        chkCheats.setText("Allow Cheats / Commands (allowCommands)");
+        chkCheats.setChecked(cur.allowCommands);
+        form.addView(chkCheats);
+
+        final CheckBox chkHardcore = new CheckBox(ctx);
+        chkHardcore.setText("Hardcore Mode (single life)");
+        chkHardcore.setChecked(cur.hardcore);
+        form.addView(chkHardcore);
+
+        form.addView(ZyroxStudioUi.createSubtitle(ctx,
+                "Original level.dat is automatically backed up to level.dat_old before saving."));
+        scroll.addView(form);
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Quick level.dat Editor • " + world.displayName)
+                .setView(scroll)
+                .setPositiveButton("Save level.dat", (d, w) -> {
+                    final LevelDatNbtEditor.EditSpec spec = new LevelDatNbtEditor.EditSpec()
+                            .setLevelName(nameInput.getText() != null ? nameInput.getText().toString() : null)
+                            .setGameType(gmSpinner.getSelectedItemPosition())
+                            .setDifficulty(diffSpinner.getSelectedItemPosition())
+                            .setAllowCommands(chkCheats.isChecked())
+                            .setHardcore(chkHardcore.isChecked());
+                    String rawSeed = seedInput.getText() != null ? seedInput.getText().toString().trim() : "";
+                    if (!rawSeed.isEmpty() && !rawSeed.equals(origSeedStr)) {
+                        spec.setSeed(LevelDatNbtEditor.parseMinecraftSeed(rawSeed));
+                    }
+                    MojoApplication.sExecutorService.execute(() -> {
+                        try {
+                            LevelDatNbtEditor.LevelDatSummary updated =
+                                    WorldManager.editWorldLevelDat(world.directory, spec);
+                            Tools.runOnUiThread(() -> {
+                                if (!isAdded()) return;
+                                Toast.makeText(requireContext(),
+                                        "Saved level.dat (" + updated.getGameModeLabel()
+                                                + ", Cheats " + (updated.allowCommands ? "ON" : "OFF") + ")",
+                                        Toast.LENGTH_LONG).show();
+                                refreshWorlds();
+                            });
+                        } catch (Exception e) {
+                            Tools.runOnUiThread(() -> {
+                                if (isAdded()) {
+                                    Toast.makeText(requireContext(),
+                                            "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
+                })
+                .setNeutralButton("ZIP Backup First", (d, w) -> createBackup(world))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void createBackup(@NonNull WorldManager.WorldEntry world) {

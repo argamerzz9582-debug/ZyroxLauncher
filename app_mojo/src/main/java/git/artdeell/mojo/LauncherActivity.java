@@ -38,7 +38,6 @@ import git.artdeell.mojo.fragments.ContentManagerFragment;
 import git.artdeell.mojo.fragments.DownloadCenterFragment;
 import git.artdeell.mojo.fragments.ElyByLoginFragment;
 import git.artdeell.mojo.fragments.FabriclikeInstallFragment;
-import git.artdeell.mojo.fragments.FileSelectorFragment;
 import git.artdeell.mojo.fragments.GamepadMapperFragment;
 import git.artdeell.mojo.fragments.InstanceEditorFragment;
 import git.artdeell.mojo.fragments.LocalLoginFragment;
@@ -143,8 +142,6 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             mPageTitleView.setText(R.string.zyrox_title_elyby_login);
         } else if (f instanceof FabriclikeInstallFragment || f instanceof ModVersionListFragment) {
             mPageTitleView.setText(R.string.zyrox_title_modloader_install);
-        } else if (f instanceof FileSelectorFragment) {
-            mPageTitleView.setText(R.string.zyrox_title_file_browser);
         } else if (f instanceof GamepadMapperFragment) {
             mPageTitleView.setText(R.string.zyrox_title_gamepad);
         } else if (f instanceof LogInspectorFragment) {

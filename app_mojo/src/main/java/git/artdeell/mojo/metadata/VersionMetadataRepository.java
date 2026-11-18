@@ -58,8 +58,7 @@ public class VersionMetadataRepository {
     private final QuiltMetadataProvider mQuiltProvider;
     private final ForgeMetadataProvider mForgeProvider;
     private final NeoForgeMetadataProvider mNeoForgeProvider;
-    private final ModrinthProvider mModrinthProvider;
-    private final CurseForgeProvider mCurseForgeProvider;
+    private final ModPlatformRepository mModPlatformRepository;
     private final Executor mSyncExecutor;
 
     private final AtomicReference<JVersionList> mLatestCatalog = new AtomicReference<>();
@@ -81,8 +80,7 @@ public class VersionMetadataRepository {
         mQuiltProvider = new QuiltMetadataProvider(cache);
         mForgeProvider = new ForgeMetadataProvider(cache);
         mNeoForgeProvider = new NeoForgeMetadataProvider(cache);
-        mModrinthProvider = new ModrinthProvider();
-        mCurseForgeProvider = new CurseForgeProvider();
+        mModPlatformRepository = ModPlatformRepository.getInstance();
         mSyncExecutor = syncExecutor;
     }
 
@@ -149,13 +147,18 @@ public class VersionMetadataRepository {
     }
 
     @NonNull
+    public ModPlatformRepository getModPlatformRepository() {
+        return mModPlatformRepository;
+    }
+
+    @NonNull
     public ModrinthProvider getModrinthProvider() {
-        return mModrinthProvider;
+        return mModPlatformRepository.getModrinthProvider();
     }
 
     @NonNull
     public CurseForgeProvider getCurseForgeProvider() {
-        return mCurseForgeProvider;
+        return mModPlatformRepository.getCurseForgeProvider();
     }
 
     @Nullable

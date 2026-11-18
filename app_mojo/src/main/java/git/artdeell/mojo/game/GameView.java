@@ -130,7 +130,49 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         mSurface = mSurfaceProvider.create(getContext(), this);
         this.addView(mSurface);
         this.mCursorView.bringToFront();
+        syncHighRefreshTouchMode();
         this.requestFocus();
+    }
+
+    /**
+     * Synchronizes 120Hz / 144Hz touch interpolation cadence with the physical display refresh rate
+     * and hints Android 11+ SurfaceFlinger to drive the game surface at peak refresh rate.
+     */
+    public void syncHighRefreshTouchMode() {
+        float rateHz = 120f;
+        try {
+            android.view.Display display = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                    ? getDisplay()
+                    : ((Activity) getContext()).getWindowManager().getDefaultDisplay();
+            if (display != null) {
+                rateHz = display.getRefreshRate();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    android.view.Display.Mode[] modes = display.getSupportedModes();
+                    if (modes != null) {
+                        for (android.view.Display.Mode mode : modes) {
+                            if (mode.getRefreshRate() > rateHz) {
+                                rateHz = mode.getRefreshRate();
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        mIngameProcessor.setTargetRefreshRateHz(rateHz);
+        mInGUIProcessor.setTargetRefreshRateHz(rateHz);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                && LauncherPreferences.PREF_ZYROX_HIGH_RATE_TOUCH
+                && mSurface instanceof SurfaceView) {
+            try {
+                Surface surface = ((SurfaceView) mSurface).getHolder().getSurface();
+                if (surface != null && surface.isValid() && rateHz >= 90f) {
+                    surface.setFrameRate(rateHz, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     /**
@@ -162,6 +204,11 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             return true; //mouse event handled successfully
         }
         if (mIngameProcessor == null || mInGUIProcessor == null) return true;
+        // Request unbuffered 120Hz/144Hz/240Hz digitizer delivery bypassing 60Hz VSync batching
+        if (LauncherPreferences.PREF_ZYROX_HIGH_RATE_TOUCH
+                && e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            requestUnbufferedDispatch(e);
+        }
         // Optional accidental palm / bezel edge touch rejection during grabbed 3D gameplay
         if (LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD
                 && mCurrentTouchProcessor == mIngameProcessor

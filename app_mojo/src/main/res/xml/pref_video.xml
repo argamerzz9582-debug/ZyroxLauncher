@@ -61,6 +61,23 @@
             android:persistent="false"
             android:summary="@string/driver_config_pref_subtitle"
             android:title="@string/driver_config_pref_title"/>
+        <Preference
+            android:key="zyroxTurnipStore"
+            android:persistent="false"
+            android:icon="@drawable/ic_px_volcano"
+            android:title="@string/zyrox_pref_turnip_store_title"
+            android:summary="@string/zyrox_pref_turnip_store_summary"/>
+        <Preference
+            android:key="zyroxGpuAutoPreset"
+            android:persistent="false"
+            android:icon="@drawable/ic_px_image_renderer"
+            android:title="@string/zyrox_pref_gpu_autopreset_title"
+            android:summary="@string/zyrox_pref_gpu_autopreset_summary"/>
+        <Preference
+            android:key="zyroxPurgeShaderCache"
+            android:persistent="false"
+            android:title="@string/zyrox_pref_purge_shader_cache_title"
+            android:summary="@string/zyrox_pref_purge_shader_cache_summary"/>
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:icon="@drawable/ic_px_volcano"

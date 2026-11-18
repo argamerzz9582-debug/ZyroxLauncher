@@ -13,15 +13,170 @@ import android.opengl.GLES30;
 import android.os.Build;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Hardware OpenGL ES / Vulkan capability probe and mobile GPU micro-architecture classifier.
+ */
 public class GpuUtils {
     public static String GLES_VERSION_PREFIX = "OpenGL ES ";
+
+    private static final Pattern ADRENO_MODEL_PATTERN =
+            Pattern.compile("adreno\\s*(?:\\(tm\\)\\s*)?([0-9]{3,4})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MALI_G_MODEL_PATTERN =
+            Pattern.compile("(?:mali|immortalis)[-\\s]*g([0-9]{2,4})", Pattern.CASE_INSENSITIVE);
+
+    /** Fine-grained Android GPU architecture families used for Zink / Freedreno / LTW presets. */
+    public enum GpuArchitecture {
+        ADRENO_8XX("Qualcomm Adreno 8xx (Snapdragon 8 Elite Gen)"),
+        ADRENO_7XX("Qualcomm Adreno 7xx"),
+        ADRENO_6XX("Qualcomm Adreno 6xx"),
+        ADRENO_LEGACY("Qualcomm Adreno Legacy (2xx–5xx)"),
+        ARM_IMMORTALIS("ARM Immortalis (Flagship Valhall/5th-Gen)"),
+        ARM_MALI_VALHALL("ARM Mali Valhall"),
+        ARM_MALI_BIFROST_OR_OLDER("ARM Mali Bifrost / Midgard"),
+        SAMSUNG_XCLIPSE("Samsung Xclipse (AMD RDNA)"),
+        POWERVR("Imagination PowerVR"),
+        DESKTOP_OR_VIRGL("Desktop / ChromeOS VirGL"),
+        UNKNOWN("Generic Mobile GPU");
+
+        @NonNull public final String displayName;
+
+        GpuArchitecture(@NonNull String displayName) {
+            this.displayName = displayName;
+        }
+
+        public boolean isAdrenoFamily() {
+            return this == ADRENO_8XX || this == ADRENO_7XX
+                    || this == ADRENO_6XX || this == ADRENO_LEGACY;
+        }
+
+        public boolean isArmFamily() {
+            return this == ARM_IMMORTALIS || this == ARM_MALI_VALHALL
+                    || this == ARM_MALI_BIFROST_OR_OLDER;
+        }
+
+        /** True when Mesa Turnip ({@code .adpkg}) custom Vulkan drivers target this GPU family. */
+        public boolean supportsTurnipDrivers() {
+            return this == ADRENO_6XX || this == ADRENO_7XX || this == ADRENO_8XX;
+        }
+
+        /** True when Mesa Freedreno KGSL direct driver is viable on this GPU. */
+        public boolean supportsFreedrenoKgsl() {
+            return isAdrenoFamily();
+        }
+
+        /** True when high-throughput flagship defaults (100% scale, cached descriptors) are safe. */
+        public boolean isFlagshipTier() {
+            return this == ADRENO_8XX || this == ADRENO_7XX
+                    || this == ARM_IMMORTALIS || this == SAMSUNG_XCLIPSE
+                    || this == DESKTOP_OR_VIRGL;
+        }
+    }
+
     private static GLInfo info;
 
+    /**
+     * Classifies a GPU micro-architecture from its raw {@code GL_VENDOR} and {@code GL_RENDERER}
+     * strings. Deterministic and pure (safe to call from JVM unit tests without an EGL context).
+     */
+    @NonNull
+    public static GpuArchitecture detectArchitecture(@Nullable String vendor,
+                                                     @Nullable String renderer) {
+        String v = vendor != null ? vendor.toLowerCase(Locale.ROOT) : "";
+        String r = renderer != null ? renderer.toLowerCase(Locale.ROOT) : "";
+
+        if (r.contains("adreno") || v.contains("qualcomm")) {
+            int model = parseAdrenoModelNumber(renderer);
+            if (model >= 800) return GpuArchitecture.ADRENO_8XX;
+            if (model >= 700) return GpuArchitecture.ADRENO_7XX;
+            if (model >= 600) return GpuArchitecture.ADRENO_6XX;
+            if (model >= 200) return GpuArchitecture.ADRENO_LEGACY;
+            return GpuArchitecture.ADRENO_6XX;
+        }
+
+        if (r.contains("xclipse") || (v.contains("samsung") && r.contains("xclipse"))) {
+            return GpuArchitecture.SAMSUNG_XCLIPSE;
+        }
+
+        if (r.contains("immortalis")) {
+            return GpuArchitecture.ARM_IMMORTALIS;
+        }
+
+        if (r.contains("mali") || v.equals("arm") || v.contains("arm ")) {
+            int maliModel = parseMaliGModelNumber(renderer);
+            // Mali-G57, G68, G77, G78, G310, G510, G610, G615, G710, G715, G720 are Valhall/5th-Gen
+            if (maliModel >= 300 || maliModel == 57 || maliModel == 68
+                    || maliModel == 77 || maliModel == 78) {
+                return GpuArchitecture.ARM_MALI_VALHALL;
+            }
+            return GpuArchitecture.ARM_MALI_BIFROST_OR_OLDER;
+        }
+
+        if (r.contains("powervr") || v.contains("imagination")) {
+            return GpuArchitecture.POWERVR;
+        }
+
+        if (r.contains("virgl") || r.contains("virtio") || r.contains("radeon")
+                || r.contains("geforce") || r.contains("intel") || r.contains("mesa")) {
+            return GpuArchitecture.DESKTOP_OR_VIRGL;
+        }
+
+        return GpuArchitecture.UNKNOWN;
+    }
+
+    /** Extracts the 3–4 digit Adreno model number (e.g. {@code 750}, {@code 830}), or {@code -1}. */
+    public static int parseAdrenoModelNumber(@Nullable String renderer) {
+        if (renderer == null || renderer.isEmpty()) return -1;
+        Matcher m = ADRENO_MODEL_PATTERN.matcher(renderer);
+        if (!m.find()) return -1;
+        try {
+            return Integer.parseInt(m.group(1));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /** Extracts the numeric suffix of a {@code Mali-Gxx} / {@code Immortalis-Gxxx}, or {@code -1}. */
+    public static int parseMaliGModelNumber(@Nullable String renderer) {
+        if (renderer == null || renderer.isEmpty()) return -1;
+        Matcher m = MALI_G_MODEL_PATTERN.matcher(renderer);
+        if (!m.find()) return -1;
+        try {
+            return Integer.parseInt(m.group(1));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    /**
+     * Returns {@code true} for entry-level Adreno 6xx GPUs (610/612/615/616/618/619/620) and
+     * legacy Adreno 5xx parts where {@code sysmem} avoids GMEM tile-binning hangs under Zink/KGSL.
+     */
+    public static boolean needsAdrenoSysmemWorkaround(@Nullable String renderer) {
+        int model = parseAdrenoModelNumber(renderer);
+        if (model <= 0) return false;
+        return model < 600 || (model >= 605 && model <= 620);
+    }
+
+    /** Returns {@code true} for Adreno 6xx parts prone to UBWC texture-swizzle artifacts. */
+    public static boolean needsAdrenoUbwcWorkaround(@Nullable String renderer) {
+        int model = parseAdrenoModelNumber(renderer);
+        return model >= 610 && model <= 630;
+    }
+
     private static int getMajorGLVersion(String versionString) {
-        if(versionString.startsWith(GLES_VERSION_PREFIX)) {
+        if (versionString == null) return 2;
+        if (versionString.startsWith(GLES_VERSION_PREFIX)) {
             versionString = versionString.substring(GLES_VERSION_PREFIX.length());
         }
         int firstDot = versionString.indexOf('.');
+        if (firstDot <= 0) return 2;
         String majorVersion = versionString.substring(0, firstDot).trim();
         return Integer.parseInt(majorVersion);
     }
@@ -33,39 +188,41 @@ public class GpuUtils {
         int version = 2;
         try {
             version = getMajorGLVersion(versionString);
-        }catch (NumberFormatException e) {
-            Log.w("GLInfoUtils","Failed to parse GL version number, falling back to 2", e);
+        } catch (NumberFormatException e) {
+            Log.w("GLInfoUtils", "Failed to parse GL version number, falling back to 2", e);
         }
-        // LTW depends on the ability to create a context with a major version of 3,
-        // and even if the string parse returns 3 while EGL can only create 2,
-        // it's still a noncompilant implementation
         version = Math.min(version, contextGLVersion);
-        return new GLInfo(vendor, renderer, version, forcedMsaa);
+        return new GLInfo(
+                vendor != null ? vendor : "<Unknown>",
+                renderer != null ? renderer : "<Unknown>",
+                version,
+                forcedMsaa);
     }
 
     private static void initDummyInfo() {
-        Log.e("GLInfoUtils", "An error happened during info query. Will use dummy info. This should be investigated.");
+        Log.e("GLInfoUtils", "An error happened during info query. Will use dummy info.");
         info = new GLInfo("<Unknown>", "<Unknown>", 2, false);
     }
 
     private static EGLContext tryCreateContext(EGLDisplay eglDisplay, EGLConfig config, int majorVersion) {
-        int[] egl_context_attributes = new int[] { EGL14.EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL14.EGL_NONE };
-        EGLContext context = EGL14.eglCreateContext(eglDisplay, config, EGL14.EGL_NO_CONTEXT, egl_context_attributes, 0);
-        if(EGL14.EGL_NO_CONTEXT.equals(context) || context == null) {
-            Log.e("GLInfoUtils", "Failed to create a context with major version "+majorVersion);
+        int[] attrs = new int[]{EGL14.EGL_CONTEXT_CLIENT_VERSION, majorVersion, EGL14.EGL_NONE};
+        EGLContext context = EGL14.eglCreateContext(eglDisplay, config, EGL14.EGL_NO_CONTEXT, attrs, 0);
+        if (EGL14.EGL_NO_CONTEXT.equals(context) || context == null) {
+            Log.e("GLInfoUtils", "Failed to create a context with major version " + majorVersion);
             return null;
         }
         return context;
     }
 
-    private static EGLContext tryMakeCurrent(EGLDisplay eglDisplay, EGLConfig config, EGLSurface surface, int majorVersion) {
+    private static EGLContext tryMakeCurrent(EGLDisplay eglDisplay,
+                                             EGLConfig config,
+                                             EGLSurface surface,
+                                             int majorVersion) {
         EGLContext context = tryCreateContext(eglDisplay, config, majorVersion);
-        if(context == null) return null;
-        // Old Mali drivers are broken, and will actually let us create a context with GLES 3
-        // But won't let us make it current, which will break the check anyway...
-        boolean makeCurrentResult = EGL14.eglMakeCurrent(eglDisplay, surface, surface, context);
-        if(!makeCurrentResult) {
-            Log.i("GLInfoUtils", "Failed to make context GL version "+majorVersion +" current");
+        if (context == null) return null;
+        boolean ok = EGL14.eglMakeCurrent(eglDisplay, surface, surface, context);
+        if (!ok) {
+            Log.i("GLInfoUtils", "Failed to make context GL version " + majorVersion + " current");
             EGL14.eglDestroyContext(eglDisplay, context);
             return null;
         }
@@ -79,11 +236,13 @@ public class GpuUtils {
     }
 
     private static boolean initAndQueryInfo() {
-        // This is here just to satisfy Android M which incorrectly null-checks it
-        int[] egl_version = new int[2];
+        int[] eglVersion = new int[2];
         EGLDisplay eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-        if(eglDisplay == EGL14.EGL_NO_DISPLAY || !EGL14.eglInitialize(eglDisplay, egl_version, 0 , egl_version, 1)) return false;
-        int[] egl_attributes = new int[]  {
+        if (eglDisplay == EGL14.EGL_NO_DISPLAY
+                || !EGL14.eglInitialize(eglDisplay, eglVersion, 0, eglVersion, 1)) {
+            return false;
+        }
+        int[] eglAttributes = new int[]{
                 EGL14.EGL_BLUE_SIZE, 8,
                 EGL14.EGL_GREEN_SIZE, 8,
                 EGL14.EGL_RED_SIZE, 8,
@@ -94,81 +253,67 @@ public class GpuUtils {
                 EGL14.EGL_NONE
         };
         EGLConfig[] config = new EGLConfig[1];
-        int[] num_configs = new int[]{0};
-        if(!EGL14.eglChooseConfig(eglDisplay, egl_attributes, 0, config, 0, 1, num_configs, 0) || num_configs[0] == 0) {
+        int[] numConfigs = new int[]{0};
+        if (!EGL14.eglChooseConfig(eglDisplay, eglAttributes, 0, config, 0, 1, numConfigs, 0)
+                || numConfigs[0] == 0) {
             EGL14.eglTerminate(eglDisplay);
-            Log.e("GLInfoUtils", "Failed to choose an EGL config");
             return false;
         }
 
         boolean forcedMsaa = isMSAAConfig(eglDisplay, config[0]);
-
-        // Create PBuffer surface as some devices might actually not support surfaceless.
-        int[] pbuffer_attributes = new int[] {
-                EGL14.EGL_WIDTH, 16,
-                EGL14.EGL_HEIGHT, 16,
-                EGL14.EGL_NONE
-        };
-
-        EGLSurface surface = EGL14.eglCreatePbufferSurface(eglDisplay, config[0], pbuffer_attributes, 0);
-        if(surface == null || surface == EGL14.EGL_NO_SURFACE) {
-            Log.e("GLInfoUtils", "Failed to create pbuffer surface");
+        int[] pbufferAttrs = new int[]{EGL14.EGL_WIDTH, 16, EGL14.EGL_HEIGHT, 16, EGL14.EGL_NONE};
+        EGLSurface surface = EGL14.eglCreatePbufferSurface(eglDisplay, config[0], pbufferAttrs, 0);
+        if (surface == null || surface == EGL14.EGL_NO_SURFACE) {
             EGL14.eglTerminate(eglDisplay);
             return false;
         }
 
         int contextGLVersion = 3;
         EGLContext context = tryMakeCurrent(eglDisplay, config[0], surface, contextGLVersion);
-        if(context == null) {
+        if (context == null) {
             contextGLVersion = 2;
             context = tryMakeCurrent(eglDisplay, config[0], surface, contextGLVersion);
         }
-
-        // Creation/currenting failed in both cases
-        if(context == null) {
-            Log.e("GLInfoUtils", "Failed to create and make context current");
+        if (context == null) {
             EGL14.eglDestroySurface(eglDisplay, surface);
             EGL14.eglTerminate(eglDisplay);
             return false;
         }
 
         info = queryInfo(contextGLVersion, forcedMsaa);
-
         EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
+        EGL14.eglDestroySurface(eglDisplay, surface);
         EGL14.eglDestroyContext(eglDisplay, context);
         EGL14.eglTerminate(eglDisplay);
         return true;
     }
 
     public static boolean checkVulkanSupport(PackageManager packageManager) {
-        if(SDK_INT >= Build.VERSION_CODES.N) {
-            return packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL) &&
-                    packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION);
+        if (SDK_INT >= Build.VERSION_CODES.N && packageManager != null) {
+            return packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_LEVEL)
+                    && packageManager.hasSystemFeature(PackageManager.FEATURE_VULKAN_HARDWARE_VERSION);
         }
         return false;
     }
 
     public static boolean checkChromebook(PackageManager packageManager) {
-        return packageManager.hasSystemFeature("org.chromium.arc")
-                || packageManager.hasSystemFeature("org.chromium.arc.device_management")
+        return (packageManager != null
+                && (packageManager.hasSystemFeature("org.chromium.arc")
+                || packageManager.hasSystemFeature("org.chromium.arc.device_management")))
                 || (Build.MODEL != null && Build.MODEL.startsWith("sdk_gpc_"));
     }
 
-    /**
-     * Get the information about the current OpenGL ES device, which consists of the vendor,
-     * the renderer and the major GLES version
-     * @return the info
-     */
+    @NonNull
     public static GLInfo getGlInfo() {
-        if(info != null) return info;
+        if (info != null) return info;
         Log.i("GLInfoUtils", "Querying graphics device info...");
-        boolean infoQueryResult = false;
+        boolean ok = false;
         try {
-            infoQueryResult = initAndQueryInfo();
-        }catch (Throwable e) {
+            ok = initAndQueryInfo();
+        } catch (Throwable e) {
             Log.e("GLInfoUtils", "Throwable when trying to initialize GL info", e);
         }
-        if(!infoQueryResult) initDummyInfo();
+        if (!ok) initDummyInfo();
         return info;
     }
 
@@ -177,39 +322,44 @@ public class GpuUtils {
         public final String renderer;
         public final int glesMajorVersion;
         public final boolean forcedMsaa;
-        protected GLInfo(String vendor, String renderer, int glesMajorVersion, boolean forcedMsaa) {
-            this.vendor = vendor;
-            this.renderer = renderer;
+        @NonNull public final GpuArchitecture architecture;
+        public final int adrenoModel;
+
+        public GLInfo(String vendor, String renderer, int glesMajorVersion, boolean forcedMsaa) {
+            this.vendor = vendor != null ? vendor : "<Unknown>";
+            this.renderer = renderer != null ? renderer : "<Unknown>";
             this.glesMajorVersion = glesMajorVersion;
             this.forcedMsaa = forcedMsaa;
+            this.architecture = detectArchitecture(this.vendor, this.renderer);
+            this.adrenoModel = parseAdrenoModelNumber(this.renderer);
         }
 
-        /**
-         * Check if this GLInfo belongs to a Qualcomm Adreno graphics adapter
-         * @return
-         */
         public boolean isAdreno() {
-            return renderer.contains("Adreno") && vendor.contains("Qualcomm");
+            return architecture.isAdrenoFamily();
         }
 
-        /**
-         * Check if this GLInfo belongs to a Qualcomm Adreno 200/300/400/500 graphics adapter
-         * @return
-         */
-        public boolean isAdreno500Lower(){
-            return vendor.contains("Qualcomm") &&
-                    (renderer.contains("Adreno (TM) 5") ||
-                    renderer.contains("Adreno (TM) 4") ||
-                    renderer.contains("Adreno (TM) 3") ||
-                    renderer.contains("Adreno (TM) 2"));
+        public boolean isAdreno500Lower() {
+            return architecture == GpuArchitecture.ADRENO_LEGACY;
         }
 
-        /**
-         * Check if this GLInfo belongs to a ARM Mali/Immortalis graphics adapter
-         * @return
-         */
         public boolean isArm() {
-            return (renderer.contains("Mali") || renderer.contains("Immortalis")) && vendor.equals("ARM");
+            return architecture.isArmFamily();
+        }
+
+        public boolean isXclipse() {
+            return architecture == GpuArchitecture.SAMSUNG_XCLIPSE;
+        }
+
+        public boolean supportsTurnip() {
+            return SDK_INT >= Build.VERSION_CODES.P && architecture.supportsTurnipDrivers();
+        }
+
+        public boolean needsSysmemWorkaround() {
+            return needsAdrenoSysmemWorkaround(renderer);
+        }
+
+        public boolean needsUbwcWorkaround() {
+            return needsAdrenoUbwcWorkaround(renderer);
         }
     }
 }

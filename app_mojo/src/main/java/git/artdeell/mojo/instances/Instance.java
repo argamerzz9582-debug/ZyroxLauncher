@@ -46,6 +46,12 @@ public class Instance extends DisplayInstance {
     public int consecutiveStartupFailures;
     public String notes;
     public String groupTag;
+    /**
+     * Optional per-instance Vulkan / Adreno Turnip ({@code .adpkg}) driver folder ID;
+     * {@code null} or blank inherits global {@code LauncherPreferences.PREF_DRIVER}, while
+     * {@code "default"} explicitly forces the device system Vulkan ICD.
+     */
+    public String vulkanDriver;
 
     protected Instance() {
         this.schemaVersion = CURRENT_SCHEMA_VERSION;
@@ -80,6 +86,15 @@ public class Instance extends DisplayInstance {
         if (createdAtMs == 0L && mInstanceRoot != null && mInstanceRoot.exists()) {
             long mod = mInstanceRoot.lastModified();
             if (mod > 0L) createdAtMs = mod;
+        }
+        if (vulkanDriver != null) {
+            String trimmed = vulkanDriver.trim();
+            if (trimmed.isEmpty() || trimmed.contains("..")
+                    || trimmed.contains("/") || trimmed.contains("\\")) {
+                vulkanDriver = null;
+            } else {
+                vulkanDriver = trimmed;
+            }
         }
     }
 
@@ -131,6 +146,26 @@ public class Instance extends DisplayInstance {
     public String getLaunchRenderer() {
         if (Tools.isValidString(renderer)) return renderer;
         return LauncherPreferences.PREF_RENDERER;
+    }
+
+    /** Returns {@code true} when this instance specifies an explicit Vulkan / Turnip driver ID. */
+    public boolean hasCustomVulkanDriver() {
+        return Tools.isValidString(vulkanDriver)
+                && !vulkanDriver.contains("..")
+                && !vulkanDriver.contains("/")
+                && !vulkanDriver.contains("\\");
+    }
+
+    /**
+     * Resolves the effective Vulkan / Turnip driver ID for this instance (per-instance override
+     * when present, otherwise {@link LauncherPreferences#PREF_DRIVER}).
+     */
+    @NonNull
+    public String getVulkanDriver() {
+        if (hasCustomVulkanDriver()) return vulkanDriver;
+        return Tools.isValidString(LauncherPreferences.PREF_VULKAN_DRIVER)
+                ? LauncherPreferences.PREF_VULKAN_DRIVER
+                : git.artdeell.mojo.vulkan.DriverManager.SYSTEM_DRIVER_TOKEN;
     }
 
     /**

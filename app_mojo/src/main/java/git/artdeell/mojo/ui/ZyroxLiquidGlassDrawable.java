@@ -97,6 +97,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     private boolean mFocused;
     private boolean mDisabled;
     private int mMasterAlpha = 255;
+    private int mHudOpacityPercent = 78; // Adjustable 10..100% fill opacity for HUD mode
     private float mCornerRadiusPercent = 0f; // 0 => sculpted 30% liquid squircle radius
     private int mCustomBgColor = LEGACY_DEFAULT_CONTROL_BG;
     private int mCustomStrokeColor = Color.WHITE;
@@ -291,10 +292,12 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             bodyMid = 0x08CCD8E4;
             bodyBot = 0x10C4D0DE;
         } else if (mHudSurfaceMode) {
-            // Subtle smoked crystal for text telemetry pills (Performance HUD)
-            bodyTop = 0x440D1522;
-            bodyMid = 0x36090F1A;
-            bodyBot = 0x420B121E;
+            // Adjustable smoked-crystal telemetry surface (10%..100% opacity slider support)
+            int edgeAlpha = Math.max(16, Math.min(238, Math.round(230f * (mHudOpacityPercent / 100f))));
+            int midAlpha = Math.max(12, Math.min(226, Math.round(206f * (mHudOpacityPercent / 100f))));
+            bodyTop = (edgeAlpha << 24) | 0x0B1320;
+            bodyMid = (midAlpha << 24) | 0x080E19;
+            bodyBot = (edgeAlpha << 24) | 0x0A111D;
         } else if (hasCustomUserTint()) {
             // Preserve user's chosen tint hue while keeping ultra-sheer Liquid Glass translucency
             int targetAlpha = Math.min(Color.alpha(mCustomBgColor), activeCool ? 96 : 66);
@@ -513,6 +516,73 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         mBodyPaint.setColorFilter(colorFilter);
         mOuterRimPaint.setColorFilter(colorFilter);
         invalidateSelf();
+    }
+
+    /** Adjusts the HUD crystal backdrop fill opacity ({@code 10%..100%}) while keeping crisp rims. */
+    public void setHudBackdropOpacityPercent(int opacityPercent) {
+        int clamped = Math.max(10, Math.min(100, opacityPercent));
+        if (mHudOpacityPercent != clamped) {
+            mHudOpacityPercent = clamped;
+            mGeometryDirty = true;
+            invalidateSelf();
+        }
+    }
+
+    public int getHudBackdropOpacityPercent() {
+        return mHudOpacityPercent;
+    }
+
+    /**
+     * Strict blur-isolation predicate ensuring glass blur applies exclusively to foreground UI
+     * cards and NEVER to {@link ZyroxSeamlessGifView}, {@link ZyroxShaderBackgroundView}, or any
+     * parent container hosting an animated background GIF.
+     */
+    public static boolean isEligibleForForegroundBlur(@Nullable android.view.View target) {
+        if (target == null) return false;
+        if (target instanceof ZyroxSeamlessGifView || target instanceof ZyroxShaderBackgroundView) {
+            return false;
+        }
+        if (ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP.equals(target.getTag())) {
+            return false;
+        }
+        if (target instanceof android.view.ViewGroup) {
+            return !containsBackdropGif((android.view.ViewGroup) target);
+        }
+        return true;
+    }
+
+    private static boolean containsBackdropGif(@NonNull android.view.ViewGroup group) {
+        int count = group.getChildCount();
+        for (int i = 0; i < count; i++) {
+            android.view.View child = group.getChildAt(i);
+            if (child instanceof ZyroxSeamlessGifView
+                    || child instanceof ZyroxShaderBackgroundView
+                    || ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP.equals(child.getTag())) {
+                return true;
+            }
+            if (child instanceof android.view.ViewGroup
+                    && containsBackdropGif((android.view.ViewGroup) child)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Attaches a foreground-isolated Liquid Glass surface to {@code cardView} while explicitly
+     * clearing any accidental {@link android.graphics.RenderEffect} on background GIF hierarchies.
+     */
+    public static void attachForegroundCardGlass(@NonNull android.view.View cardView,
+                                                 float density,
+                                                 boolean hudSurfaceMode) {
+        if (!isEligibleForForegroundBlur(cardView)) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                cardView.setRenderEffect(null);
+            }
+            return;
+        }
+        cardView.setBackground(new ZyroxLiquidGlassDrawable(density, hudSurfaceMode));
+        cardView.setClipToOutline(true);
     }
 
     @Override

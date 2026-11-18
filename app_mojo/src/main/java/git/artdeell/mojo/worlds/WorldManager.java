@@ -191,8 +191,43 @@ public final class WorldManager {
         }
         File validIcon = (icon.isFile() && icon.length() > 0L && icon.length() <= 2L * 1024L * 1024L)
                 ? icon : null;
-        return new WorldEntry(worldDir, folderName, folderName, validIcon,
+        String displayName = folderName;
+        if (integrity != Integrity.CORRUPT && levelDat.isFile()) {
+            try {
+                LevelDatNbtEditor.LevelDatSummary nbt = LevelDatNbtEditor.readSummary(levelDat);
+                if (!nbt.levelName.trim().isEmpty()) {
+                    displayName = nbt.levelName.trim();
+                }
+                StringBuilder nbtInfo = new StringBuilder();
+                nbtInfo.append(nbt.getGameModeLabel());
+                if (nbt.hardcore) nbtInfo.append(" (Hardcore)");
+                nbtInfo.append(" • ").append(nbt.allowCommands ? "Cheats ON" : "Cheats OFF");
+                if (!nbt.versionName.isEmpty()) nbtInfo.append(" • MC ").append(nbt.versionName);
+                note = nbtInfo.toString();
+            } catch (Exception ignored) {
+                // Keep structural integrity note if level.dat uses a non-standard header
+            }
+        }
+        return new WorldEntry(worldDir, folderName, displayName, validIcon,
                 bytes, modified, dpCount, integrity, note);
+    }
+
+    /** Reads {@code level.dat} gameplay attributes (gamemode, seed, cheats, hardcore, difficulty). */
+    @NonNull
+    public static LevelDatNbtEditor.LevelDatSummary readWorldLevelDat(@NonNull File worldDir) throws IOException {
+        return LevelDatNbtEditor.readSummary(new File(worldDir, "level.dat"));
+    }
+
+    /** Atomically updates {@code level.dat} attributes while preserving {@code level.dat_old}. */
+    @NonNull
+    public static LevelDatNbtEditor.LevelDatSummary editWorldLevelDat(
+            @NonNull File worldDir,
+            @NonNull LevelDatNbtEditor.EditSpec edits) throws IOException {
+        File lock = new File(worldDir, "session.lock");
+        if (lock.isFile() && (System.currentTimeMillis() - lock.lastModified()) < 3_000L) {
+            throw new IOException("World appears to be actively open. Save & Quit to Title before editing level.dat.");
+        }
+        return LevelDatNbtEditor.applyEdits(new File(worldDir, "level.dat"), edits);
     }
 
     /**

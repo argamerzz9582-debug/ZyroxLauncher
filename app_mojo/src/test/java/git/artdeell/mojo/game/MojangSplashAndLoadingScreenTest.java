@@ -198,25 +198,20 @@ public class MojangSplashAndLoadingScreenTest {
         assertEquals(expectedFrames, meta.frameCount);
         assertEquals(expectedDelayMs, meta.medianDelayMs);
 
-        // Decode raw (unblended) at 1x native resolution to measure baseline hard-cut discontinuity
-        ZyroxGifDecoder.SeamlessSequence<short[]> rawSeq = ZyroxGifDecoder.decodeSeamlessLoop(
-                gifBytes, 1, false, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
+        // Decode raw (unblended) at 1x full native resolution into lossless 32-bit ARGB_8888
+        ZyroxGifDecoder.SeamlessSequence<int[]> rawSeq = ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, false, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
         assertTrue(rawSeq != null);
+        assertEquals(expectedW, rawSeq.width);
+        assertEquals(expectedH, rawSeq.height);
         assertEquals(expectedFrames, rawSeq.frames.size());
-        double rawWrap = meanRgbDiff565(rawSeq.frames.get(rawSeq.frames.size() - 1), rawSeq.frames.get(0));
+        double rawWrap = meanArgbDiff(rawSeq.frames.get(rawSeq.frames.size() - 1), rawSeq.frames.get(0));
 
-        // Verify 2x low-RAM half-resolution decoder path as well
-        ZyroxGifDecoder.SeamlessSequence<short[]> lowRamSeq = ZyroxGifDecoder.decodeSeamlessLoop(
-                gifBytes, 2, true, null, (w, h, px) -> Arrays.copyOf(px, px.length), null);
-        assertTrue(lowRamSeq != null);
-        assertEquals(expectedW / 2, lowRamSeq.width);
-        assertEquals(expectedH / 2, lowRamSeq.height);
-
-        // Decode C¹-continuous seamless loop at full 1x native resolution & verify preview parity
+        // Decode C¹-continuous seamless loop at full 1x native ARGB_8888 resolution & verify preview parity
         AtomicInteger previewCount = new AtomicInteger();
-        final short[][] previewHolder = new short[1][];
-        ZyroxGifDecoder.SeamlessSequence<short[]> seamless = ZyroxGifDecoder.decodeSeamlessLoop(
-                gifBytes, 1, true, null,
+        final int[][] previewHolder = new int[1][];
+        ZyroxGifDecoder.SeamlessSequence<int[]> seamless = ZyroxGifDecoder.decodeSeamlessLoop(
+                gifBytes, true, null,
                 (w, h, px) -> Arrays.copyOf(px, px.length),
                 (preview, w, h) -> {
                     previewCount.incrementAndGet();
@@ -230,18 +225,19 @@ public class MojangSplashAndLoadingScreenTest {
         assertTrue("Preview frame matches seamless frame 0 identically (zero startup snap)",
                 Arrays.equals(previewHolder[0], seamless.frames.get(0)));
 
-        List<short[]> frames = seamless.frames;
+        List<int[]> frames = seamless.frames;
         int m = frames.size();
         assertTrue("Seamless loop retains healthy frame count", m >= 20 && m < expectedFrames);
 
-        // Every frame must contain real illuminated scene pixels (never blank/corrupt LZW output)
+        // Every frame must contain full 32-bit ARGB_8888 illuminated scene pixels (no RGB_565 truncation)
         for (int i = 0; i < m; i++) {
-            short[] f = frames.get(i);
+            int[] f = frames.get(i);
             assertEquals(expectedW * expectedH, f.length);
             long lumaSum = 0L;
             int samples = 0;
             for (int p = 0; p < f.length; p += 97) {
-                int argb = ZyroxGifDecoder.unpackRgb565(f[p]);
+                int argb = f[p];
+                assertEquals("Opaque scene frame alpha must be 0xFF", 0xFF, (argb >>> 24) & 0xFF);
                 int r = (argb >>> 16) & 0xFF;
                 int g = (argb >>> 8) & 0xFF;
                 int b = argb & 0xFF;
@@ -253,13 +249,24 @@ public class MojangSplashAndLoadingScreenTest {
                     avgLuma >= 18 && avgLuma <= 230);
         }
 
+        // Verify Nearest-Neighbor keeps crisp hard steps while Catmull-Rom Bicubic interpolates smoothly
+        int[] checker2x2 = {0xFF000000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF000000};
+        int[] nn4x4 = ZyroxGifDecoder.resampleNearestNeighbor(checker2x2, 2, 2, 4, 4);
+        assertEquals(0xFF000000, nn4x4[0]);
+        assertEquals(0xFF000000, nn4x4[1]);
+        assertEquals(0xFFFFFFFF, nn4x4[2]);
+        int[] bc4x4 = ZyroxGifDecoder.resampleBicubic(checker2x2, 2, 2, 4, 4);
+        assertEquals(16, bc4x4.length);
+        int midR = (bc4x4[5] >>> 16) & 0xFF;
+        assertTrue("Bicubic center sample interpolates between 0 and 255", midR > 16 && midR < 239);
+
         // Verify seamless wrap (frame[M-1] -> frame[0]) matches normal per-frame motion cleanly
         double stepSum = 0.0;
         for (int i = 0; i < m - 1; i++) {
-            stepSum += meanRgbDiff565(frames.get(i), frames.get(i + 1));
+            stepSum += meanArgbDiff(frames.get(i), frames.get(i + 1));
         }
         double avgStep = stepSum / (m - 1);
-        double seamlessWrap = meanRgbDiff565(frames.get(m - 1), frames.get(0));
+        double seamlessWrap = meanArgbDiff(frames.get(m - 1), frames.get(0));
         if (rawWrap > avgStep * 2.0) {
             assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must strongly reduce raw cut (" + rawWrap + ")",
                     seamlessWrap < rawWrap * 0.65);
@@ -270,15 +277,15 @@ public class MojangSplashAndLoadingScreenTest {
         // Verify pre-cancelled flag aborts cleanly with zero work
         AtomicBoolean cancelled = new AtomicBoolean(true);
         assertTrue(ZyroxGifDecoder.decodeSeamlessLoop(
-                gifBytes, 1, true, cancelled, (w, h, px) -> px, null) == null);
+                gifBytes, true, cancelled, (w, h, px) -> px, null) == null);
     }
 
-    private static double meanRgbDiff565(short[] a, short[] b) {
+    private static double meanArgbDiff(int[] a, int[] b) {
         long diff = 0L;
         int samples = 0;
         for (int i = 0; i < a.length; i += 13) {
-            int ca = ZyroxGifDecoder.unpackRgb565(a[i]);
-            int cb = ZyroxGifDecoder.unpackRgb565(b[i]);
+            int ca = a[i];
+            int cb = b[i];
             diff += Math.abs(((ca >>> 16) & 0xFF) - ((cb >>> 16) & 0xFF));
             diff += Math.abs(((ca >>> 8) & 0xFF) - ((cb >>> 8) & 0xFF));
             diff += Math.abs((ca & 0xFF) - (cb & 0xFF));

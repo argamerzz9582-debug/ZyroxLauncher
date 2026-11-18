@@ -12,6 +12,16 @@
             android:title="@string/zyrox_pref_animated_bg_title"
             android:summary="@string/zyrox_pref_animated_bg_summary" />
 
+        <androidx.preference.ListPreference
+            android:defaultValue="bicubic"
+            android:icon="@drawable/ic_px_image"
+            android:key="zyroxGifFilter"
+            android:entries="@array/zyrox_gif_filter_names"
+            android:entryValues="@array/zyrox_gif_filter_values"
+            android:title="@string/zyrox_pref_gif_filter_title"
+            android:summary="@string/zyrox_pref_gif_filter_summary"
+            app2:useSimpleSummaryProvider="true" />
+
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:icon="@drawable/ic_px_alt_sliders"

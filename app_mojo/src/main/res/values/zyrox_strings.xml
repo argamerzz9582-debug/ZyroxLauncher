@@ -3,7 +3,15 @@
     <!-- Global Zyrox 2.2 Starlight Firefly Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">STARLIGHT  •  LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX STARLIGHT v2.2.1</string>
+    <string name="zyrox_engine_watermark">ZYROX STARLIGHT v2.3.0</string>
+    <string name="zyrox_action_import">Import JSON…</string>
+    <string name="mcl_option_import_control">Import Control JSON…</string>
+    <string name="zyrox_pref_turnip_store_title">Turnip Driver &amp; Java Runtime Store</string>
+    <string name="zyrox_pref_turnip_store_summary">1-click install AdrenoTools Turnip (.adpkg) Vulkan drivers and JRE 8/17/21/25</string>
+    <string name="zyrox_pref_gpu_autopreset_title">Apply Smart GPU Auto-Preset</string>
+    <string name="zyrox_pref_gpu_autopreset_summary">Auto-tune renderer, resolution scale &amp; JVM memory for your Adreno / Mali / Xclipse GPU</string>
+    <string name="zyrox_pref_purge_shader_cache_title">Clear Mesa / Zink Shader Cache</string>
+    <string name="zyrox_pref_purge_shader_cache_summary">Purge cached Vulkan &amp; Freedreno pipeline caches after switching drivers</string>
     <string name="zyrox_back">&lt; BACK</string>
     <string name="zyrox_home">HOME</string>
 
@@ -134,6 +142,24 @@
     <string name="zyrox_pref_select_bg_video_summary">Pick a looping GIF or MP4 wallpaper (muted, center-cropped) or reset to Starlight Firefly.</string>
     <string name="zyrox_pref_reset_bg_video_title">Reset Starlight backdrop</string>
     <string name="zyrox_pref_reset_bg_video_summary">Restore default Zyrox Starlight Firefly lakeside animated scene.</string>
+    <string name="zyrox_pref_gif_filter_title">GIF scaling filter</string>
+    <string name="zyrox_pref_gif_filter_summary">Bicubic for crisp HD animated scenes, or Nearest-Neighbor for razor-sharp pixel-art GIFs.</string>
+    <string-array name="zyrox_gif_filter_names">
+        <item>Bicubic (Crisp HD Animated GIFs)</item>
+        <item>Nearest-Neighbor (Sharp Pixel-Art GIFs)</item>
+    </string-array>
+    <string-array name="zyrox_gif_filter_values">
+        <item>bicubic</item>
+        <item>nearest</item>
+    </string-array>
+    <string name="zyrox_hud_section_title">Performance HUD Overlay</string>
+    <string name="zyrox_hud_scale_title">HUD Scale (%)</string>
+    <string name="zyrox_hud_opacity_title">HUD Backdrop Opacity (%)</string>
+    <string name="zyrox_hud_lock_title">Lock HUD Position</string>
+    <string name="zyrox_hud_compact_title">Compact Mini-Pill Mode</string>
+    <string name="zyrox_hud_reset_pos">Reset HUD Position</string>
+    <string name="zyrox_pref_high_rate_touch_title">120Hz / 144Hz Touch Sampling &amp; Interpolation</string>
+    <string name="zyrox_pref_high_rate_touch_summary">Request unbuffered high-rate touch dispatch and sub-frame historical camera smoothing.</string>
     <string name="zyrox_ram_status_fmt">Allocated: %1$d MB  •  Free: %2$d MB / %3$d MB Total</string>
 
     <string-array name="zyrox_optimizer_mode_names">

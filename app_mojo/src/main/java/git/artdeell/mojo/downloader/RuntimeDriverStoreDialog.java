@@ -14,35 +14,40 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.kdt.mcgui.ProgressLayout;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
-import git.artdeell.mojo.BuildConfig;
 import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.diagnostics.GraphicsAdvisor;
+import git.artdeell.mojo.game.renderer.impl.MesaRenderSpec;
+import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.multirt.MultiRTUtils;
 import git.artdeell.mojo.ui.ZyroxStudioUi;
+import git.artdeell.mojo.utils.GpuUtils;
+import git.artdeell.mojo.utils.GpuUtils.GpuArchitecture;
+import git.artdeell.mojo.utils.ZyroxHttpClient;
 import git.artdeell.mojo.vulkan.DriverManager;
+import git.artdeell.mojo.vulkan.driver.AdrenoDriver;
+import git.artdeell.mojo.vulkan.driver.BuiltinDriver;
+import git.artdeell.mojo.vulkan.driver.Driver;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
- * In-App Verified HTTPS OpenJDK Runtime (JRE 8 / 17 / 21 / 25) &amp; Snapdragon Adreno Turnip
- * Vulkan Driver catalog installer.
- *
- * <p>Auto-detects the device CPU ABI ({@code arm64}, {@code arm}, {@code x86_64}, {@code x86}) so
- * users can download and install compatible Java runtimes and Mesa Turnip drivers in 1 tap without
- * hunting archives externally.
+ * Verified HTTPS OpenJDK Runtime (JRE 8 / 17 / 21 / 25) &amp; One-Click Qualcomm Adreno Turnip
+ * ({@code .adpkg} / {@code .adpkg.zip} / {@code .zip}) Vulkan Driver Store, Version Manager, and
+ * Per-Instance GPU Driver Assignment hub.
  */
 public final class RuntimeDriverStoreDialog {
 
@@ -50,10 +55,13 @@ public final class RuntimeDriverStoreDialog {
             "https://api.github.com/repos/MojoLauncher/android-openjdk-build-multiarch/releases?per_page=10",
             "https://api.github.com/repos/PojavLauncherTeam/android-openjdk-build-multiarch/releases?per_page=10"
     };
-    private static final String TURNIP_RELEASES_API =
-            "https://api.github.com/repos/K11MCH1/AdrenoToolsDrivers/releases?per_page=12";
-    private static final String USER_AGENT =
-            "ZyroxLauncher/" + BuildConfig.VERSION_NAME + " (Android)";
+
+    /** Official community AdrenoTools Turnip (.adpkg / .zip) release catalogs with automatic failover. */
+    private static final String[] TURNIP_RELEASES_APIS = {
+            "https://api.github.com/repos/K11MCH1/AdrenoToolsDrivers/releases?per_page=15",
+            "https://api.github.com/repos/MrPurple666/purple-turnip/releases?per_page=12"
+    };
+
     private static final long MAX_DOWNLOAD_BYTES = 180L * 1024L * 1024L;
 
     public static final class CatalogAsset {
@@ -62,21 +70,33 @@ public final class RuntimeDriverStoreDialog {
         @NonNull public final String downloadUrl;
         public final long sizeBytes;
         public final boolean isDriver;
+        public final boolean recommendedForGpu;
 
         public CatalogAsset(@NonNull String displayLabel,
                             @NonNull String installName,
                             @NonNull String downloadUrl,
                             long sizeBytes,
                             boolean isDriver) {
+            this(displayLabel, installName, downloadUrl, sizeBytes, isDriver, false);
+        }
+
+        public CatalogAsset(@NonNull String displayLabel,
+                            @NonNull String installName,
+                            @NonNull String downloadUrl,
+                            long sizeBytes,
+                            boolean isDriver,
+                            boolean recommendedForGpu) {
             this.displayLabel = displayLabel;
             this.installName = installName;
             this.downloadUrl = downloadUrl;
             this.sizeBytes = sizeBytes;
             this.isDriver = isDriver;
+            this.recommendedForGpu = recommendedForGpu;
         }
     }
 
-    private RuntimeDriverStoreDialog() {}
+    private RuntimeDriverStoreDialog() {
+    }
 
     @NonNull
     public static String detectJreArchToken() {
@@ -92,20 +112,84 @@ public final class RuntimeDriverStoreDialog {
         return "arm64";
     }
 
-    /** Opens chooser between Java Runtime Store (JRE 8/17/21+) and Adreno Turnip Driver Store. */
+    /** Convenience entry point using the currently selected instance. */
+    public static void show(@NonNull Context ctx) {
+        showHub(ctx, null);
+    }
+
+    /** Opens the full Runtime, Turnip (.adpkg) Store, Version Manager &amp; GPU Auto-Preset Hub. */
     public static void showHub(@NonNull Context ctx, @Nullable Runnable onInstalledUi) {
+        Instance selected = null;
+        try {
+            selected = Instances.loadSelectedInstance();
+        } catch (Throwable ignored) {
+        }
+        showForInstance(ctx, selected, onInstalledUi);
+    }
+
+    /**
+     * Opens the Runtime &amp; Turnip Driver Hub scoped to {@code targetInstance} so newly
+     * downloaded or already-installed {@code .adpkg} drivers can be assigned in a single tap.
+     */
+    public static void showForInstance(@NonNull Context ctx,
+                                       @Nullable Instance targetInstance,
+                                       @Nullable Runnable onUpdatedUi) {
         String arch = detectJreArchToken();
-        CharSequence[] options = {
-                "OpenJDK Java Runtimes (JRE 8 / 17 / 21 • " + arch + ")",
-                "Adreno Turnip / Mesa Vulkan Drivers (Snapdragon arm64)"
-        };
+        GpuUtils.GLInfo gl = GpuUtils.getGlInfo();
+        int installedCount = DriverManager.getDriverPaths().size();
+        Driver globalDrv = DriverManager.getPreferredDriver();
+
+        List<String> options = new ArrayList<>(5);
+        options.add("1-Click Download Adreno Turnip (.adpkg) Drivers");
+        options.add("Manage Installed Turnip Versions (" + installedCount
+                + " installed • Active: " + globalDrv.getName() + ")");
+        if (targetInstance != null) {
+            String instName = Tools.isValidString(targetInstance.name)
+                    ? targetInstance.name : targetInstance.versionId;
+            options.add("Assign GPU Driver to \"" + instName + "\"");
+        }
+        options.add("Auto-Apply Optimal GPU Preset (" + gl.architecture.displayName + ")");
+        options.add("OpenJDK Java Runtimes (JRE 8 / 17 / 21 / 25 • " + arch + ")");
+        options.add("Purge Mesa / Zink / Turnip Shader Cache");
+
         new AlertDialog.Builder(ctx)
-                .setTitle("Zyrox Runtime & Driver Store")
-                .setItems(options, (d, which) -> {
-                    if (which == 0) {
-                        showJreStore(ctx, onInstalledUi);
-                    } else {
-                        showTurnipDriverStore(ctx, onInstalledUi);
+                .setTitle("Zyrox GPU Driver (.adpkg) & Runtime Store")
+                .setItems(options.toArray(new CharSequence[0]), (d, which) -> {
+                    int idx = which;
+                    if (targetInstance == null && idx >= 2) idx++;
+                    switch (idx) {
+                        case 0:
+                            showTurnipDriverStore(ctx, targetInstance, onUpdatedUi);
+                            break;
+                        case 1:
+                            showInstalledDriverManager(ctx, targetInstance, onUpdatedUi);
+                            break;
+                        case 2:
+                            if (targetInstance != null) {
+                                showInstanceDriverPicker(ctx, targetInstance, onUpdatedUi);
+                            }
+                            break;
+                        case 3: {
+                            GraphicsAdvisor.RendererPreset preset =
+                                    GraphicsAdvisor.applyOptimalPreset(
+                                            ctx, targetInstance,
+                                            targetInstance != null ? targetInstance.versionId : null);
+                            Toast.makeText(ctx, preset.presetName + " applied!",
+                                    Toast.LENGTH_LONG).show();
+                            if (onUpdatedUi != null) onUpdatedUi.run();
+                            break;
+                        }
+                        case 4:
+                            showJreStore(ctx, onUpdatedUi);
+                            break;
+                        case 5: {
+                            long freed = MesaRenderSpec.purgeShaderCaches();
+                            Toast.makeText(ctx, "Cleared "
+                                            + ZyroxStudioUi.formatBytes(freed)
+                                            + " of cached Mesa/Turnip shaders.",
+                                    Toast.LENGTH_SHORT).show();
+                            break;
+                        }
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -114,41 +198,198 @@ public final class RuntimeDriverStoreDialog {
 
     public static void showJreStore(@NonNull Context ctx, @Nullable Runnable onInstalledUi) {
         final String arch = detectJreArchToken();
-        Toast.makeText(ctx, "Fetching verified OpenJDK builds (" + arch + ")…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(ctx, "Fetching verified OpenJDK builds (" + arch + ")…",
+                Toast.LENGTH_SHORT).show();
         MojoApplication.sExecutorService.execute(() -> {
             try {
                 List<CatalogAsset> items = fetchJreCatalog(arch);
                 Tools.runOnUiThread(() -> presentCatalogDialog(
-                        ctx, "Install OpenJDK Runtime (" + arch + ")", items, onInstalledUi));
+                        ctx, "Install OpenJDK Runtime (" + arch + ")", items, null, onInstalledUi));
             } catch (Exception e) {
                 Tools.runOnUiThread(() -> Toast.makeText(ctx,
-                        "Could not load JRE catalog: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                        "Could not load JRE catalog: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show());
             }
         });
     }
 
     public static void showTurnipDriverStore(@NonNull Context ctx, @Nullable Runnable onInstalledUi) {
-        if (!"arm64".equals(detectJreArchToken())) {
-            Toast.makeText(ctx, "Turnip Vulkan drivers require a 64-bit Snapdragon Adreno device.",
+        showTurnipDriverStore(ctx, null, onInstalledUi);
+    }
+
+    public static void showTurnipDriverStore(@NonNull Context ctx,
+                                             @Nullable Instance targetInstance,
+                                             @Nullable Runnable onInstalledUi) {
+        if (!DriverManager.isSupportedByDevice() || !"arm64".equals(detectJreArchToken())) {
+            Toast.makeText(ctx,
+                    "Turnip .adpkg Vulkan drivers require Android 9+ on 64-bit arm64 Snapdragon Adreno.",
                     Toast.LENGTH_LONG).show();
             return;
         }
-        Toast.makeText(ctx, "Fetching Mesa Turnip Adreno Vulkan drivers…", Toast.LENGTH_SHORT).show();
+        final GpuArchitecture gpuArch = GpuUtils.getGlInfo().architecture;
+        Toast.makeText(ctx, "Fetching Adreno Turnip (.adpkg) catalog…",
+                Toast.LENGTH_SHORT).show();
         MojoApplication.sExecutorService.execute(() -> {
             try {
-                List<CatalogAsset> items = fetchTurnipCatalog();
+                List<CatalogAsset> items = fetchTurnipCatalog(gpuArch);
                 Tools.runOnUiThread(() -> presentCatalogDialog(
-                        ctx, "Install Adreno Turnip Driver", items, onInstalledUi));
+                        ctx, "1-Click Adreno Turnip (.adpkg) Drivers",
+                        items, targetInstance, onInstalledUi));
             } catch (Exception e) {
                 Tools.runOnUiThread(() -> Toast.makeText(ctx,
-                        "Could not load Turnip catalog: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                        "Could not load Turnip catalog: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show());
             }
         });
+    }
+
+    /**
+     * Interactive version manager for all installed Adreno Turnip drivers: activate globally,
+     * assign to an instance, inspect version/API metadata, or uninstall old driver revisions.
+     */
+    public static void showInstalledDriverManager(@NonNull Context ctx,
+                                                  @Nullable Instance targetInstance,
+                                                  @Nullable Runnable onChangedUi) {
+        List<Driver> drivers = DriverManager.getDrivers();
+        CharSequence[] rows = new CharSequence[drivers.size()];
+        for (int i = 0; i < drivers.size(); i++) {
+            Driver drv = drivers.get(i);
+            StringBuilder row = new StringBuilder();
+            if (DriverManager.isPreferredDriver(drv)) {
+                row.append("★ [GLOBAL] ");
+            }
+            if (targetInstance != null && targetInstance.hasCustomVulkanDriver()) {
+                String tok = targetInstance.getVulkanDriver();
+                if ((drv instanceof BuiltinDriver
+                        && DriverManager.SYSTEM_DRIVER_TOKEN.equalsIgnoreCase(tok))
+                        || (drv.getHash() != null && drv.getHash().equals(tok))) {
+                    row.append("[INSTANCE] ");
+                }
+            }
+            row.append(DriverManager.formatDriverLabel(drv));
+            long disk = DriverManager.getDriverDiskBytes(drv);
+            if (disk > 0L) {
+                row.append(" • ").append(ZyroxStudioUi.formatBytes(disk));
+            }
+            rows[i] = row.toString();
+        }
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Installed Vulkan / Turnip Drivers")
+                .setItems(rows, (d, which) -> showSingleDriverActions(
+                        ctx, drivers.get(which), targetInstance, onChangedUi))
+                .setNeutralButton("+ Download .adpkg",
+                        (d, w) -> showTurnipDriverStore(ctx, targetInstance, onChangedUi))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void showSingleDriverActions(@NonNull Context ctx,
+                                                @NonNull Driver driver,
+                                                @Nullable Instance targetInstance,
+                                                @Nullable Runnable onChangedUi) {
+        boolean isBuiltin = driver instanceof BuiltinDriver;
+        List<String> actions = new ArrayList<>(4);
+        actions.add("Set as Global Active Vulkan Driver");
+        if (targetInstance != null) {
+            String instName = Tools.isValidString(targetInstance.name)
+                    ? targetInstance.name : targetInstance.versionId;
+            actions.add("Assign Only to Instance \"" + instName + "\"");
+        }
+        if (!isBuiltin) {
+            actions.add("Uninstall This Driver Version");
+        }
+
+        StringBuilder subtitle = new StringBuilder();
+        if (driver instanceof AdrenoDriver) {
+            AdrenoDriver ad = (AdrenoDriver) driver;
+            if (Tools.isValidString(ad.author)) subtitle.append("Author: ").append(ad.author).append('\n');
+            if (Tools.isValidString(ad.driverVersion)) subtitle.append("Version: ").append(ad.driverVersion).append('\n');
+            if (Tools.isValidString(ad.libraryName)) subtitle.append("Library: ").append(ad.libraryName).append('\n');
+            if (Tools.isValidString(ad.description)) subtitle.append(ad.description);
+        }
+
+        AlertDialog.Builder b = new AlertDialog.Builder(ctx)
+                .setTitle(DriverManager.formatDriverLabel(driver))
+                .setItems(actions.toArray(new CharSequence[0]), (d, which) -> {
+                    if (which == 0) {
+                        DriverManager.setPreferredDriver(driver);
+                        Toast.makeText(ctx, "Global driver set: " + DriverManager.formatDriverLabel(driver),
+                                Toast.LENGTH_SHORT).show();
+                        if (onChangedUi != null) onChangedUi.run();
+                    } else if (targetInstance != null && which == 1) {
+                        targetInstance.vulkanDriver = isBuiltin
+                                ? DriverManager.SYSTEM_DRIVER_TOKEN : driver.getHash();
+                        targetInstance.maybeWrite();
+                        Toast.makeText(ctx, "Assigned to instance: "
+                                        + DriverManager.formatDriverLabel(driver),
+                                Toast.LENGTH_SHORT).show();
+                        if (onChangedUi != null) onChangedUi.run();
+                    } else if (!isBuiltin) {
+                        boolean ok = DriverManager.removeDriver(driver.getHash());
+                        if (ok && targetInstance != null
+                                && driver.getHash() != null
+                                && driver.getHash().equals(targetInstance.vulkanDriver)) {
+                            targetInstance.vulkanDriver = null;
+                            targetInstance.maybeWrite();
+                        }
+                        Toast.makeText(ctx, ok ? "Removed " + driver.getName() : "Could not remove driver",
+                                Toast.LENGTH_SHORT).show();
+                        if (onChangedUi != null) onChangedUi.run();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null);
+        if (subtitle.length() > 0) {
+            // Note: AlertDialog cannot show message + items simultaneously on AppCompat, so keep title concise.
+            b.setTitle(DriverManager.formatDriverLabel(driver));
+        }
+        b.show();
+    }
+
+    public static void showInstanceDriverPicker(@NonNull Context ctx,
+                                                @NonNull Instance instance,
+                                                @Nullable Runnable onChangedUi) {
+        List<Driver> drivers = DriverManager.getDrivers();
+        String[] labels = new String[drivers.size() + 1];
+        String[] tokens = new String[drivers.size() + 1];
+        labels[0] = "Inherit Global Default ("
+                + DriverManager.formatDriverLabel(DriverManager.getPreferredDriver()) + ")";
+        tokens[0] = null;
+        int checked = 0;
+
+        for (int i = 0; i < drivers.size(); i++) {
+            Driver drv = drivers.get(i);
+            String tok = (drv instanceof BuiltinDriver)
+                    ? DriverManager.SYSTEM_DRIVER_TOKEN : drv.getHash();
+            tokens[i + 1] = tok;
+            labels[i + 1] = DriverManager.formatDriverLabel(drv);
+            if (instance.hasCustomVulkanDriver() && tok != null
+                    && tok.equalsIgnoreCase(instance.vulkanDriver)) {
+                checked = i + 1;
+            }
+        }
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("GPU Driver — "
+                        + (Tools.isValidString(instance.name) ? instance.name : instance.versionId))
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    instance.vulkanDriver = tokens[which];
+                    instance.maybeWrite();
+                    Toast.makeText(ctx, "Instance GPU driver: " + labels[which],
+                            Toast.LENGTH_SHORT).show();
+                    if (onChangedUi != null) onChangedUi.run();
+                    dialog.dismiss();
+                })
+                .setNeutralButton("+ Get Turnip .adpkg",
+                        (d, w) -> showTurnipDriverStore(ctx, instance, onChangedUi))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private static void presentCatalogDialog(@NonNull Context ctx,
                                              @NonNull String title,
                                              @NonNull List<CatalogAsset> items,
+                                             @Nullable Instance targetInstance,
                                              @Nullable Runnable onInstalledUi) {
         if (items.isEmpty()) {
             Toast.makeText(ctx, "No matching packages found for this device right now.",
@@ -161,13 +402,15 @@ public final class RuntimeDriverStoreDialog {
         }
         new AlertDialog.Builder(ctx)
                 .setTitle(title)
-                .setItems(labels, (d, which) -> installCatalogAsset(ctx, items.get(which), onInstalledUi))
+                .setItems(labels, (d, which) -> installCatalogAsset(
+                        ctx, items.get(which), targetInstance, onInstalledUi))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
     private static void installCatalogAsset(@NonNull Context ctx,
                                             @NonNull CatalogAsset asset,
+                                            @Nullable Instance targetInstance,
                                             @Nullable Runnable onInstalledUi) {
         if (!ProgressLayout.ensureNoOngoingTasks(ctx)) return;
         final Context appCtx = ctx.getApplicationContext();
@@ -176,23 +419,35 @@ public final class RuntimeDriverStoreDialog {
         Toast.makeText(appCtx, "Downloading " + asset.installName + "…", Toast.LENGTH_SHORT).show();
 
         MojoApplication.sExecutorService.execute(() -> {
+            String ext = asset.isDriver
+                    ? (asset.installName.toLowerCase(Locale.ROOT).endsWith(".adpkg") ? ".adpkg" : ".zip")
+                    : ".tar.xz";
             File cacheFile = new File(Tools.DIR_CACHE,
-                    "zyrox_pkg_" + System.currentTimeMillis() + (asset.isDriver ? ".zip" : ".tar.xz"));
+                    "zyrox_pkg_" + System.currentTimeMillis() + ext);
             try {
                 ProgressLayout.setProgress(progressKey, 5, R.string.zyrox_pkg_downloading);
                 downloadHttpsToFile(asset.downloadUrl, cacheFile, progressKey);
+
+                String installedDriverHash = null;
                 if (asset.isDriver) {
-                    String target;
                     ProgressLayout.setProgress(progressKey, 75, R.string.driver_progress_validate);
                     try (InputStream in = new FileInputStream(cacheFile)) {
-                        target = DriverManager.validateDriver(in);
+                        installedDriverHash = DriverManager.validateDriver(in);
                     }
-                    if (target == null) {
-                        throw new IOException("Downloaded archive is not a compatible AdrenoTools driver");
+                    if (installedDriverHash == null) {
+                        throw new IOException(
+                                "Downloaded file is not a compatible AdrenoTools Turnip (.adpkg) driver");
                     }
                     ProgressLayout.setProgress(progressKey, 88, R.string.driver_progress_install);
                     try (InputStream in = new FileInputStream(cacheFile)) {
-                        DriverManager.installDriverContent(target, in, true);
+                        DriverManager.installDriverContent(installedDriverHash, in, true);
+                    }
+                    // Activate immediately: bind to targetInstance when scoped, else set as global Turnip
+                    if (targetInstance != null) {
+                        targetInstance.vulkanDriver = installedDriverHash;
+                        targetInstance.maybeWrite();
+                    } else {
+                        DriverManager.setPreferredDriverByHash(installedDriverHash);
                     }
                 } else {
                     ProgressLayout.setProgress(progressKey, 80, R.string.multirt_progress_caching);
@@ -201,8 +456,16 @@ public final class RuntimeDriverStoreDialog {
                     }
                     MultiRTUtils.postPrepare(asset.installName);
                 }
+
+                final String finalHash = installedDriverHash;
                 Tools.runOnUiThread(() -> {
-                    Toast.makeText(appCtx, "Installed " + asset.installName + " successfully!",
+                    String suffix = "";
+                    if (finalHash != null) {
+                        suffix = targetInstance != null
+                                ? " (assigned to instance)" : " (activated globally)";
+                    }
+                    Toast.makeText(appCtx,
+                            "Installed " + asset.installName + suffix + "!",
                             Toast.LENGTH_LONG).show();
                     if (onInstalledUi != null) onInstalledUi.run();
                 });
@@ -222,7 +485,8 @@ public final class RuntimeDriverStoreDialog {
         IOException lastErr = null;
         for (String apiUrl : JRE_RELEASES_APIS) {
             try {
-                String json = httpGetJson(apiUrl);
+                String json = ZyroxHttpClient.getStringOrThrow(
+                        apiUrl, Collections.singletonMap("Accept", "application/vnd.github+json"));
                 List<CatalogAsset> list = parseJreReleases(json, arch);
                 if (!list.isEmpty()) return list;
             } catch (IOException e) {
@@ -234,12 +498,13 @@ public final class RuntimeDriverStoreDialog {
     }
 
     @NonNull
-    private static List<CatalogAsset> parseJreReleases(@NonNull String json, @NonNull String arch) {
+    public static List<CatalogAsset> parseJreReleases(@NonNull String json, @NonNull String arch) {
         List<CatalogAsset> out = new ArrayList<>();
         String archSuffix = "-" + arch.toLowerCase(Locale.ROOT) + ".tar.xz";
         String altSuffix = "aarch64.tar.xz";
-        JsonArray releases = JsonParser.parseString(json).getAsJsonArray();
-        for (JsonElement relEl : releases) {
+        JsonElement root = JsonParser.parseString(json);
+        if (!root.isJsonArray()) return out;
+        for (JsonElement relEl : root.getAsJsonArray()) {
             if (!relEl.isJsonObject()) continue;
             JsonObject rel = relEl.getAsJsonObject();
             String relTag = optStr(rel, "tag_name", "");
@@ -248,140 +513,165 @@ public final class RuntimeDriverStoreDialog {
                 if (!aEl.isJsonObject()) continue;
                 JsonObject a = aEl.getAsJsonObject();
                 String name = optStr(a, "name", "");
-                String lower = name.toLowerCase(Locale.ROOT);
+                String low = name.toLowerCase(Locale.ROOT);
+                boolean match = low.endsWith(archSuffix)
+                        || ("arm64".equalsIgnoreCase(arch) && low.endsWith(altSuffix));
+                if (!match) continue;
                 String url = optStr(a, "browser_download_url", "");
-                if (!url.toLowerCase(Locale.ROOT).startsWith("https://")) continue;
-                boolean matches = lower.endsWith(archSuffix)
-                        || ("arm64".equals(arch) && lower.endsWith(altSuffix));
-                if (!matches) continue;
-                long sz = a.has("size") && !a.get("size").isJsonNull() ? a.get("size").getAsLong() : 0L;
-                String cleanName = name.replace(".tar.xz", "")
-                        + (relTag.isEmpty() ? "" : "-" + relTag.replaceAll("[^a-zA-Z0-9._-]", ""));
-                String label = name.replace(".tar.xz", "")
-                        + (relTag.isEmpty() ? "" : " (" + relTag + ")")
-                        + (sz > 0 ? " • " + ZyroxStudioUi.formatBytes(sz) : "");
-                out.add(new CatalogAsset(label, cleanName, url, sz, false));
-                if (out.size() >= 14) return out;
+                if (!ZyroxHttpClient.isStrictHttpsUrl(url)) continue;
+                long size = a.has("size") && !a.get("size").isJsonNull()
+                        ? a.get("size").getAsLong() : 0L;
+                String cleanName = name.replace(".tar.xz", "");
+                String label = cleanName
+                        + (relTag.isEmpty() ? "" : " [" + relTag + "]")
+                        + (size > 0 ? " • " + ZyroxStudioUi.formatBytes(size) : "");
+                out.add(new CatalogAsset(label, cleanName, url, size, false));
+                if (out.size() >= 18) return out;
             }
         }
         return out;
     }
 
     @NonNull
-    private static List<CatalogAsset> fetchTurnipCatalog() throws IOException {
-        String json = httpGetJson(TURNIP_RELEASES_API);
+    private static List<CatalogAsset> fetchTurnipCatalog(@NonNull GpuArchitecture gpuArch)
+            throws IOException {
+        List<CatalogAsset> combined = new ArrayList<>();
+        IOException lastErr = null;
+        for (String apiUrl : TURNIP_RELEASES_APIS) {
+            try {
+                String json = ZyroxHttpClient.getStringOrThrow(
+                        apiUrl, Collections.singletonMap("Accept", "application/vnd.github+json"));
+                combined.addAll(parseTurnipReleases(json, gpuArch));
+                if (combined.size() >= 16) break;
+            } catch (IOException e) {
+                lastErr = e;
+            }
+        }
+        if (combined.isEmpty() && lastErr != null) throw lastErr;
+        // Bubble GPU-architecture-matched Turnip .adpkg builds to the top
+        Collections.sort(combined, (a, b) -> Boolean.compare(b.recommendedForGpu, a.recommendedForGpu));
+        return combined;
+    }
+
+    /**
+     * Parses GitHub Releases JSON for AdrenoTools Turnip {@code .adpkg}, {@code .adpkg.zip}, and
+     * {@code .zip} driver packages, annotating builds matched to the detected {@link GpuArchitecture}.
+     */
+    @NonNull
+    public static List<CatalogAsset> parseTurnipReleases(@NonNull String json,
+                                                         @NonNull GpuArchitecture gpuArch) {
         List<CatalogAsset> out = new ArrayList<>();
-        JsonArray releases = JsonParser.parseString(json).getAsJsonArray();
+        JsonElement root = JsonParser.parseString(json);
+        if (!root.isJsonArray()) return out;
+        JsonArray releases = root.getAsJsonArray();
         for (JsonElement relEl : releases) {
             if (!relEl.isJsonObject()) continue;
             JsonObject rel = relEl.getAsJsonObject();
-            String relName = optStr(rel, "name", optStr(rel, "tag_name", "Driver"));
+            String relTitle = optStr(rel, "name", optStr(rel, "tag_name", "Turnip"));
+            String relBody = optStr(rel, "body", "");
             if (!rel.has("assets") || !rel.get("assets").isJsonArray()) continue;
             for (JsonElement aEl : rel.getAsJsonArray("assets")) {
                 if (!aEl.isJsonObject()) continue;
                 JsonObject a = aEl.getAsJsonObject();
                 String name = optStr(a, "name", "");
+                if (!DriverManager.isSupportedDriverArchiveName(name)) continue;
                 String url = optStr(a, "browser_download_url", "");
-                if (!name.toLowerCase(Locale.ROOT).endsWith(".zip")
-                        || !url.toLowerCase(Locale.ROOT).startsWith("https://")) {
-                    continue;
-                }
-                long sz = a.has("size") && !a.get("size").isJsonNull() ? a.get("size").getAsLong() : 0L;
-                String label = relName + " (" + name + ")"
-                        + (sz > 0 ? " • " + ZyroxStudioUi.formatBytes(sz) : "");
-                out.add(new CatalogAsset(label, name.replace(".zip", ""), url, sz, true));
-                if (out.size() >= 14) return out;
+                if (!ZyroxHttpClient.isStrictHttpsUrl(url)) continue;
+                long size = a.has("size") && !a.get("size").isJsonNull()
+                        ? a.get("size").getAsLong() : 0L;
+
+                String combinedLower = (relTitle + " " + name + " " + relBody).toLowerCase(Locale.ROOT);
+                boolean isTurnipOrQualcomm = combinedLower.contains("turnip")
+                        || combinedLower.contains("mesa")
+                        || combinedLower.contains("adreno")
+                        || combinedLower.contains("qualcomm")
+                        || name.toLowerCase(Locale.ROOT).endsWith(".adpkg")
+                        || name.toLowerCase(Locale.ROOT).endsWith(".adpkg.zip");
+                if (!isTurnipOrQualcomm) continue;
+
+                boolean recommended = matchesGpuArch(combinedLower, gpuArch);
+                String formatBadge = name.toLowerCase(Locale.ROOT).contains(".adpkg")
+                        ? " [.adpkg]" : " [AdrenoTools]";
+                String label = (recommended ? "★ " : "")
+                        + relTitle + " — " + name + formatBadge
+                        + (size > 0 ? " • " + ZyroxStudioUi.formatBytes(size) : "");
+                out.add(new CatalogAsset(label, name, url, size, true, recommended));
+                if (out.size() >= 24) return out;
             }
         }
         return out;
     }
 
+    private static boolean matchesGpuArch(@NonNull String textLower,
+                                          @NonNull GpuArchitecture gpuArch) {
+        boolean isTurnip = textLower.contains("turnip") || textLower.contains("mesa");
+        switch (gpuArch) {
+            case ADRENO_8XX:
+                return textLower.contains("a8") || textLower.contains("8xx")
+                        || textLower.contains("830") || textLower.contains("elite")
+                        || textLower.contains("gen 4");
+            case ADRENO_7XX:
+                return isTurnip && (textLower.contains("a7") || textLower.contains("7xx")
+                        || textLower.contains("gmem") || !textLower.contains("a6xx-only"));
+            case ADRENO_6XX:
+                return isTurnip && !textLower.contains("a7xx only") && !textLower.contains("a8xx");
+            default:
+                return false;
+        }
+    }
+
     private static void downloadHttpsToFile(@NonNull String httpsUrl,
-                                            @NonNull File outFile,
+                                            @NonNull File target,
                                             @NonNull String progressKey) throws IOException {
-        if (!httpsUrl.toLowerCase(Locale.ROOT).startsWith("https://")) {
-            throw new IOException("Blocked non-HTTPS URL");
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Could not create package cache folder");
         }
-        File parent = outFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            parent.mkdirs();
-        }
-        HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
-        conn.setConnectTimeout(15_000);
-        conn.setReadTimeout(30_000);
-        conn.setInstanceFollowRedirects(true);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        try {
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("HTTP " + code);
+        try (Response resp = ZyroxHttpClient.openDownloadResponse(httpsUrl, 0L)) {
+            if (!resp.isSuccessful()) {
+                throw new IOException("Download server returned HTTP " + resp.code());
             }
-            long contentLen = conn.getContentLengthLong();
-            long read = 0L;
-            int lastPct = 5;
-            try (InputStream in = new BufferedInputStream(conn.getInputStream());
-                 FileOutputStream out = new FileOutputStream(outFile)) {
-                byte[] buf = new byte[32768];
+            ResponseBody body = resp.body();
+            if (body == null) {
+                throw new IOException("Empty package response body");
+            }
+            long contentLen = body.contentLength();
+            if (contentLen > MAX_DOWNLOAD_BYTES) {
+                throw new IOException("Package exceeds safety limit");
+            }
+            try (InputStream in = body.byteStream();
+                 BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(target))) {
+                byte[] buf = new byte[32 * 1024];
+                long downloaded = 0L;
+                int lastPct = -1;
                 int n;
                 while ((n = in.read(buf)) != -1) {
-                    read += n;
-                    if (read > MAX_DOWNLOAD_BYTES) {
-                        throw new IOException("Archive exceeds safe limit");
+                    downloaded += n;
+                    if (downloaded > MAX_DOWNLOAD_BYTES) {
+                        throw new IOException("Package exceeded safety limit");
                     }
                     out.write(buf, 0, n);
                     if (contentLen > 0) {
-                        int pct = 5 + (int) Math.min(68L, (read * 68L) / contentLen);
-                        if (pct >= lastPct + 3) {
+                        int pct = 5 + (int) ((downloaded * 68L) / contentLen);
+                        if (pct != lastPct) {
                             lastPct = pct;
                             ProgressLayout.setProgress(progressKey, pct, R.string.zyrox_pkg_downloading);
                         }
                     }
                 }
-                out.getFD().sync();
             }
-        } finally {
-            conn.disconnect();
         }
     }
 
     @NonNull
-    private static String httpGetJson(@NonNull String httpsUrl) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(12_000);
-        conn.setReadTimeout(20_000);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Accept", "application/vnd.github+json");
+    private static String optStr(@NonNull JsonObject obj,
+                                 @NonNull String key,
+                                 @NonNull String fallback) {
+        if (!obj.has(key) || obj.get(key).isJsonNull()) return fallback;
         try {
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("GitHub API HTTP " + code);
-            }
-            try (InputStream in = new BufferedInputStream(conn.getInputStream());
-                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                byte[] buf = new byte[16384];
-                int total = 0;
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    total += n;
-                    if (total > 4 * 1024 * 1024) break;
-                    out.write(buf, 0, n);
-                }
-                return new String(out.toByteArray(), StandardCharsets.UTF_8);
-            }
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    @NonNull
-    private static String optStr(@NonNull JsonObject o, @NonNull String k, @NonNull String def) {
-        if (!o.has(k) || o.get(k).isJsonNull()) return def;
-        try {
-            return o.get(k).getAsString();
-        } catch (Throwable ignored) {
-            return def;
+            return obj.get(key).getAsString();
+        } catch (Exception e) {
+            return fallback;
         }
     }
 }

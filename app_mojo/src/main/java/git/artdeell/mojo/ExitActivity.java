@@ -60,16 +60,27 @@ public class ExitActivity extends AppCompatActivity {
         traceView.setText(ZyroxLogHighlighter.highlightBlock(displayLog));
         scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
 
-        // Zyrox Guard smart crash diagnosis + user-confirmed Safe Compatibility Mode recovery
+        // Zyrox Guard smart crash diagnosis + one-tap actionable Auto-Fix buttons
+        // (disable crashing mod, adjust JVM heap RAM, switch JRE via JavaRuntimeAdvisor, or GPU preset)
         ZyroxCrashAnalyzer.Diagnosis diag = ZyroxCrashAnalyzer.analyze(displayLog);
         View guardBox = findViewById(R.id.layout_zyrox_guard);
         TextView guardSummary = findViewById(R.id.tv_zyrox_guard_summary);
+        View autoFixScroll = findViewById(R.id.sv_zyrox_autofix_actions);
+        android.widget.LinearLayout autoFixRow = findViewById(R.id.layout_zyrox_autofix_actions);
         Button guardFix = findViewById(R.id.btn_zyrox_guard_fix);
         if (guardBox != null && guardSummary != null
                 && diag.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
             guardBox.setVisibility(View.VISIBLE);
             guardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
-            if (guardFix != null && diag.primaryAction == ZyroxCrashAnalyzer.SuggestedAction.SWITCH_SAFE_RENDERER) {
+            if (autoFixRow != null && autoFixScroll != null && !diag.autoFixes.isEmpty()) {
+                int added = ShowErrorActivity.populateAutoFixButtons(
+                        this, autoFixRow, diag, guardSummary);
+                if (added > 0) {
+                    autoFixScroll.setVisibility(View.VISIBLE);
+                }
+            } else if (guardFix != null
+                    && diag.primaryAction == ZyroxCrashAnalyzer.SuggestedAction.SWITCH_SAFE_RENDERER) {
+                if (autoFixScroll != null) autoFixScroll.setVisibility(View.VISIBLE);
                 guardFix.setVisibility(View.VISIBLE);
                 guardFix.setOnClickListener(v -> applySafeCompatibilityRecovery(guardFix));
             }
