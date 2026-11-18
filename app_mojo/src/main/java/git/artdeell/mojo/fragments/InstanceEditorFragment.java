@@ -757,7 +757,7 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
                 mInstance.rendererLocked = false;
                 if (mLockRuntimeCheckbox != null) mLockRuntimeCheckbox.setChecked(false);
                 if (mLockRendererCheckbox != null) mLockRendererCheckbox.setChecked(false);
-                applyOptimalGpuPreset();
+                applyAutoGpuPresetToInstance();
             });
         }
 

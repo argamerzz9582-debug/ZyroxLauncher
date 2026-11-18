@@ -83,6 +83,9 @@ public class Instance extends DisplayInstance {
      */
     public boolean pendingAutoFpsPack;
     public boolean pendingAutoIncludeIris;
+    /** Optional Pro-Mode per-instance environment variable overrides ({@code KEY -> VALUE}). */
+    @Nullable
+    public java.util.Map<String, String> envVars;
 
     protected Instance() {
         this.schemaVersion = CURRENT_SCHEMA_VERSION;

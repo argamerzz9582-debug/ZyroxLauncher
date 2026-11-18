@@ -108,7 +108,7 @@ public final class ContextInventoryHelperBar extends LinearLayout {
     /** Synchronizes visibility and modifier latch state on LWJGL/SDL grab-state transitions. */
     public void onContextStateChanged(boolean isGrabbing, boolean isInControlEditor) {
         boolean show = shouldShowInventoryBar(
-                LauncherPreferences.PREF_ZYROX_CONTEXT_AWARE_CONTROLS,
+                LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS,
                 mGameLoaded,
                 isGrabbing,
                 isInControlEditor);

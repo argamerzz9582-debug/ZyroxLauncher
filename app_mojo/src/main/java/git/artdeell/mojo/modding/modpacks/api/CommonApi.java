@@ -172,7 +172,6 @@ public class CommonApi implements ModpackApi {
         copy.mcVersion = src.mcVersion;
         copy.platform = SearchFilters.PLATFORM_MODRINTH;
         copy.category = src.category;
-        copy.modloader = src.modloader;
         copy.projectTypeOverride = src.projectTypeOverride;
         return copy;
     }

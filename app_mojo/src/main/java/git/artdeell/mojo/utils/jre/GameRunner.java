@@ -223,7 +223,7 @@ public class GameRunner {
 
             InstanceManager.HealthReport health = InstanceHealthInspector.checkHealth(
                     instance, versionsDir, controlsDir, requiredJava, selectedJavaMajor);
-            if (health.status != InstanceManager.HealthStatus.HEALTHY || !health.availableRepairs.isEmpty()) {
+            if (health.status != InstanceManager.HealthStatus.HEALTHY || !health.repairableActions.isEmpty()) {
                 List<String> repairs = InstanceHealthInspector.repairInstance(instance, controlsDir);
                 repairedCount = repairs.size();
             } else {

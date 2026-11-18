@@ -901,7 +901,7 @@ public final class QuickMacroDialog {
                     wheelView.invalidate();
                     Toast.makeText(ctx, "Radial wheel reset to defaults.", Toast.LENGTH_SHORT).show();
                 })
-                .setNegativeButton(android.R.string.close, null)
+                .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
@@ -915,12 +915,12 @@ public final class QuickMacroDialog {
         int p = ZyroxStudioUi.dp(ctx, 14);
         box.setPadding(p, ZyroxStudioUi.dp(ctx, 8), p, ZyroxStudioUi.dp(ctx, 4));
 
-        EditText etLabel = ZyroxStudioUi.createStyledInput(ctx, "Short wheel label (e.g. /warp)");
+        EditText etLabel = ZyroxStudioUi.createGlassInput(ctx, "Short wheel label (e.g. /warp)");
         etLabel.setFilters(new InputFilter[]{new InputFilter.LengthFilter(10)});
         etLabel.setText(current.label);
         box.addView(etLabel);
 
-        EditText etAction = ZyroxStudioUi.createStyledInput(
+        EditText etAction = ZyroxStudioUi.createGlassInput(
                 ctx, "Command (e.g. /spawn, GG) or script (CHORD:F3+A)");
         etAction.setText(current.formatScript());
         box.addView(etAction, ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 8)));

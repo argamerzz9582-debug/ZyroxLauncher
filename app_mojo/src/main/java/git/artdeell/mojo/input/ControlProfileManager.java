@@ -803,7 +803,7 @@ public final class ControlProfileManager {
         } finally {
             deflater.end();
         }
-        String b64 = toUrlSafeBase64NoPad(compressed.toByteArray());
+        String b64 = toUrlSafeBase64(compressed.toByteArray());
         return SETUP_CODE_HEADER + shaTag + "." + b64;
     }
 
@@ -917,7 +917,7 @@ public final class ControlProfileManager {
                 renderer,
                 preset,
                 resScale,
-                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_AWARE_CONTROLS
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS
         );
         return encodeZyroxSetupBundle(bundle);
     }
@@ -933,7 +933,7 @@ public final class ControlProfileManager {
                                                          boolean applySettings) throws IOException {
         String trimmed = payload.trim();
         if (trimmed.startsWith(SHARE_TOKEN_PREFIX)) {
-            DecodedShareProfile legacy = decodeShareToken(trimmed);
+            DecodedShareProfile legacy = decodeSharePayload(trimmed);
             File saved = saveControlJsonAtomically(
                     targetFileName != null ? targetFileName : legacy.profileName, legacy.jsonText);
             ZyroxSetupBundle legacyBundle = new ZyroxSetupBundle(
@@ -961,7 +961,7 @@ public final class ControlProfileManager {
             git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_X = bundle.gyroInvertX;
             git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_Y = bundle.gyroInvertY;
             git.artdeell.mojo.prefs.LauncherPreferences.PREF_SCALE_FACTOR = bundle.resolutionScalePct / 100f;
-            git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_AWARE_CONTROLS =
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS =
                     bundle.contextAwareControls;
             android.content.SharedPreferences.Editor ed =
                     git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF.edit();
@@ -973,7 +973,8 @@ public final class ControlProfileManager {
             ed.putBoolean("gyroInvertX", bundle.gyroInvertX);
             ed.putBoolean("gyroInvertY", bundle.gyroInvertY);
             ed.putInt("resolutionRatio", bundle.resolutionScalePct);
-            ed.putBoolean("zyroxContextAwareControls", bundle.contextAwareControls);
+            ed.putBoolean(git.artdeell.mojo.prefs.LauncherPreferences.KEY_ZYROX_CONTEXT_CONTROLS,
+                    bundle.contextAwareControls);
             if (savedFile != null) {
                 git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULTCTRL_PATH =
                         savedFile.getAbsolutePath();
@@ -1055,7 +1056,7 @@ public final class ControlProfileManager {
                     }
                     Toast.makeText(ctx, "ZYROX:// setup code copied to clipboard!", Toast.LENGTH_SHORT).show();
                 })
-                .setNegativeButton(android.R.string.close, null);
+                .setNegativeButton(android.R.string.cancel, null);
         if (exportCallback != null) {
             b.setNeutralButton("Save .zyrox File", (d, w) ->
                     exportCallback.onSaveFileRequested(suggestedFile));
@@ -1073,7 +1074,7 @@ public final class ControlProfileManager {
         int pad = ZyroxStudioUi.dp(ctx, 16);
         body.setPadding(pad, ZyroxStudioUi.dp(ctx, 10), pad, ZyroxStudioUi.dp(ctx, 6));
 
-        EditText input = ZyroxStudioUi.createStyledInput(ctx, "Paste ZYROX://v1... code");
+        EditText input = ZyroxStudioUi.createGlassInput(ctx, "Paste ZYROX://v1... code");
         input.setSingleLine(false);
         input.setMaxLines(5);
         try {
@@ -1191,60 +1192,6 @@ public final class ControlProfileManager {
         } catch (Exception e) {
             throw new IOException("SHA-256 unavailable", e);
         }
-    }
-
-    @NonNull
-    private static String toUrlSafeBase64NoPad(@NonNull byte[] data) {
-        // Portable JVM + Android API 21+ URL-safe Base64 encoder (no android.util.Base64 stub trap!)
-        final char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".toCharArray();
-        StringBuilder sb = new StringBuilder((data.length * 4 + 2) / 3);
-        int i = 0;
-        while (i + 3 <= data.length) {
-            int n = ((data[i++] & 0xFF) << 16) | ((data[i++] & 0xFF) << 8) | (data[i++] & 0xFF);
-            sb.append(alphabet[(n >>> 18) & 63])
-                    .append(alphabet[(n >>> 12) & 63])
-                    .append(alphabet[(n >>> 6) & 63])
-                    .append(alphabet[n & 63]);
-        }
-        int rem = data.length - i;
-        if (rem == 1) {
-            int n = (data[i] & 0xFF) << 16;
-            sb.append(alphabet[(n >>> 18) & 63]).append(alphabet[(n >>> 12) & 63]);
-        } else if (rem == 2) {
-            int n = ((data[i] & 0xFF) << 16) | ((data[i + 1] & 0xFF) << 8);
-            sb.append(alphabet[(n >>> 18) & 63])
-                    .append(alphabet[(n >>> 12) & 63])
-                    .append(alphabet[(n >>> 6) & 63]);
-        }
-        return sb.toString();
-    }
-
-    @NonNull
-    private static byte[] fromUrlSafeBase64(@NonNull String s) throws IOException {
-        int[] rev = new int[128];
-        Arrays.fill(rev, -1);
-        String alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-        for (int i = 0; i < alpha.length(); i++) rev[alpha.charAt(i)] = i;
-        rev['+'] = 62;
-        rev['/'] = 63;
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream((s.length() * 3) / 4);
-        int acc = 0;
-        int bits = 0;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '=') break;
-            if (c >= 128 || rev[c] < 0) {
-                throw new IOException("Invalid Base64 character in ZYROX:// code.");
-            }
-            acc = (acc << 6) | rev[c];
-            bits += 6;
-            if (bits >= 8) {
-                bits -= 8;
-                out.write((acc >>> bits) & 0xFF);
-            }
-        }
-        return out.toByteArray();
     }
 
     private static int optClampedInt(@NonNull JsonObject obj, @NonNull String key,

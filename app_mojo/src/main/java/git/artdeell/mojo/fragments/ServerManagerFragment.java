@@ -131,7 +131,7 @@ public class ServerManagerFragment extends Fragment {
                         ServerListManager.loadServers(mInstance.getGameDirectory());
                 List<Instance> allInstances = Collections.emptyList();
                 try {
-                    allInstances = Instances.loadDisplay().list;
+                    allInstances = Instances.loadAllInstances();
                 } catch (Exception ignored) {
                 }
                 final List<Instance> finalInst = allInstances;
