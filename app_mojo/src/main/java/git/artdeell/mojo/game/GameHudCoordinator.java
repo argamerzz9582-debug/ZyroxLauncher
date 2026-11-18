@@ -40,20 +40,20 @@ public final class GameHudCoordinator {
     private final int[] mParentLoc = new int[2];
     private final int[] mViewLoc = new int[2];
 
-    private final git.artdeell.mojo.game.platform.input.PlatformGrabListener mContextGrabListener =
-            grabbing -> mActivity.runOnUiThread(() -> {
-                if (mInventoryHelperBar == null) return;
-                if (grabbing) {
-                    // First grabbed frame confirms player entered a world/server gameplay session
-                    mInventoryHelperBar.setGameSessionReady(true);
-                }
-                boolean inEditor = mControlLayout != null && mControlLayout.getModifiable();
-                mInventoryHelperBar.onContextStateChanged(grabbing, inEditor);
-                onControlsLayoutChanged();
-            });
+    private final git.artdeell.mojo.game.platform.input.PlatformGrabListener mContextGrabListener;
 
     public GameHudCoordinator(@NonNull Activity activity) {
         mActivity = activity;
+        mContextGrabListener = grabbing -> mActivity.runOnUiThread(() -> {
+            if (mInventoryHelperBar == null) return;
+            if (grabbing) {
+                // First grabbed frame confirms player entered a world/server gameplay session
+                mInventoryHelperBar.setGameSessionReady(true);
+            }
+            boolean inEditor = mControlLayout != null && mControlLayout.getModifiable();
+            mInventoryHelperBar.onContextStateChanged(grabbing, inEditor);
+            onControlsLayoutChanged();
+        });
     }
 
     public void attach(@Nullable ViewGroup contentFrame,
