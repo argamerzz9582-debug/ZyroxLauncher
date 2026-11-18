@@ -75,7 +75,7 @@ public class ShowErrorActivity extends Activity {
      */
     public static void installRemoteDialogHandling(Activity callerActivity, @NonNull AlertDialog.Builder builder) {
         if (callerActivity instanceof ShowErrorActivity) {
-            builder.setOnDismissListener(d -> callerActivity.finish());
+            builder.setOnDismissListener(d -> callerActivity.finishAndRemoveTask());
         }
     }
 }

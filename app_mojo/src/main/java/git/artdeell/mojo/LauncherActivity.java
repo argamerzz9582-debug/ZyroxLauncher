@@ -333,6 +333,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         }
 
         IconCacheJanitor.runJanitor();
+        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
 
         getWindow().setBackgroundDrawable(null);
         bindViews();
