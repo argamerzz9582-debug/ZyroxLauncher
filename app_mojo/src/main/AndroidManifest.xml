@@ -68,10 +68,13 @@
         <activity
             android:name=".TestStorageActivity"
             android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/app_short_name"
-            android:launchMode="singleTop"
-            android:screenOrientation="sensorLandscape">
+            android:launchMode="singleInstance"
+            android:screenOrientation="sensorLandscape"
+            android:taskAffinity=""
+            android:theme="@style/Zyrox.DialogActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

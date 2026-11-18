@@ -197,17 +197,18 @@ public class ZyroxV22UpgradeTest {
         assertTrue(manifestFile.isFile());
         String manifest = readUtf8(manifestFile);
 
-        // TestStorageActivity must NOT split into a second black Recents card via singleInstance/taskAffinity=""
+        // TestStorageActivity is a StrandHogg-isolated launch trampoline and MUST be excluded from Recents
+        // (and auto-removed on finishAndRemoveTask) so it NEVER leaves a second black card in Android Recents.
         int tsStart = manifest.indexOf("android:name=\".TestStorageActivity\"");
         assertTrue(tsStart > 0);
         int tsEnd = manifest.indexOf("<intent-filter>", tsStart);
         String tsTag = manifest.substring(tsStart, tsEnd);
-        assertFalse("TestStorageActivity must not use singleInstance (causes duplicate black Recents card)",
-                tsTag.contains("singleInstance"));
-        assertFalse("TestStorageActivity must not set empty taskAffinity (causes second Recents card)",
-                tsTag.contains("taskAffinity=\"\""));
+        assertTrue("TestStorageActivity must set excludeFromRecents=true to prevent duplicate black Recents card",
+                tsTag.contains("android:excludeFromRecents=\"true\""));
         assertTrue("TestStorageActivity must set autoRemoveFromRecents=true",
                 tsTag.contains("android:autoRemoveFromRecents=\"true\""));
+        assertTrue("TestStorageActivity must remain StrandHogg-hardened with empty taskAffinity",
+                tsTag.contains("android:taskAffinity=\"\""));
 
         // LauncherActivity and GameActivity must enforce StrandHogg-safe singleTop + autoRemoveFromRecents
         assertFalse("Must never introduce StrandHogg-vulnerable singleTask",

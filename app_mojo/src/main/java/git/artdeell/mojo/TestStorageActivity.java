@@ -35,6 +35,18 @@ public class TestStorageActivity extends Activity {
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (git.artdeell.mojo.utils.lifecycle.AppTaskGuard.resumeExistingAppTask(this)) {
+            return;
+        }
+        if (!mPermsRequired) {
+            exit();
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         if(!mPermsRequired) return;
@@ -90,8 +102,12 @@ public class TestStorageActivity extends Activity {
 
     private void exit() {
         if(!Tools.checkStorageRoot(this)) {
-            startActivity(new Intent(this, MissingStorageActivity.class));
-            finish();
+            Intent missingIntent = new Intent(this, MissingStorageActivity.class);
+            missingIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(missingIntent);
+            finishAndRemoveTask();
             overridePendingTransition(0, 0);
             return;
         }
@@ -101,9 +117,11 @@ public class TestStorageActivity extends Activity {
         AsyncAssetManager.unpackSingleFiles(this);
 
         Intent intent = new Intent(this, LauncherActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
-        finish();
+        finishAndRemoveTask();
         overridePendingTransition(0, 0);
     }
 }
