@@ -522,11 +522,14 @@ public final class ServerListManager {
             } catch (Throwable ignored) {
             }
         }
-        List<ServerEntry> list = loadServers(gameDir);
-        for (ServerEntry e : list) {
-            if (e != null && e.favorite && e.address != null && !e.address.trim().isEmpty()) {
-                return e.address.trim();
+        try {
+            List<ServerEntry> list = loadServers(gameDir);
+            for (ServerEntry e : list) {
+                if (e != null && e.favorite && e.address != null && !e.address.trim().isEmpty()) {
+                    return e.address.trim();
+                }
             }
+        } catch (Throwable ignored) {
         }
         return null;
     }
