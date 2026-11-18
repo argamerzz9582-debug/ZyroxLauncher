@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Pearl Switch Thumb -->
+<!-- Zyrox Starlight Pearl Switch Thumb -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_checked="true">
         <shape android:shape="oval">
             <size android:width="20dp" android:height="20dp" />
-            <gradient android:angle="270" android:startColor="#FFFFFAFD" android:endColor="#FFFAD4E8" />
+            <gradient android:angle="270" android:startColor="#FFFAFCFF" android:endColor="#FFD5E5F9" />
             <stroke android:width="1dp" android:color="#FFFFFFFF" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
             <size android:width="20dp" android:height="20dp" />
-            <solid android:color="#EFF2DCE8" />
-            <stroke android:width="1dp" android:color="#80FFF2F8" />
+            <solid android:color="#EFDDE6F1" />
+            <stroke android:width="1dp" android:color="#80F2F8FF" />
         </shape>
     </item>
 </selector>

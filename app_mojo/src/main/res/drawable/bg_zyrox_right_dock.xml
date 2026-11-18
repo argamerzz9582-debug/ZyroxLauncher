@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Frosted Liquid Glass Right Home Dock (Vivid Scene + Crisp Legibility) -->
+<!-- Zyrox Starlight Celestial Frosted Liquid Glass Right Home Dock (Vivid Scene + Crisp Legibility) -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 1. Smoked sakura-twilight translucent body -->
+    <!-- 1. Smoked celestial-midnight translucent body -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="0"
-                android:startColor="#34160D20"
-                android:centerColor="#40170E22"
-                android:endColor="#4C150C1F" />
+                android:startColor="#340B1120"
+                android:centerColor="#400C1322"
+                android:endColor="#4C0A101F" />
         </shape>
     </item>
-    <!-- 2. Delicate sakura-pearl top-down skylight sheen -->
+    <!-- 2. Delicate starlight-ice top-down skylight sheen -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#18FFF0F7"
-                android:centerColor="#06FCE4F1"
-                android:endColor="#1612091A" />
+                android:startColor="#18F0F7FF"
+                android:centerColor="#06E5EEFB"
+                android:endColor="#16070D1A" />
         </shape>
     </item>
-    <!-- 3. Luminous vertical rose-pearl refractive edge separating dock from live scene -->
+    <!-- 3. Luminous vertical starlight-crystal refractive edge separating dock from live scene -->
     <item android:width="1.2dp" android:gravity="start">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#48FFF2F8"
-                android:centerColor="#B8FFE4F2"
-                android:endColor="#48FFF2F8" />
+                android:startColor="#48F2F8FF"
+                android:centerColor="#B8E5F0FE"
+                android:endColor="#48F2F8FF" />
         </shape>
     </item>
 </layer-list>

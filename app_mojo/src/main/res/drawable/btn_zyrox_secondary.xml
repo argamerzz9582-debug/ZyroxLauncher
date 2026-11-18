@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Pearl Liquid Glass Secondary Button -->
+<!-- Zyrox Starlight Pearl Liquid Glass Secondary Button -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:state_enabled="false">
         <shape android:shape="rectangle">
-            <solid android:color="#14EADAE4" />
-            <stroke android:width="1dp" android:color="#42FFF2F8" />
+            <solid android:color="#14D4DCE7" />
+            <stroke android:width="1dp" android:color="#42F2F8FF" />
             <corners android:radius="13dp" />
         </shape>
     </item>
@@ -16,10 +16,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#50FFE4F2"
-                        android:centerColor="#32F4A2CA"
-                        android:endColor="#44F9C2DE" />
-                    <stroke android:width="1.3dp" android:color="#FAFFF7FB" />
+                        android:startColor="#50E5F0FE"
+                        android:centerColor="#329ABFF4"
+                        android:endColor="#44B9D4F9" />
+                    <stroke android:width="1.3dp" android:color="#FAF7FAFF" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
@@ -38,10 +38,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#46FFE2F1"
-                        android:centerColor="#2AF39CC6"
-                        android:endColor="#3CF8BCDA" />
-                    <stroke android:width="1.25dp" android:color="#F2FFF5FA" />
+                        android:startColor="#46E3EFFE"
+                        android:centerColor="#2A94BCF3"
+                        android:endColor="#3CB3D0F8" />
+                    <stroke android:width="1.25dp" android:color="#F2F5F9FF" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
@@ -56,19 +56,19 @@
 
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#3AFFEBF5" android:endColor="#28F8C4DF" />
-            <stroke android:width="1.6dp" android:color="#FFFFFAFD" />
+            <gradient android:angle="270" android:startColor="#3AEBF4FE" android:endColor="#28BBD5F8" />
+            <stroke android:width="1.6dp" android:color="#FFFAFCFF" />
             <corners android:radius="13dp" />
         </shape>
     </item>
 
-    <!-- Default: Ultra-Sheer Sakura Pearl Crystal Glass -->
+    <!-- Default: Ultra-Sheer Starlight Pearl Crystal Glass -->
     <item>
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
                     <solid android:color="@android:color/transparent" />
-                    <stroke android:width="0.9dp" android:color="#30120919" />
+                    <stroke android:width="0.9dp" android:color="#30070D19" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
@@ -76,10 +76,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#2CFFF5FA"
-                        android:centerColor="#16FCE4F1"
-                        android:endColor="#22F9D2E7" />
-                    <stroke android:width="1.1dp" android:color="#C8FFF2F8" />
+                        android:startColor="#2CF5F9FF"
+                        android:centerColor="#16E5EEFB"
+                        android:endColor="#22C9DCF8" />
+                    <stroke android:width="1.1dp" android:color="#C8F2F8FF" />
                     <corners android:radius="12.2dp" />
                 </shape>
             </item>

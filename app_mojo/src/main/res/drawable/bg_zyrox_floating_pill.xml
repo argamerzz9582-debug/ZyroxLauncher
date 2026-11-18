@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Floating Capsule Pill (HUD Editor Toolbar & Quick Overlays) -->
+<!-- Zyrox Starlight Floating Capsule Pill (HUD Editor Toolbar & Quick Overlays) -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#6C1A1025" android:endColor="#58140B1D" />
+            <gradient android:angle="270" android:startColor="#6C0E1525" android:endColor="#58090F1D" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#22FFF2F8" android:centerColor="#08FCE6F2" android:endColor="#16FAD4E8" />
-            <stroke android:width="1.1dp" android:color="#B8FFEAF5" />
+            <gradient android:angle="270" android:startColor="#22F2F8FF" android:centerColor="#08E7F0FB" android:endColor="#16D5E5F9" />
+            <stroke android:width="1.1dp" android:color="#B8EBF3FE" />
             <corners android:radius="999dp" />
         </shape>
     </item>

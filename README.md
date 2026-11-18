@@ -1,6 +1,6 @@
 # Zyrox Launcher — Sakura Edition
 
-**Zyrox Launcher** (`com.zyrox.launcher`, v`2.1.0`) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, smooth 60/90/120 Hz mobile performance, seamless zero-buffer animated Sakura scenes, and a cohesive **Sakura Bloom × Liquid Glass** user interface and in-game control system.
+**Zyrox Launcher** (`com.zyrox.launcher`, v`2.2.0` — *Starlight Firefly Edition*) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, 90/120/144 Hz low-pause G1GC mobile optimization, Android 15/16 `16 KB` page alignment, log-driven launch progress, an All-in-One Modrinth/CurseForge Content & Runtime/Driver Store, seamless zero-buffer Starlight Firefly & Dawn animated scenes, and a cohesive **Starlight Firefly × Liquid Glass** user interface and in-game control system.
 
 > **Official Repository:** <https://github.com/argamerzz9582-debug/ZyroxLauncher>  
 > **Official Releases:** <https://github.com/argamerzz9582-debug/ZyroxLauncher/releases>  

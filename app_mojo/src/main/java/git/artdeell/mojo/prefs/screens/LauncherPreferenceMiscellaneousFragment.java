@@ -49,17 +49,27 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
             }
     );
 
-    private final ActivityResultLauncher<String> mSelectBgVideoLauncher = registerForActivityResult(
-            new ActivityResultContracts.GetContent(), (uri) -> {
+    private final ActivityResultLauncher<String[]> mSelectBgVideoLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(), (uri) -> {
                 if (uri == null || getContext() == null) return;
                 Context appCtx = getContext().getApplicationContext();
                 MojoApplication.sExecutorService.execute(() -> {
-                    File dest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_VIDEO_FILENAME);
+                    String mime = appCtx.getContentResolver().getType(uri);
+                    boolean isGif = (mime != null && mime.toLowerCase(java.util.Locale.ROOT).contains("gif"))
+                            || uri.toString().toLowerCase(java.util.Locale.ROOT).endsWith(".gif");
+                    File gifDest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_GIF_FILENAME);
+                    File videoDest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_VIDEO_FILENAME);
+                    File dest = isGif ? gifDest : videoDest;
+                    File stale = isGif ? videoDest : gifDest;
                     try (InputStream in = appCtx.getContentResolver().openInputStream(uri);
                          OutputStream out = new FileOutputStream(dest)) {
                         if (in == null) return;
                         IOUtils.copy(in, out);
                         out.flush();
+                        if (stale.exists()) {
+                            //noinspection ResultOfMethodCallIgnored
+                            stale.delete();
+                        }
                         Tools.runOnUiThread(() -> {
                             ExtraCore.setValue(ExtraConstants.REFRESH_BG_VIDEO, true);
                             if (isAdded()) updateVisibility();
@@ -78,16 +88,21 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
 
         Preference selectVideoPref = requirePreference("selectBgVideo");
         selectVideoPref.setOnPreferenceClickListener(p -> {
-            mSelectBgVideoLauncher.launch("video/*");
+            mSelectBgVideoLauncher.launch(new String[]{"image/gif", "video/*"});
             return true;
         });
 
         Preference resetVideoPref = requirePreference("resetBgVideo");
         resetVideoPref.setOnPreferenceClickListener(p -> {
-            File dest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_VIDEO_FILENAME);
-            if (dest.exists()) {
+            File videoDest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_VIDEO_FILENAME);
+            File gifDest = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_GIF_FILENAME);
+            if (videoDest.exists()) {
                 //noinspection ResultOfMethodCallIgnored
-                dest.delete();
+                videoDest.delete();
+            }
+            if (gifDest.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                gifDest.delete();
             }
             ExtraCore.setValue(ExtraConstants.REFRESH_BG_VIDEO, true);
             updateVisibility();
@@ -115,7 +130,8 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
         }
         requirePreference("clearMetadataCache").setVisible(new File(Tools.DIR_CACHE, "string_cache").exists());
         File customVideo = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_VIDEO_FILENAME);
-        requirePreference("resetBgVideo").setVisible(customVideo.isFile());
+        File customGif = new File(Tools.DIR_GAME_HOME, ZyroxShaderBackgroundView.CUSTOM_GIF_FILENAME);
+        requirePreference("resetBgVideo").setVisible(customVideo.isFile() || customGif.isFile());
     }
 
     private void setupNotificationRequestPreference() {

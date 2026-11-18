@@ -252,6 +252,12 @@ public class ControlButton extends TextView implements ControlInterface {
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN:
+                if (git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS) {
+                    try {
+                        performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                    } catch (Throwable ignored) {
+                    }
+                }
                 handlePressed();
                 break;
             case MotionEvent.ACTION_UP:

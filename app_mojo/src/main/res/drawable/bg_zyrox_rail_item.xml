@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Crystal Settings & Instance Rail Item -->
+<!-- Zyrox Starlight Crystal Settings & Instance Rail Item -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#4AFFE4F2" android:endColor="#30F4A4CC" />
-            <stroke android:width="1.15dp" android:color="#F6FFF7FB" />
+            <gradient android:angle="270" android:startColor="#4AE5F0FE" android:endColor="#309CC1F4" />
+            <stroke android:width="1.15dp" android:color="#F6F7FAFF" />
             <corners android:radius="12dp" />
         </shape>
     </item>
@@ -12,8 +12,8 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#42FFE0F0" android:endColor="#28F29AC5" />
-                    <stroke android:width="1.15dp" android:color="#F0FFF5FA" />
+                    <gradient android:angle="270" android:startColor="#42E1EEFE" android:endColor="#2892BAF2" />
+                    <stroke android:width="1.15dp" android:color="#F0F5F9FF" />
                     <corners android:radius="12dp" />
                 </shape>
             </item>
@@ -27,15 +27,15 @@
     </item>
     <item android:state_activated="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#42FFE0F0" android:endColor="#28F29AC5" />
-            <stroke android:width="1.15dp" android:color="#F0FFF5FA" />
+            <gradient android:angle="270" android:startColor="#42E1EEFE" android:endColor="#2892BAF2" />
+            <stroke android:width="1.15dp" android:color="#F0F5F9FF" />
             <corners android:radius="12dp" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#18FFF2F8" android:endColor="#0EFAD4E8" />
-            <stroke android:width="0.85dp" android:color="#48FCE8F3" />
+            <gradient android:angle="270" android:startColor="#18F2F8FF" android:endColor="#0ED5E5F9" />
+            <stroke android:width="0.85dp" android:color="#48E8F1FB" />
             <corners android:radius="12dp" />
         </shape>
     </item>

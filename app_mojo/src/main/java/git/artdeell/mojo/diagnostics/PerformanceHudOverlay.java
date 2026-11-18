@@ -58,6 +58,11 @@ public class PerformanceHudOverlay extends AppCompatTextView implements Choreogr
     private int mFrameCount = 0;
     private long mWorstFrameNs = 0L;
 
+    private static final char[] SPARK_BARS = {'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'};
+    private final float[] mHzHistory = new float[10];
+    private int mHzHistoryCount = 0;
+    private int mHzHistoryCursor = 0;
+
     // Session aggregate counters for truthful post-session summary
     private double mSumHz = 0.0;
     private int mHzSamples = 0;
@@ -168,6 +173,7 @@ public class PerformanceHudOverlay extends AppCompatTextView implements Choreogr
         double elapsedSec = Math.max(0.001, (nowNs - mWindowStartNs) / 1_000_000_000.0);
         double hz = mFrameCount / elapsedSec;
         double avgMs = mFrameCount > 0 ? (elapsedSec * 1000.0) / mFrameCount : 0.0;
+        double worstMs = mWorstFrameNs > 0L ? (mWorstFrameNs / 1_000_000.0) : avgMs;
         mWindowStartNs = nowNs;
         mFrameCount = 0;
         mWorstFrameNs = 0L;
@@ -175,6 +181,9 @@ public class PerformanceHudOverlay extends AppCompatTextView implements Choreogr
         if (hz > 0.5 && hz <= 240.0) {
             mSumHz += hz;
             mHzSamples++;
+            mHzHistory[mHzHistoryCursor] = (float) hz;
+            mHzHistoryCursor = (mHzHistoryCursor + 1) % mHzHistory.length;
+            if (mHzHistoryCount < mHzHistory.length) mHzHistoryCount++;
         }
 
         int freeMb = -1;
@@ -196,10 +205,19 @@ public class PerformanceHudOverlay extends AppCompatTextView implements Choreogr
         long secs = uptimeSec % 60L;
 
         mTextBuilder.setLength(0);
-        mTextBuilder.append(String.format(Locale.ROOT, "DISP %.0f Hz (%.1f ms)", hz, avgMs));
+        mTextBuilder.append(String.format(Locale.ROOT, "DISP %.0f Hz (%.1f/%.0fms) ", hz, avgMs, worstMs));
+        if (mHzHistoryCount > 0) {
+            int start = (mHzHistoryCursor - mHzHistoryCount + mHzHistory.length) % mHzHistory.length;
+            for (int i = 0; i < mHzHistoryCount; i++) {
+                float v = mHzHistory[(start + i) % mHzHistory.length];
+                int idx = Math.max(0, Math.min(SPARK_BARS.length - 1,
+                        Math.round((v / 120f) * (SPARK_BARS.length - 1))));
+                mTextBuilder.append(SPARK_BARS[idx]);
+            }
+        }
         if (freeMb >= 0 && totalMb > 0) {
             mTextBuilder.append(" • RAM ").append(freeMb).append('/').append(totalMb)
-                    .append(" MB (JVM ").append(mHeapMb).append("M)");
+                    .append("M (JVM ").append(mHeapMb).append("M)");
         }
         mTextBuilder.append('\n');
         mTextBuilder.append("GPU ").append(mRendererLabel)

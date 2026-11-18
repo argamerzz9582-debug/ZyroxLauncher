@@ -1,6 +1,9 @@
 
 cmake_minimum_required(VERSION 3.22.1)
 
+# Android 15/16 16 KB memory page-size compatibility for all native shared libraries
+add_link_options("-Wl,-z,max-page-size=16384")
+
 # ------ MojoExec ------
 
 add_subdirectory(mojoexec)

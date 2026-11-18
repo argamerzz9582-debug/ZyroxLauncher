@@ -51,9 +51,12 @@ public class SkinStudioFragment extends Fragment {
     private LinearLayout mListContainer;
     @Nullable private SkinStudioManager.SkinEntry mSelectedSkin;
     @Nullable private Bitmap mPreviewBitmap;
+    @Nullable private Bitmap mCapeBitmap;
 
     private final ActivityResultLauncher<String[]> mSkinPicker =
             registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onSkinPicked);
+    private final ActivityResultLauncher<String[]> mCapePicker =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onCapePicked);
 
     @Nullable
     @Override
@@ -90,10 +93,21 @@ public class SkinStudioFragment extends Fragment {
         mBtnModelToggle.setOnClickListener(v -> toggleSelectedModel());
         leftBtns.addView(mBtnModelToggle, new LinearLayout.LayoutParams(0, ZyroxStudioUi.dp(ctx, 35), 1f));
 
+        Button btnCape = ZyroxStudioUi.createSecondaryButton(ctx, "Cape", true);
+        btnCape.setOnClickListener(v -> mCapePicker.launch(new String[]{"image/png"}));
+        btnCape.setOnLongClickListener(v -> {
+            clearCapePreview();
+            return true;
+        });
+        LinearLayout.LayoutParams cLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 35));
+        cLp.setMarginStart(ZyroxStudioUi.dp(ctx, 5));
+        leftBtns.addView(btnCape, cLp);
+
         mBtnUploadOnline = ZyroxStudioUi.createPrimaryButton(ctx, "Apply Online");
         mBtnUploadOnline.setOnClickListener(v -> confirmUploadOnline());
         LinearLayout.LayoutParams uLp = new LinearLayout.LayoutParams(0, ZyroxStudioUi.dp(ctx, 35), 1f);
-        uLp.setMarginStart(ZyroxStudioUi.dp(ctx, 6));
+        uLp.setMarginStart(ZyroxStudioUi.dp(ctx, 5));
         leftBtns.addView(mBtnUploadOnline, uLp);
 
         left.addView(leftBtns);
@@ -139,6 +153,7 @@ public class SkinStudioFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         mLibraryDir = SkinStudioManager.getLibraryDir(new File(Tools.DIR_GAME_HOME));
+        loadSavedCapePreview();
         refreshLibrary();
     }
 
@@ -148,7 +163,81 @@ public class SkinStudioFragment extends Fragment {
             mPreviewBitmap.recycle();
             mPreviewBitmap = null;
         }
+        if (mCapeBitmap != null && !mCapeBitmap.isRecycled()) {
+            mCapeBitmap.recycle();
+            mCapeBitmap = null;
+        }
         super.onDestroyView();
+    }
+
+    private void loadSavedCapePreview() {
+        if (mLibraryDir == null) return;
+        final File capeFile = new File(mLibraryDir, "zyrox_cape_preview.png");
+        if (!capeFile.isFile()) return;
+        MojoApplication.sExecutorService.execute(() -> {
+            Bitmap bmp = BitmapFactory.decodeFile(capeFile.getAbsolutePath());
+            if (bmp == null) return;
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) {
+                    bmp.recycle();
+                    return;
+                }
+                if (mCapeBitmap != null && !mCapeBitmap.isRecycled()) mCapeBitmap.recycle();
+                mCapeBitmap = bmp;
+                if (mPreviewView != null) mPreviewView.setCape(bmp);
+            });
+        });
+    }
+
+    private void onCapePicked(@Nullable Uri uri) {
+        if (uri == null || mLibraryDir == null) return;
+        final Context appCtx = requireContext().getApplicationContext();
+        final File capeOut = new File(mLibraryDir, "zyrox_cape_preview.png");
+        MojoApplication.sExecutorService.execute(() -> {
+            try (InputStream in = appCtx.getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new IllegalStateException("Cannot open PNG");
+                Bitmap bmp = BitmapFactory.decodeStream(in);
+                if (bmp == null || bmp.getWidth() < 22 || bmp.getHeight() < 17 || bmp.getWidth() > 2048) {
+                    if (bmp != null) bmp.recycle();
+                    throw new IllegalArgumentException("Expected a Minecraft cape PNG (e.g. 64×32)");
+                }
+                if (!mLibraryDir.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    mLibraryDir.mkdirs();
+                }
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(capeOut)) {
+                    bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+                }
+                Tools.runOnUiThread(() -> {
+                    if (!isAdded()) {
+                        bmp.recycle();
+                        return;
+                    }
+                    if (mCapeBitmap != null && !mCapeBitmap.isRecycled()) mCapeBitmap.recycle();
+                    mCapeBitmap = bmp;
+                    mPreviewView.setCape(bmp);
+                    Toast.makeText(appCtx,
+                            "Cape applied to 3D preview! Drag to view back (long-press Cape to clear).",
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> Toast.makeText(appCtx,
+                        "Cape import failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void clearCapePreview() {
+        if (mLibraryDir != null) {
+            //noinspection ResultOfMethodCallIgnored
+            new File(mLibraryDir, "zyrox_cape_preview.png").delete();
+        }
+        if (mCapeBitmap != null && !mCapeBitmap.isRecycled()) {
+            mCapeBitmap.recycle();
+        }
+        mCapeBitmap = null;
+        if (mPreviewView != null) mPreviewView.setCape(null);
+        Toast.makeText(requireContext(), "Cleared cape preview", Toast.LENGTH_SHORT).show();
     }
 
     private void refreshLibrary() {

@@ -162,6 +162,19 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             return true; //mouse event handled successfully
         }
         if (mIngameProcessor == null || mInGUIProcessor == null) return true;
+        // Optional accidental palm / bezel edge touch rejection during grabbed 3D gameplay
+        if (LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD
+                && mCurrentTouchProcessor == mIngameProcessor
+                && e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            float edgePx = 14f * getResources().getDisplayMetrics().density;
+            float x = e.getX();
+            float y = e.getY();
+            int w = getWidth();
+            int h = getHeight();
+            if (w > 0 && h > 0 && (x < edgePx || x > w - edgePx || y < edgePx || y > h - edgePx)) {
+                return true;
+            }
+        }
         boolean ret = mCurrentTouchProcessor.processTouchEvent(e);
         // Keep cursor on screen if panning with IME inset
         if(LauncherPreferences.PREF_KEYBOARD_AUTOPANNING && GameActivity.mImeHeight > 0){

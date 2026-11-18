@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Twilight Smoked-Crystal Global Sub-Page Header Bar -->
+<!-- Zyrox Starlight Twilight Smoked-Crystal Global Sub-Page Header Bar -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#64160D20"
-                android:endColor="#42150C1E" />
+                android:startColor="#640B1120"
+                android:endColor="#420A101E" />
         </shape>
     </item>
     <item android:height="14dp" android:gravity="top">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#1CFFF2F8" android:endColor="#00FFFFFF" />
+            <gradient android:angle="270" android:startColor="#1CF2F8FF" android:endColor="#00FFFFFF" />
         </shape>
     </item>
     <item android:height="1.1dp" android:gravity="bottom">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="0"
-                android:startColor="#28FCE6F2"
-                android:centerColor="#A4FFE4F2"
-                android:endColor="#28FCE6F2" />
+                android:startColor="#28E7F0FB"
+                android:centerColor="#A4E5F0FE"
+                android:endColor="#28E7F0FB" />
         </shape>
     </item>
 </layer-list>

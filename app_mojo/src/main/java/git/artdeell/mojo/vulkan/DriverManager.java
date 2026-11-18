@@ -268,7 +268,7 @@ public class DriverManager {
         }
     }
 
-    static void installDriverContent(String hash, InputStream is, boolean overwrite) throws IOException {
+    public static void installDriverContent(String hash, InputStream is, boolean overwrite) throws IOException {
         ensureRootExists();
         try(ZipInputStream zis = new ZipInputStream(is)){
             if(driverExists(hash)){

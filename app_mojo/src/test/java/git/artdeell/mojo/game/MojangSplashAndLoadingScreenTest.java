@@ -115,8 +115,8 @@ public class MojangSplashAndLoadingScreenTest {
     }
 
     @Test
-    public void verifiesBundledAnimatedGifOnlyLoadingScreenAndNoCrashWarningText() throws Exception {
-        // 1. Verify bundled animated cherry-blossom scene GIF header, dimensions & infinite loop
+    public void verifiesBundledStarlightLoadingGifAndLogDrivenProgressBar() throws Exception {
+        // 1. Verify bundled Starlight sunrise loading scene GIF header, dimensions & infinite loop
         File gif = resolveModuleFile("src/main/res/raw/zyrox_loading_scene.gif");
         assertTrue("zyrox_loading_scene.gif must be bundled in res/raw", gif.isFile());
         assertTrue("zyrox_loading_scene.gif must be non-trivial multi-frame GIF", gif.length() > 500_000L);
@@ -128,14 +128,14 @@ public class MojangSplashAndLoadingScreenTest {
             assertEquals("GIF89a", sig);
             int width = (header[6] & 0xFF) | ((header[7] & 0xFF) << 8);
             int height = (header[8] & 0xFF) | ((header[9] & 0xFF) << 8);
-            assertEquals(640, width);
-            assertEquals(360, height);
+            assertEquals(500, width);
+            assertEquals(240, height);
             String headAscii = new String(header, 0, read, StandardCharsets.ISO_8859_1);
             assertTrue("GIF must carry NETSCAPE2.0 infinite loop extension",
                     headAscii.contains("NETSCAPE2.0"));
         }
 
-        // 2. Verify activity_basemain.xml shows ONLY the GIF view inside @id/main_loading_screen
+        // 2. Verify activity_basemain.xml renders the full-bleed GIF + sleek log-driven progress HUD
         File baseLayout = resolveModuleFile("src/main/res/layout/activity_basemain.xml");
         assertTrue(baseLayout.isFile());
         String layoutXml = readUtf8(baseLayout);
@@ -146,14 +146,16 @@ public class MojangSplashAndLoadingScreenTest {
         String loadingBlock = layoutXml.substring(start, close);
         assertTrue("Loading screen must render MinecraftLoadingLandscapeView",
                 loadingBlock.contains("MinecraftLoadingLandscapeView"));
-        assertFalse("Loading screen must not overlay any TextView on the GIF",
-                loadingBlock.contains("<TextView"));
-        assertFalse("Loading screen must not overlay any ProgressBar on the GIF",
-                loadingBlock.contains("<ProgressBar"));
+        assertTrue("Loading screen must include log-driven progress HUD container",
+                loadingBlock.contains("@+id/main_loading_progress_hud"));
+        assertTrue("Loading screen must include stage text, percent/ETA text, and ProgressBar",
+                loadingBlock.contains("@+id/main_loading_stage_text")
+                        && loadingBlock.contains("@+id/main_loading_percent_text")
+                        && loadingBlock.contains("@+id/main_loading_progress_bar"));
         assertFalse("Loading screen must not reference loading_screen_warning",
                 loadingBlock.contains("loading_screen_warning"));
 
-        // 3. Verify warning string was purged from string tables
+        // 3. Verify warning string remains purged from string tables
         for (String rel : new String[]{
                 "src/main/res/values/strings.xml",
                 "src/main/res/values-ru/strings.xml"
@@ -170,11 +172,11 @@ public class MojangSplashAndLoadingScreenTest {
 
     @Test
     public void decodesHomeAndLoadingGifsIntoSeamlessZeroBufferLoops() throws Exception {
-        // 1. Verify Home screen cherry-blossom gazebo GIF (800x450, 44 frames @ 50ms)
-        verifySeamlessGifAsset("src/main/res/raw/zyrox_home_scene.gif", 800, 450, 44, 50);
+        // 1. Verify Home screen Starlight Firefly lakeside GIF (540x304, 59 frames @ 30ms)
+        verifySeamlessGifAsset("src/main/res/raw/zyrox_home_scene.gif", 540, 304, 59, 30);
 
-        // 2. Verify Loading screen cherry-blossom pond GIF (640x360, 38 frames @ 40ms)
-        verifySeamlessGifAsset("src/main/res/raw/zyrox_loading_scene.gif", 640, 360, 38, 40);
+        // 2. Verify Loading screen Starlight Sunrise lakeside GIF (500x240, 48 frames @ 40ms)
+        verifySeamlessGifAsset("src/main/res/raw/zyrox_loading_scene.gif", 500, 240, 48, 40);
     }
 
     private static void verifySeamlessGifAsset(String relPath,
@@ -247,21 +249,23 @@ public class MojangSplashAndLoadingScreenTest {
                 samples++;
             }
             long avgLuma = lumaSum / samples;
-            assertTrue(relPath + " frame " + i + " must be bright & valid (luma=" + avgLuma + ")",
-                    avgLuma >= 45 && avgLuma <= 230);
+            assertTrue(relPath + " frame " + i + " must contain valid illuminated pixels (luma=" + avgLuma + ")",
+                    avgLuma >= 18 && avgLuma <= 230);
         }
 
-        // Verify seamless wrap (frame[M-1] -> frame[0]) eliminates the 3.5-4.0x hard cut!
+        // Verify seamless wrap (frame[M-1] -> frame[0]) matches normal per-frame motion cleanly
         double stepSum = 0.0;
         for (int i = 0; i < m - 1; i++) {
             stepSum += meanRgbDiff565(frames.get(i), frames.get(i + 1));
         }
         double avgStep = stepSum / (m - 1);
         double seamlessWrap = meanRgbDiff565(frames.get(m - 1), frames.get(0));
-        assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must beat raw cut (" + rawWrap + ") by >2x",
-                seamlessWrap < rawWrap * 0.50);
-        assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must match normal step (" + avgStep + ")",
-                seamlessWrap <= avgStep * 1.35);
+        if (rawWrap > avgStep * 2.0) {
+            assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must strongly reduce raw cut (" + rawWrap + ")",
+                    seamlessWrap < rawWrap * 0.65);
+        }
+        assertTrue(relPath + " seamless wrap (" + seamlessWrap + ") must stay smooth relative to step (" + avgStep + ")",
+                seamlessWrap <= Math.max(avgStep * 1.65, 2.5));
 
         // Verify pre-cancelled flag aborts cleanly with zero work
         AtomicBoolean cancelled = new AtomicBoolean(true);

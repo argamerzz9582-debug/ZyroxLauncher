@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Luminous Dawn-Ember -> Firefly-Gold -> Starlight-Crystal Live Boot Progress Bar -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <solid android:color="#30E0EEFF" />
+            <stroke
+                android:width="0.8dp"
+                android:color="#5CE8F2FF" />
+            <corners android:radius="5dp" />
+        </shape>
+    </item>
+    <item android:id="@android:id/secondaryProgress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <solid android:color="#36FFB86C" />
+                <corners android:radius="5dp" />
+            </shape>
+        </scale>
+    </item>
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <layer-list>
+                <item>
+                    <shape android:shape="rectangle">
+                        <gradient
+                            android:angle="0"
+                            android:startColor="#FFFF8E53"
+                            android:centerColor="#FFFFD479"
+                            android:endColor="#FFB8DCFF" />
+                        <corners android:radius="5dp" />
+                    </shape>
+                </item>
+                <item
+                    android:left="1dp"
+                    android:top="0.6dp"
+                    android:right="1dp"
+                    android:height="2dp"
+                    android:gravity="top">
+                    <shape android:shape="rectangle">
+                        <solid android:color="#6EFFFFFF" />
+                        <corners android:radius="2dp" />
+                    </shape>
+                </item>
+            </layer-list>
+        </scale>
+    </item>
+</layer-list>

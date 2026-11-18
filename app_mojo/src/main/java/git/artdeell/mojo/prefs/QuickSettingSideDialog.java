@@ -32,12 +32,12 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
     private SharedPreferences.Editor mEditor;
 
-    private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch;
-    private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar;
-    private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText;
+    private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch, mHapticsSwitch, mEdgeGuardSwitch;
+    private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar, mGyroDeadzoneBar;
+    private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText, mGyroDeadzoneText, mGyroDeadzoneLabel;
 
-    private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled;
-    private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution;
+    private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled, mOriginalHaptics, mOriginalEdgeGuard;
+    private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution, mOriginalGyroDeadzone;
     private int mOriginalGestureDelay;
     private short mOriginalTransparency;
 
@@ -81,6 +81,29 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGestureDelayDisplayText = mDialogContent.findViewById(R.id.editGestureDelay_textView);
         mResolutionText = mDialogContent.findViewById(R.id.editResolution_textView_percent);
         mTransparencyText = mDialogContent.findViewById(R.id.buttonTransparency_textView_percent);
+
+        mHapticsSwitch = mDialogContent.findViewById(R.id.checkboxHaptics);
+        mEdgeGuardSwitch = mDialogContent.findViewById(R.id.checkboxEdgeGuard);
+        mGyroDeadzoneBar = mDialogContent.findViewById(R.id.editGyroDeadzone_seekBar);
+        mGyroDeadzoneText = mDialogContent.findViewById(R.id.editGyroDeadzone_percent);
+        mGyroDeadzoneLabel = mDialogContent.findViewById(R.id.editGyroDeadzone_textView);
+
+        View shotBtn = mDialogContent.findViewById(R.id.quickBtn_screenshot);
+        if (shotBtn != null) {
+            shotBtn.setOnClickListener(v -> {
+                mEditor.apply();
+                disappear(true);
+                git.artdeell.mojo.game.QuickMacroDialog.triggerScreenshot(v.getContext());
+            });
+        }
+        View macrosBtn = mDialogContent.findViewById(R.id.quickBtn_macros);
+        if (macrosBtn != null) {
+            macrosBtn.setOnClickListener(v -> {
+                mEditor.apply();
+                disappear(true);
+                git.artdeell.mojo.game.QuickMacroDialog.show(v.getContext());
+            });
+        }
     }
 
     private void setupListeners() {
@@ -169,6 +192,34 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             onButtonTransparencyChanged();
         });
 
+        mOriginalHaptics = LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS;
+        mOriginalEdgeGuard = LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD;
+        mOriginalGyroDeadzone = LauncherPreferences.PREF_ZYROX_GYRO_DEADZONE;
+
+        if (mHapticsSwitch != null) {
+            mHapticsSwitch.setChecked(mOriginalHaptics);
+            mHapticsSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS = checked;
+                mEditor.putBoolean("zyroxControlHaptics", checked);
+            });
+        }
+        if (mEdgeGuardSwitch != null) {
+            mEdgeGuardSwitch.setChecked(mOriginalEdgeGuard);
+            mEdgeGuardSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD = checked;
+                mEditor.putBoolean("zyroxEdgeTouchGuard", checked);
+            });
+        }
+        if (mGyroDeadzoneBar != null && mGyroDeadzoneText != null) {
+            int dzInit = Math.max(20, Math.min(250, Math.round(mOriginalGyroDeadzone * 100f)));
+            mGyroDeadzoneBar.setProgress(dzInit);
+            setSeekTextPercent(mGyroDeadzoneText, dzInit);
+            mGyroDeadzoneBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
+                LauncherPreferences.PREF_ZYROX_GYRO_DEADZONE = progress / 100f;
+                mEditor.putInt("zyroxGyroDeadzone", progress);
+                setSeekTextPercent(mGyroDeadzoneText, progress);
+            });
+        }
 
         updateGyroVisibility(mOriginalGyroEnabled);
         updateGestureVisibility(mOriginalGestureDisabled);
@@ -194,6 +245,9 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGyroSensitivityBar.setVisibility(visibility);
         mGyroSensitivityText.setVisibility(visibility);
         mGyroSensitivityDisplayText.setVisibility(visibility);
+        if (mGyroDeadzoneBar != null) mGyroDeadzoneBar.setVisibility(visibility);
+        if (mGyroDeadzoneText != null) mGyroDeadzoneText.setVisibility(visibility);
+        if (mGyroDeadzoneLabel != null) mGyroDeadzoneLabel.setVisibility(visibility);
     }
 
     private void updateGyroCompatibility() {
@@ -216,8 +270,11 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGyroXSwitch.setOnCheckedChangeListener(null);
         mGyroYSwitch.setOnCheckedChangeListener(null);
         mGestureSwitch.setOnCheckedChangeListener(null);
+        if (mHapticsSwitch != null) mHapticsSwitch.setOnCheckedChangeListener(null);
+        if (mEdgeGuardSwitch != null) mEdgeGuardSwitch.setOnCheckedChangeListener(null);
 
         mGyroSensitivityBar.setOnSeekBarChangeListener(null);
+        if (mGyroDeadzoneBar != null) mGyroDeadzoneBar.setOnSeekBarChangeListener(null);
         mMouseSpeedBar.setOnSeekBarChangeListener(null);
         mGestureDelayBar.setOnSeekBarChangeListener(null);
         mResolutionBar.setOnSeekBarChangeListener(null);
@@ -246,6 +303,9 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             PREF_LONGPRESS_TRIGGER = mOriginalGestureDelay;
             PREF_SCALE_FACTOR = mOriginalResolution;
             PREF_BUTTON_TRANSPARENCY = mOriginalTransparency;
+            LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS = mOriginalHaptics;
+            LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD = mOriginalEdgeGuard;
+            LauncherPreferences.PREF_ZYROX_GYRO_DEADZONE = mOriginalGyroDeadzone;
 
             onGyroStateChanged();
             onResolutionChanged();

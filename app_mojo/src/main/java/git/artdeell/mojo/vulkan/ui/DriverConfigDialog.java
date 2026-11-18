@@ -25,7 +25,21 @@ public class DriverConfigDialog extends PackageSelector {
 
     protected PackageAdapter<?> createAdapter(Context context, PackageSelector dialog) { return new DriverViewAdapter(this); }
     protected void onPositive(Context context, ActivityResultLauncher<Object> launcher) {
-        Toast.makeText(context, R.string.driver_config_import_notify, Toast.LENGTH_LONG).show();
-        launcher.launch(null);
+        CharSequence[] opts = {
+                context.getString(R.string.zyrox_turnip_download_online),
+                context.getString(R.string.zyrox_pkg_import_local)
+        };
+        new androidx.appcompat.app.AlertDialog.Builder(context)
+                .setTitle(R.string.driver_config_title)
+                .setItems(opts, (d, which) -> {
+                    if (which == 0) {
+                        git.artdeell.mojo.downloader.RuntimeDriverStoreDialog.showTurnipDriverStore(context, this::refresh);
+                    } else {
+                        Toast.makeText(context, R.string.driver_config_import_notify, Toast.LENGTH_LONG).show();
+                        launcher.launch(null);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 }

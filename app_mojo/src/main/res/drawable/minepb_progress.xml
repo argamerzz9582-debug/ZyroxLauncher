@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Blossom Liquid Glass SeekBar & Progress Track -->
+<!-- Zyrox Starlight Blossom Liquid Glass SeekBar & Progress Track -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:id="@android:id/background">
         <shape android:shape="rectangle">
-            <solid android:color="#22FCE8F3" />
-            <stroke android:width="0.9dp" android:color="#6CFCE8F3" />
+            <solid android:color="#22E8F1FB" />
+            <stroke android:width="0.9dp" android:color="#6CE8F1FB" />
             <corners android:radius="999dp" />
         </shape>
     </item>
     <item android:id="@android:id/secondaryProgress">
         <clip android:clipOrientation="horizontal" android:gravity="left">
             <shape android:shape="rectangle">
-                <solid android:color="#52F7BAD8" />
+                <solid android:color="#52B2CEF7" />
                 <corners android:radius="999dp" />
             </shape>
         </clip>
@@ -21,9 +21,9 @@
             <shape android:shape="rectangle">
                 <gradient
                     android:angle="0"
-                    android:startColor="#D8F296C2"
-                    android:centerColor="#EEF9C6E1"
-                    android:endColor="#FFFFF7FB"
+                    android:startColor="#D88EB8F2"
+                    android:centerColor="#EEBDD6F9"
+                    android:endColor="#FFF7FAFF"
                     android:type="linear" />
                 <corners android:radius="999dp" />
             </shape>

@@ -104,6 +104,26 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private HotbarView mHotbarView;
     private View mLoadingScreen;
     private MinecraftLoadingLandscapeView mLoadingLandscape;
+    private android.widget.ProgressBar mLoadingProgressBar;
+    private android.widget.TextView mLoadingStageText;
+    private android.widget.TextView mLoadingEtaText;
+    private android.widget.TextView mLoadingPercentText;
+    private android.animation.ObjectAnimator mLoadingBarAnimator;
+    private GameLaunchProgressTracker mLaunchProgressTracker;
+    private Logger.eventLogListener mLaunchLogListener;
+    private long mLastProgressUiPushMs = 0L;
+    private long mSessionResumeRealtimeMs = 0L;
+    private final Runnable mLoadingProgressTickRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (mLoadingScreen == null || mLoadingScreenHiding || mLaunchProgressTracker == null) {
+                return;
+            }
+            applyProgressSnapshotOnUi(
+                    mLaunchProgressTracker.onTick(android.os.SystemClock.elapsedRealtime()));
+            Tools.MAIN_HANDLER.postDelayed(this, 260L);
+        }
+    };
     private PerformanceHudOverlay mPerfHudOverlay;
     private boolean mLoadingScreenHiding = false;
     private static volatile boolean sMojangSplashReached = false;
@@ -159,6 +179,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         // Set the sustained performance mode for available APIs
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
             getWindow().setSustainedPerformanceMode(PREF_SUSTAINED_PERFORMANCE);
+
+        // Zyrox Optimizer: reclaim launcher bitmap caches & unlock native 90/120/144 Hz display mode
+        git.artdeell.mojo.performance.GameOptimizer.applyInGameSystemBoost(
+                this, LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE);
+        git.artdeell.mojo.instances.InstancePlaytimeTracker.recordSessionStart(
+                this, instance, System.currentTimeMillis());
 
         // This is required on Android 10 for the insets listener
         // https://issuetracker.google.com/issues/266331465
@@ -245,6 +271,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             if(!latestLogFile.exists() && !latestLogFile.createNewFile())
                 throw new IOException("Failed to create a new log file");
             Logger.begin(latestLogFile.getAbsolutePath());
+            if (mLaunchLogListener != null) {
+                Logger.addLogListener(mLaunchLogListener);
+            }
 
             Intent activityIntent = getIntent();
             Bundle extras = Objects.requireNonNull(activityIntent.getExtras());
@@ -258,11 +287,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             setTitle("Zyrox Launcher (" + version + ")");
 
-            // In-game menu (preserves existing 5 actions + optional truthful Performance HUD toggle)
+            // In-game menu (preserves existing 5 core actions + Performance HUD + Quick Macros)
             String[] baseActions = getResources().getStringArray(R.array.menu_ingame);
-            String[] allActions = new String[baseActions.length + 1];
+            String[] allActions = new String[baseActions.length + 2];
             System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
             allActions[baseActions.length] = getString(R.string.zyrox_toggle_perf_hud);
+            allActions[baseActions.length + 1] = getString(R.string.zyrox_quick_macros);
             gameActionArrayAdapter = new ArrayAdapter<>(this,
                     R.layout.item_zyrox_ingame_menu, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
@@ -281,6 +311,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                                  LauncherPreferences.DEFAULT_PREF.edit().putBoolean("zyroxPerfHud", next).apply();
                              }
                          }
+                         break;
+                     case 6:
+                         QuickMacroDialog.show(GameActivity.this);
                          break;
                 }
                 drawerLayout.closeDrawers();
@@ -342,7 +375,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         launcherGLView = findViewById(R.id.main_game_render_view);
         drawerLayout = findViewById(R.id.main_drawer_options);
         if (drawerLayout != null) {
-            drawerLayout.setScrimColor(0x34120919);
+            drawerLayout.setScrimColor(0x38080D1B);
         }
         navDrawer = findViewById(R.id.main_navigation_view);
         loggerView = findViewById(R.id.mainLoggerView);
@@ -352,15 +385,22 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         mLoadingScreen = findViewById(R.id.main_loading_screen);
         if (mLoadingScreen != null) {
             mLoadingLandscape = mLoadingScreen.findViewById(R.id.main_loading_landscape);
+            mLoadingProgressBar = mLoadingScreen.findViewById(R.id.main_loading_progress_bar);
+            mLoadingStageText = mLoadingScreen.findViewById(R.id.main_loading_stage_text);
+            mLoadingEtaText = mLoadingScreen.findViewById(R.id.main_loading_eta_text);
+            mLoadingPercentText = mLoadingScreen.findViewById(R.id.main_loading_percent_text);
             if (sMojangSplashReached && !(PLATFORM instanceof DummyBackend)) {
                 destroyLoadingScreenImmediate();
-            } else if (launcherGLView != null) {
-                launcherGLView.setFirstSplashFrameListener(() -> {
-                    sMojangSplashReached = true;
-                    hideLoadingScreen();
-                });
-                if (!(PLATFORM instanceof DummyBackend)) {
-                    launcherGLView.notifyNativeWindowBackendReady();
+            } else {
+                initLaunchProgressTracking();
+                if (launcherGLView != null) {
+                    launcherGLView.setFirstSplashFrameListener(() -> {
+                        sMojangSplashReached = true;
+                        hideLoadingScreen();
+                    });
+                    if (!(PLATFORM instanceof DummyBackend)) {
+                        launcherGLView.notifyNativeWindowBackendReady();
+                    }
                 }
             }
         }
@@ -380,9 +420,88 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
     }
 
+    /** Initializes live stdout/stderr log-driven launch progress &amp; smart ETA tracking. */
+    private void initLaunchProgressTracking() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        int modCount = 0;
+        long learnedBootMs = 0L;
+        if (instance != null) {
+            try {
+                modCount = git.artdeell.mojo.performance.GameOptimizer.countInstalledMods(
+                        instance.getGameDirectory());
+            } catch (Throwable ignored) {
+            }
+            learnedBootMs = git.artdeell.mojo.instances.InstancePlaytimeTracker.getLearnedBootMs(
+                    this, instance);
+        }
+        mLaunchProgressTracker = new GameLaunchProgressTracker(now, modCount, learnedBootMs);
+        applyProgressSnapshotOnUi(mLaunchProgressTracker.onTick(now));
+
+        mLaunchLogListener = text -> {
+            GameLaunchProgressTracker tracker = mLaunchProgressTracker;
+            if (tracker == null || mLoadingScreenHiding) return;
+            long ts = android.os.SystemClock.elapsedRealtime();
+            int prevPct = tracker.getPercent();
+            GameLaunchProgressTracker.ProgressSnapshot snap = tracker.onLogOutput(text, ts);
+            // Coalesce rapid log bursts to <= 12 UI updates/sec unless percentage advanced
+            if (snap.percent > prevPct || (ts - mLastProgressUiPushMs) >= 85L) {
+                mLastProgressUiPushMs = ts;
+                Tools.runOnUiThread(() -> applyProgressSnapshotOnUi(snap));
+            }
+        };
+        Tools.MAIN_HANDLER.removeCallbacks(mLoadingProgressTickRunnable);
+        Tools.MAIN_HANDLER.postDelayed(mLoadingProgressTickRunnable, 260L);
+    }
+
+    private void applyProgressSnapshotOnUi(@NonNull GameLaunchProgressTracker.ProgressSnapshot snap) {
+        if (mLoadingScreen == null) return;
+        if (mLoadingStageText != null) {
+            mLoadingStageText.setText(snap.stageText);
+        }
+        if (mLoadingEtaText != null) {
+            mLoadingEtaText.setText(snap.etaText);
+        }
+        if (mLoadingPercentText != null) {
+            mLoadingPercentText.setText(snap.percent + "%");
+        }
+        if (mLoadingProgressBar != null) {
+            int target = Math.max(mLoadingProgressBar.getProgress(), snap.percent * 10);
+            if (LauncherPreferences.isReducedMotionEnabled(this)) {
+                mLoadingProgressBar.setProgress(target);
+            } else if (target > mLoadingProgressBar.getProgress()) {
+                if (mLoadingBarAnimator != null) {
+                    mLoadingBarAnimator.cancel();
+                }
+                mLoadingBarAnimator = android.animation.ObjectAnimator.ofInt(
+                        mLoadingProgressBar, "progress", mLoadingProgressBar.getProgress(), target);
+                mLoadingBarAnimator.setDuration(snap.completed ? 160L : 220L);
+                mLoadingBarAnimator.setInterpolator(new DecelerateInterpolator());
+                mLoadingBarAnimator.start();
+            }
+        }
+    }
+
+    private void stopLaunchProgressTracking(boolean recordSuccessDuration) {
+        Tools.MAIN_HANDLER.removeCallbacks(mLoadingProgressTickRunnable);
+        if (mLaunchLogListener != null) {
+            Logger.removeLogListener(mLaunchLogListener);
+            mLaunchLogListener = null;
+        }
+        if (mLoadingBarAnimator != null) {
+            mLoadingBarAnimator.cancel();
+            mLoadingBarAnimator = null;
+        }
+        if (recordSuccessDuration && mLaunchProgressTracker != null && instance != null) {
+            long elapsed = mLaunchProgressTracker.getElapsedMs(android.os.SystemClock.elapsedRealtime());
+            git.artdeell.mojo.instances.InstancePlaytimeTracker.recordObservedBootMs(
+                    this, instance, elapsed);
+        }
+        mLaunchProgressTracker = null;
+    }
+
     /**
-     * Thread-safe launch lifecycle hook. The loading backdrop displays only the continuous animated
-     * scene GIF without distracting overlay text until Mojang's official splash screen renders.
+     * Thread-safe launch lifecycle hook advancing the live Loading Screen progress bar through
+     * pre-JVM launcher stages before Minecraft's own stdout milestones take over.
      */
     public static void reportLoadingStage(@StringRes int stageStringRes) {
         sCurrentLoadingStatusRes = stageStringRes;
@@ -391,6 +510,26 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 GameActivity ga = (GameActivity) activity;
                 if (ga.mLoadingLandscape != null && !ga.mLoadingScreenHiding) {
                     ga.mLoadingLandscape.resumeAnimation();
+                }
+                if (ga.mLaunchProgressTracker != null && !ga.mLoadingScreenHiding) {
+                    int floor = 5;
+                    int ceil = 14;
+                    if (stageStringRes == R.string.zyrox_loading_resources) {
+                        floor = 8;
+                        ceil = 16;
+                    } else if (stageStringRes == R.string.zyrox_loading_runtime) {
+                        floor = 12;
+                        ceil = 20;
+                    } else if (stageStringRes == R.string.zyrox_loading_renderer) {
+                        floor = 15;
+                        ceil = 24;
+                    } else if (stageStringRes == R.string.zyrox_loading_starting) {
+                        floor = 19;
+                        ceil = 32;
+                    }
+                    String label = ga.getString(stageStringRes);
+                    ga.applyProgressSnapshotOnUi(ga.mLaunchProgressTracker.onLauncherStage(
+                            floor, ceil, label, android.os.SystemClock.elapsedRealtime()));
                 }
             }
         });
@@ -404,12 +543,18 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
             InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
         }
+        if (mLaunchProgressTracker != null && !mLoadingScreenHiding) {
+            GameLaunchProgressTracker.ProgressSnapshot snap =
+                    mLaunchProgressTracker.onNativeWindowReady(android.os.SystemClock.elapsedRealtime());
+            Tools.runOnUiThread(() -> applyProgressSnapshotOnUi(snap));
+        }
         if (launcherGLView != null) {
             launcherGLView.notifyNativeWindowBackendReady();
         }
     }
 
     private void destroyLoadingScreenImmediate() {
+        stopLaunchProgressTracking(false);
         if (launcherGLView != null) {
             launcherGLView.releaseSplashProbe();
         }
@@ -417,6 +562,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             mLoadingLandscape.release();
             mLoadingLandscape = null;
         }
+        mLoadingProgressBar = null;
+        mLoadingStageText = null;
+        mLoadingEtaText = null;
+        mLoadingPercentText = null;
         if (mLoadingScreen != null) {
             mLoadingScreen.animate().cancel();
             if (mLoadingScreen.getParent() instanceof ViewGroup) {
@@ -431,6 +580,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     public void onResume() {
         super.onResume();
         ContextExecutor.setActivity(this);
+        mSessionResumeRealtimeMs = android.os.SystemClock.elapsedRealtime();
         if(PREF_ENABLE_GYRO) mGyroControl.enable();
         if (mLoadingLandscape != null && !mLoadingScreenHiding) {
             mLoadingLandscape.resumeAnimation();
@@ -443,6 +593,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     protected void onPause() {
+        flushPlaytimeSession();
         ContextExecutor.clearActivity();
         mGyroControl.disable();
         if (mPerfHudOverlay != null) {
@@ -477,8 +628,18 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         super.onStop();
     }
 
+    private void flushPlaytimeSession() {
+        if (mSessionResumeRealtimeMs > 0L) {
+            long delta = android.os.SystemClock.elapsedRealtime() - mSessionResumeRealtimeMs;
+            mSessionResumeRealtimeMs = 0L;
+            git.artdeell.mojo.instances.InstancePlaytimeTracker.recordSessionElapsed(
+                    this, instance, delta);
+        }
+    }
+
     @Override
     protected void onDestroy() {
+        flushPlaytimeSession();
         if (mPerfHudOverlay != null) {
             mPerfHudOverlay.stopMonitoring(true);
             mPerfHudOverlay = null;
@@ -659,6 +820,11 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         if (mLoadingScreen == null || mLoadingScreenHiding) return;
         mLoadingScreenHiding = true;
         sMojangSplashReached = true;
+        if (mLaunchProgressTracker != null) {
+            applyProgressSnapshotOnUi(
+                    mLaunchProgressTracker.markComplete(android.os.SystemClock.elapsedRealtime()));
+        }
+        stopLaunchProgressTracking(true);
         if (launcherGLView != null) {
             launcherGLView.releaseSplashProbe();
         }

@@ -249,4 +249,99 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/buttonTransparency_textView" />
 
+    <!-- Haptic Feedback Toggle -->
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxHaptics"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="4dp"
+        android:text="@string/zyrox_pref_haptics"
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/buttonTransparency_seekBar" />
+
+    <!-- Accidental Palm / Edge Touch Guard -->
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxEdgeGuard"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:text="@string/zyrox_pref_edge_guard"
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxHaptics" />
+
+    <!-- Gyro Deadzone -->
+    <TextView
+        android:id="@+id/editGyroDeadzone_textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/zyrox_pref_gyro_deadzone"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxEdgeGuard" />
+
+    <TextView
+        android:id="@+id/editGyroDeadzone_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editGyroDeadzone_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editGyroDeadzone_textView"
+        tools:text="100%" />
+
+    <com.kdt.CustomSeekbar
+        android:id="@+id/editGyroDeadzone_seekBar"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:min="20"
+        android:max="250"
+        app:seekBarIncrement="10"
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editGyroDeadzone_textView" />
+
+    <!-- Instant Quick Screenshot (F2) & Macros Row -->
+    <LinearLayout
+        android:id="@+id/quickAction_row"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editGyroDeadzone_seekBar">
+
+        <Button
+            android:id="@+id/quickBtn_screenshot"
+            style="@style/MojoLauncher.Button"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="@string/zyrox_quick_screenshot"
+            android:textSize="10.5sp" />
+
+        <Button
+            android:id="@+id/quickBtn_macros"
+            style="@style/MojoLauncher.Button"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/zyrox_quick_macros"
+            android:textSize="10.5sp" />
+    </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

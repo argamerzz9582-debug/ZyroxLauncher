@@ -88,6 +88,11 @@ public class LauncherPreferences {
     public static int PREF_ZYROX_DOWNLOAD_THREADS = 6;
     public static int PREF_ZYROX_BACKUP_RETENTION = 5;
     public static String PREF_ZYROX_GRAPHICS_PROFILE = "balanced";
+    public static String PREF_ZYROX_OPTIMIZER_MODE = "auto";
+    public static boolean PREF_ZYROX_CONTROL_HAPTICS = true;
+    public static boolean PREF_ZYROX_EDGE_TOUCH_GUARD = false;
+    public static boolean PREF_ZYROX_HUD_SNAP_GRID = true;
+    public static float PREF_ZYROX_GYRO_DEADZONE = 1.0f;
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -146,6 +151,13 @@ public class LauncherPreferences {
         PREF_ZYROX_DOWNLOAD_THREADS = Math.max(1, Math.min(8, DEFAULT_PREF.getInt("zyroxDownloadThreads", 6)));
         PREF_ZYROX_BACKUP_RETENTION = Math.max(1, Math.min(25, DEFAULT_PREF.getInt("zyroxBackupRetention", 5)));
         PREF_ZYROX_GRAPHICS_PROFILE = DEFAULT_PREF.getString("zyroxGraphicsProfile", "balanced");
+        PREF_ZYROX_OPTIMIZER_MODE = git.artdeell.mojo.performance.GameOptimizer.normalizeMode(
+                DEFAULT_PREF.getString(git.artdeell.mojo.performance.GameOptimizer.PREF_KEY_MODE, "auto"));
+        PREF_ZYROX_CONTROL_HAPTICS = DEFAULT_PREF.getBoolean("zyroxControlHaptics", true);
+        PREF_ZYROX_EDGE_TOUCH_GUARD = DEFAULT_PREF.getBoolean("zyroxEdgeTouchGuard", false);
+        PREF_ZYROX_HUD_SNAP_GRID = DEFAULT_PREF.getBoolean("zyroxHudSnapGrid", true);
+        PREF_ZYROX_GYRO_DEADZONE = Math.max(0f, Math.min(3f,
+                DEFAULT_PREF.getInt("zyroxGyroDeadzone", 100) / 100f));
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

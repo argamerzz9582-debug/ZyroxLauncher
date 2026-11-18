@@ -64,6 +64,93 @@ public class ControlLayout extends FrameLayout {
 	private ControlButtonMenuListener mMenuListener;
 	public ActionRow mActionRow = null;
 	public String mLayoutFileName;
+	private static final int MAX_HISTORY_STEPS = 16;
+	private final java.util.ArrayDeque<String> mUndoStack = new java.util.ArrayDeque<>();
+	private final java.util.ArrayDeque<String> mRedoStack = new java.util.ArrayDeque<>();
+	private boolean mRestoringHistory = false;
+
+	/** Captures the current HUD JSON state so drag/add/delete/preset edits can be undone. */
+	public void pushUndoSnapshot() {
+		if (!mModifiable || mRestoringHistory || mLayout == null) return;
+		try {
+			String snap = Tools.GLOBAL_GSON.toJson(mLayout);
+			if (snap == null || snap.isEmpty()) return;
+			if (!mUndoStack.isEmpty() && snap.equals(mUndoStack.peek())) return;
+			mUndoStack.push(snap);
+			while (mUndoStack.size() > MAX_HISTORY_STEPS) {
+				mUndoStack.removeLast();
+			}
+			mRedoStack.clear();
+		} catch (Throwable ignored) {
+		}
+	}
+
+	public boolean undoLayout() {
+		if (!mModifiable || mUndoStack.isEmpty()) return false;
+		try {
+			LayoutBitmaps bitmaps = mLayout != null ? mLayout.mLayoutBitmaps : null;
+			if (mLayout != null) {
+				String cur = Tools.GLOBAL_GSON.toJson(mLayout);
+				if (cur != null && !cur.isEmpty()) mRedoStack.push(cur);
+			}
+			String prev = mUndoStack.pop();
+			CustomControls restored = Tools.GLOBAL_GSON.fromJson(prev, CustomControls.class);
+			if (restored == null) return false;
+			restored.mLayoutBitmaps = bitmaps != null ? bitmaps : LayoutBitmaps.createEmpty();
+			mRestoringHistory = true;
+			try {
+				removeEditWindow();
+				loadLayout(restored);
+				setModified(true);
+			} finally {
+				mRestoringHistory = false;
+			}
+			return true;
+		} catch (Throwable ignored) {
+			return false;
+		}
+	}
+
+	public boolean redoLayout() {
+		if (!mModifiable || mRedoStack.isEmpty()) return false;
+		try {
+			LayoutBitmaps bitmaps = mLayout != null ? mLayout.mLayoutBitmaps : null;
+			if (mLayout != null) {
+				String cur = Tools.GLOBAL_GSON.toJson(mLayout);
+				if (cur != null && !cur.isEmpty()) mUndoStack.push(cur);
+			}
+			String next = mRedoStack.pop();
+			CustomControls restored = Tools.GLOBAL_GSON.fromJson(next, CustomControls.class);
+			if (restored == null) return false;
+			restored.mLayoutBitmaps = bitmaps != null ? bitmaps : LayoutBitmaps.createEmpty();
+			mRestoringHistory = true;
+			try {
+				removeEditWindow();
+				loadLayout(restored);
+				setModified(true);
+			} finally {
+				mRestoringHistory = false;
+			}
+			return true;
+		} catch (Throwable ignored) {
+			return false;
+		}
+	}
+
+	/** Applies a built-in Zyrox HUD preset with automatic undo history support. */
+	public void applyPreset(int presetIndex) {
+		pushUndoSnapshot();
+		removeEditWindow();
+		CustomControls preset = ControlPresetFactory.createPreset(getContext(), presetIndex);
+		preset.mLayoutBitmaps = LayoutBitmaps.createEmpty();
+		mRestoringHistory = true;
+		try {
+			loadLayout(preset);
+			setModified(true);
+		} finally {
+			mRestoringHistory = false;
+		}
+	}
 
 	public ControlLayout(Context ctx) {
 		super(ctx);
@@ -140,6 +227,7 @@ public class ControlLayout extends FrameLayout {
 
 	//CONTROL BUTTON
 	public void addControlButton(ControlData controlButton) {
+		pushUndoSnapshot();
 		mLayout.mControlDataList.add(controlButton);
 		addControlView(controlButton);
 	}
@@ -159,6 +247,7 @@ public class ControlLayout extends FrameLayout {
 
 	// CONTROL DRAWER
 	public void addDrawer(ControlDrawerData drawerData){
+		pushUndoSnapshot();
 		mLayout.mDrawerDataList.add(drawerData);
 		addDrawerView();
 	}
@@ -213,6 +302,7 @@ public class ControlLayout extends FrameLayout {
 
 	// JOYSTICK BUTTON
 	public void addJoystickButton(ControlJoystickData data){
+		pushUndoSnapshot();
 		mLayout.mJoystickDataList.add(data);
 		addJoystickView(data);
 	}

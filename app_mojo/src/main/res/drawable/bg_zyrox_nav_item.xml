@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Crystal Navigation Pill & Studio Tab Selector -->
+<!-- Zyrox Starlight Crystal Navigation Pill & Studio Tab Selector -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:state_pressed="true">
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#4CFFE4F2" android:endColor="#32F4A4CC" />
-                    <stroke android:width="1.2dp" android:color="#F8FFF7FB" />
+                    <gradient android:angle="270" android:startColor="#4CE5F0FE" android:endColor="#329CC1F4" />
+                    <stroke android:width="1.2dp" android:color="#F8F7FAFF" />
                     <corners android:radius="11dp" />
                 </shape>
             </item>
@@ -24,8 +24,8 @@
         <layer-list>
             <item>
                 <shape android:shape="rectangle">
-                    <gradient android:angle="270" android:startColor="#44FFE0F0" android:endColor="#2AF39CC6" />
-                    <stroke android:width="1.2dp" android:color="#F4FFF5FA" />
+                    <gradient android:angle="270" android:startColor="#44E1EEFE" android:endColor="#2A94BCF3" />
+                    <stroke android:width="1.2dp" android:color="#F4F5F9FF" />
                     <corners android:radius="11dp" />
                 </shape>
             </item>
@@ -40,8 +40,8 @@
 
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#36FFEBF5" android:endColor="#24F8C4DF" />
-            <stroke android:width="1.4dp" android:color="#FFFFFAFD" />
+            <gradient android:angle="270" android:startColor="#36EBF4FE" android:endColor="#24BBD5F8" />
+            <stroke android:width="1.4dp" android:color="#FFFAFCFF" />
             <corners android:radius="11dp" />
         </shape>
     </item>

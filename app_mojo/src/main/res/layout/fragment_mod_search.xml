@@ -6,9 +6,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#30150C1F">
+    android:background="#300B1326">
 
-    <!-- Top Search + Platform Toggle + Horizontal Chip Filter Bar -->
+    <!-- Top Search + Content Mode Tabs + Platform Toggle + Chip Filter Bar -->
     <LinearLayout
         android:id="@+id/search_mod_overlay"
         android:layout_width="0dp"
@@ -23,6 +23,49 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Row 0: All-in-One Content Type Tabs + 1-Click FPS Boost Pack -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tab_store_modpacks"
+                    style="@style/Zyrox.FilterChip"
+                    android:text="@string/zyrox_store_tab_modpacks" />
+
+                <TextView
+                    android:id="@+id/tab_store_mods"
+                    style="@style/Zyrox.FilterChip"
+                    android:text="@string/zyrox_store_tab_mods" />
+
+                <TextView
+                    android:id="@+id/tab_store_shaders"
+                    style="@style/Zyrox.FilterChip"
+                    android:text="@string/zyrox_store_tab_shaders" />
+
+                <TextView
+                    android:id="@+id/tab_store_resourcepacks"
+                    style="@style/Zyrox.FilterChip"
+                    android:text="@string/zyrox_store_tab_resources" />
+
+                <TextView
+                    android:id="@+id/btn_store_fps_boost"
+                    style="@style/Zyrox.FilterChip"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/zyrox_firefly_gold"
+                    android:text="@string/zyrox_store_fps_boost" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <!-- Row 1: Search Input + Platform Pills + Version Filter -->
         <LinearLayout

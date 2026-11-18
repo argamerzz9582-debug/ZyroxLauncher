@@ -128,7 +128,13 @@ public class MainMenuFragment extends Fragment {
             return true;
         });
 
+        // Tap opens Files; long-press opens Screenshots Gallery Studio
         mOpenDirectoryButton.setOnClickListener(v -> openGameDirectory(v.getContext()));
+        mOpenDirectoryButton.setOnLongClickListener(v -> {
+            Tools.swapFragment(requireActivity(), ScreenshotGalleryFragment.class,
+                    ScreenshotGalleryFragment.TAG, null);
+            return true;
+        });
         // Tap opens Security, Verification & Graphics Center; long-press opens official GitHub repository
         mTrustButton.setOnClickListener(v ->
                 Tools.swapFragment(requireActivity(), AboutSecurityFragment.class, AboutSecurityFragment.TAG, null));
@@ -140,6 +146,14 @@ public class MainMenuFragment extends Fragment {
                 Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
 
         setupFullScreenGlassPolish(view);
+
+        // Throttled HTTPS check for newer official Zyrox Launcher releases on GitHub
+        git.artdeell.mojo.updater.AppUpdateChecker.checkSilentlyIfDue(
+                requireContext(), (info, err) -> {
+                    if (isAdded() && info != null && info.updateAvailable) {
+                        git.artdeell.mojo.updater.AppUpdateChecker.showUpdateDialog(requireContext(), info);
+                    }
+                });
     }
 
     private void setupFullScreenGlassPolish(@NonNull View root) {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Sakura Crystal Liquid Glass Home Studio Action Tile -->
+<!-- Zyrox Starlight Crystal Liquid Glass Home Studio Action Tile -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:state_pressed="true">
@@ -8,10 +8,10 @@
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#4EFFE4F2"
-                        android:centerColor="#30F49FC8"
-                        android:endColor="#42F9C0DD" />
-                    <stroke android:width="1.3dp" android:color="#F8FFF7FB" />
+                        android:startColor="#4EE5F0FE"
+                        android:centerColor="#3097BEF4"
+                        android:endColor="#42B7D3F9" />
+                    <stroke android:width="1.3dp" android:color="#F8F7FAFF" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
@@ -26,8 +26,8 @@
 
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <gradient android:angle="270" android:startColor="#3CFFEAF4" android:endColor="#28F8C4DF" />
-            <stroke android:width="1.5dp" android:color="#FFFFFAFD" />
+            <gradient android:angle="270" android:startColor="#3CEBF3FE" android:endColor="#28BBD5F8" />
+            <stroke android:width="1.5dp" android:color="#FFFAFCFF" />
             <corners android:radius="13dp" />
         </shape>
     </item>
@@ -37,20 +37,20 @@
             <!-- Subtle plum glass base for crisp contrast over sunlit cherry blossoms -->
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="#28150C1E" />
-                    <stroke android:width="0.8dp" android:color="#34120918" />
+                    <solid android:color="#280A101E" />
+                    <stroke android:width="0.8dp" android:color="#34080D18" />
                     <corners android:radius="13dp" />
                 </shape>
             </item>
-            <!-- Iridescent sakura-pearl refractive sheen + bright bevel -->
+            <!-- Iridescent starlight-ice refractive sheen + bright bevel -->
             <item android:left="0.7dp" android:top="0.7dp" android:right="0.7dp" android:bottom="0.7dp">
                 <shape android:shape="rectangle">
                     <gradient
                         android:angle="270"
-                        android:startColor="#28FFF4FA"
-                        android:centerColor="#10FCE4F1"
-                        android:endColor="#1CF9D0E6" />
-                    <stroke android:width="1.05dp" android:color="#B4FFF0F8" />
+                        android:startColor="#28F4F9FF"
+                        android:centerColor="#10E5EEFB"
+                        android:endColor="#1CC7DCF8" />
+                    <stroke android:width="1.05dp" android:color="#B4F0F7FF" />
                     <corners android:radius="12.3dp" />
                 </shape>
             </item>

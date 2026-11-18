@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 13+ Material You Monochrome Vector Icon — Zyrox Sakura Crystal Z -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Bold sculpted Zyrox Z inside 66dp adaptive safe zone -->
+
+    <!-- Bold Celestial Crystal Z Monogram inside Android 66dp adaptive safe zone -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M34,31 L74,31 L74,42 L51.5,66 L74,66 L74,77 L34,77 L34,66 L56.5,42 L34,42 Z" />
-    <!-- Floating Minecraft pixel sakura blossoms -->
+        android:pathData="M33,31 L75,31 C76.66,31 78,32.34 78,34 L78,39.2 C78,40.1 77.62,40.96 76.96,41.58 L47.4,67.5 L75,67.5 C76.66,67.5 78,68.84 78,70.5 L78,75 C78,76.66 76.66,78 75,78 L33,78 C31.34,78 30,76.66 30,75 L30,69.8 C30,68.9 30.38,68.04 31.04,67.42 L60.6,41.5 L33,41.5 C31.34,41.5 30,40.16 30,38.5 L30,34 C30,32.34 31.34,31 33,31 Z" />
+
+    <!-- Top-left 4-point North Star -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M35,51h3v3h-3zM38,48h3v3h-3zM41,51h3v3h-3zM38,54h3v3h-3z" />
+        android:pathData="M26,22 L27.3,25.7 L31,27 L27.3,28.3 L26,32 L24.7,28.3 L21,27 L24.7,25.7 Z" />
+
+    <!-- Top-right Starlight Spark & Firefly Dot -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M65,54h3v3h-3zM68,51h3v3h-3zM71,54h3v3h-3zM68,57h3v3h-3z" />
+        android:pathData="M82,47 L83,49.8 L85.8,50.8 L83,51.8 L82,54.6 L81,51.8 L78.2,50.8 L81,49.8 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M35,54 m-2.4,0 a2.4,2.4 0 1,1 4.8,0 a2.4,2.4 0 1,1 -4.8,0" />
 </vector>
