@@ -76,7 +76,7 @@ public class ZyroxPhase1To4EcosystemTest {
     @Test
     public void httpClientParsesRetryAfterAndClassifiesStatusCodes() {
         assertEquals(5000L, ZyroxHttpClient.parseRetryAfterMs("5"));
-        assertTrue(ZyroxHttpClient.parseRetryAfterMs("9999") <= 120_000L);
+        assertEquals(300_000L, ZyroxHttpClient.parseRetryAfterMs("9999"));
         assertTrue(ZyroxHttpClient.isRetryableStatus(429));
         assertTrue(ZyroxHttpClient.isRetryableStatus(503));
         assertFalse(ZyroxHttpClient.isRetryableStatus(404));

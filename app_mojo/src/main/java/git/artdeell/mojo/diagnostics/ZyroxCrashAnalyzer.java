@@ -613,7 +613,8 @@ public final class ZyroxCrashAnalyzer {
     private static final Pattern MISSING_DEP_PATTERN = Pattern.compile(
             "(?i)(?:requires\\s+(?:any\\s+version\\s+of\\s+|version\\s+[^\\s]+\\s+of\\s+)?['\"]?([a-z0-9_\\-]{3,40})['\"]?"
                     + "|Install\\s+([a-z0-9_\\-]{3,40})(?:,|\\s+version|\\s+or)"
-                    + "|Mod\\s+ID:\\s*['\"]([a-z0-9_\\-]{3,40})['\"])");
+                    + "|Mod\\s+ID:\\s*['\"]([a-z0-9_\\-]{3,40})['\"]"
+                    + "|Missing\\s+(?:mandatory\\s+)?dependency[:\\s]+['\"]?([a-z0-9_\\-]{3,40})['\"]?)");
 
     /** Extracts and maps a missing mod ID from Fabric/Quilt/Forge/NeoForge logs to a Modrinth slug. */
     @Nullable
@@ -621,8 +622,13 @@ public final class ZyroxCrashAnalyzer {
         if (text == null || text.isEmpty()) return null;
         Matcher m = MISSING_DEP_PATTERN.matcher(text);
         while (m.find()) {
-            String raw = m.group(1) != null ? m.group(1)
-                    : (m.group(2) != null ? m.group(2) : m.group(3));
+            String raw = null;
+            for (int g = 1; g <= m.groupCount(); g++) {
+                if (m.group(g) != null) {
+                    raw = m.group(g);
+                    break;
+                }
+            }
             if (raw == null) continue;
             String id = raw.trim().toLowerCase(Locale.ROOT);
             if ("minecraft".equals(id) || "java".equals(id) || "fabricloader".equals(id)
