@@ -213,8 +213,8 @@ public final class QuickMacroDialog {
                         steps.add(new MacroStep(StepKind.KEY_CHORD, mod, key, 40, null));
                     }
                 }
-            } else if (upper.startsWith("CMD:")) {
-                String cmd = tok.substring(4).trim();
+            } else if (upper.startsWith("CMD:") || upper.startsWith("CHAT:")) {
+                String cmd = tok.substring(tok.indexOf(':') + 1).trim();
                 if (!cmd.isEmpty() && cmd.length() <= 160) {
                     steps.add(new MacroStep(StepKind.CHAT_CMD, 0, 0, 0, cmd));
                 }

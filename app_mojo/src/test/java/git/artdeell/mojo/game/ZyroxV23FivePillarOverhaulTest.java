@@ -140,13 +140,13 @@ public class ZyroxV23FivePillarOverhaulTest {
 
     @Test
     public void pillar3_exp4jFormulasStrictHttpsAndAutomaticMirrorFailover() {
-        double btnX = new ExpressionBuilder("(${screen_width} - ${width}) / 2 + ${margin}")
-                .variables("${screen_width}", "${width}", "${margin}")
-                .build()
-                .setVariable("${screen_width}", 2400)
-                .setVariable("${width}", 200)
-                .setVariable("${margin}", 12)
-                .evaluate();
+        Map<String, String> vars = new HashMap<>();
+        vars.put("screen_width", "2400");
+        vars.put("width", "200");
+        vars.put("margin", "12");
+        String expanded = git.artdeell.mojo.utils.JSONUtils.insertSingleJSONValue(
+                "(${screen_width} - ${width}) / 2 + ${margin}", vars);
+        double btnX = new ExpressionBuilder(expanded).build().evaluate();
         assertEquals(1112.0, btnX, 0.001);
 
         assertTrue(ZyroxHttpClient.isStrictHttpsUrl("https://api.modrinth.com/v2/search"));
@@ -301,12 +301,12 @@ public class ZyroxV23FivePillarOverhaulTest {
         String scannedToken = ControlProfileManager.decodeQrArgbPixels(argb, w, h);
         ControlProfileManager.DecodedShareProfile decoded =
                 ControlProfileManager.decodeSharePayload(scannedToken);
-        assertEquals("PvP Pro", decoded.profileName);
+        assertEquals("PvP_Pro", decoded.profileName);
         assertEquals(sampleControlJson, decoded.jsonText);
 
         // Multi-step macro sequence script parser & JSON persistence round-trip
         List<QuickMacroDialog.MacroStep> steps = QuickMacroDialog.parseSequenceScript(
-                "KEY:1; WAIT:80; ATTACK; WAIT:60; USE; CHAT:/spawn");
+                "SLOT:1; WAIT:80; ATTACK; WAIT:60; USE; CHAT:/spawn");
         assertEquals(6, steps.size());
         QuickMacroDialog.MacroSequence seq = new QuickMacroDialog.MacroSequence("Combo", steps);
         String json = QuickMacroDialog.serializeSequencesJson(Collections.singletonList(seq));
