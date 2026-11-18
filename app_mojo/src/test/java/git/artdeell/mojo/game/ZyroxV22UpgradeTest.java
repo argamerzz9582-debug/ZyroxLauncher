@@ -209,15 +209,17 @@ public class ZyroxV22UpgradeTest {
         assertTrue("TestStorageActivity must set autoRemoveFromRecents=true",
                 tsTag.contains("android:autoRemoveFromRecents=\"true\""));
 
-        // LauncherActivity and GameActivity must enforce singleTask + autoRemoveFromRecents
+        // LauncherActivity and GameActivity must enforce StrandHogg-safe singleTop + autoRemoveFromRecents
+        assertFalse("Must never introduce StrandHogg-vulnerable singleTask",
+                manifest.contains("android:launchMode=\"singleTask\""));
         int laStart = manifest.indexOf("android:name=\".LauncherActivity\"");
         String laTag = manifest.substring(laStart, manifest.indexOf("/>", laStart));
-        assertTrue(laTag.contains("android:launchMode=\"singleTask\""));
+        assertTrue(laTag.contains("android:launchMode=\"singleTop\""));
         assertTrue(laTag.contains("android:autoRemoveFromRecents=\"true\""));
 
         int gaStart = manifest.indexOf("android:name=\".game.GameActivity\"");
         String gaTag = manifest.substring(gaStart, manifest.indexOf("/>", gaStart));
-        assertTrue(gaTag.contains("android:launchMode=\"singleTask\""));
+        assertTrue(gaTag.contains("android:launchMode=\"singleTop\""));
         assertTrue(gaTag.contains("android:autoRemoveFromRecents=\"true\""));
 
         // ShowErrorActivity and ImportControlActivity must stay excluded from Recents
