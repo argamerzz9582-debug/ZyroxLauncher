@@ -48,7 +48,7 @@ public final class ModrinthContentInstaller {
     public static final String TYPE_RESOURCEPACK = "resourcepack";
 
     private static final String MODRINTH_API = git.artdeell.mojo.metadata.ModPlatformRepository.MODRINTH_API_BASE;
-    private static final String USER_AGENT = "ZyroxLauncher/2.3.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
+    private static final String USER_AGENT = "ZyroxLauncher/2.4.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
     private static final String BACKUP_DIR_NAME = ".zyrox_mod_backup";
     private static final int CONNECT_TIMEOUT_MS = 12_000;
     private static final int READ_TIMEOUT_MS = 25_000;
@@ -103,6 +103,110 @@ public final class ModrinthContentInstaller {
         return null;
     }
 
+    /** Detects canonical loader for an {@link Instance}, defaulting to {@code fabric} when unspecified. */
+    @NonNull
+    public static String detectInstanceLoader(@Nullable Instance instance) {
+        if (instance == null) return "fabric";
+        String detected = extractModLoader(instance.versionId);
+        return detected != null ? detected : "fabric";
+    }
+
+    /** Resolves a modern Modrinth-compatible Minecraft release (defaults to {@code 1.21.4}). */
+    @NonNull
+    public static String resolveModernGameVersion(@Nullable String versionId) {
+        String mc = extractMinecraftVersion(versionId);
+        return mc != null ? mc : "1.21.4";
+    }
+
+    /**
+     * Phase 4.1 — 1-Tap "Zero-Lag" FPS Boost Pack:
+     * <ol>
+     *   <li>Creates an automatic pre-mod config/world snapshot for 1-tap rollback.</li>
+     *   <li>If the instance is plain Vanilla (no loader yet), automatically installs Fabric Loader
+     *       for its Minecraft version and binds the instance to it.</li>
+     *   <li>Installs verified SHA-1 checked Fabric API + Sodium + Lithium + FerriteCore +
+     *       EntityCulling + ImmediatelyFast (+ Iris/Oculus if {@code includeIrisShaders}).</li>
+     *   <li>Applies optimal mobile FPS {@code options.txt} settings via
+     *       {@link git.artdeell.mojo.utils.GameOptionsUtils#applyZeroLagFpsOptions}.</li>
+     * </ol>
+     */
+    @NonNull
+    public static InstallSummary installZeroLagFpsPack(@NonNull Instance instance,
+                                                       boolean includeIrisShaders,
+                                                       @Nullable ProgressCallback cb) throws IOException {
+        String mcVer = extractMinecraftVersion(instance.versionId);
+        if (mcVer == null) {
+            throw new IOException("Select a release Minecraft version (e.g. 1.21.4 or 1.20.1) first.");
+        }
+        String loader = extractModLoader(instance.versionId);
+        if (loader == null) {
+            if (cb != null) {
+                cb.onProgress("Installing Fabric Loader for Minecraft " + mcVer + "…");
+            }
+            String fabricVersionId = git.artdeell.mojo.modding.fabric.FabriclikeUtils.FABRIC_UTILS
+                    .installLatestForGameVersion(mcVer);
+            if (fabricVersionId != null && !fabricVersionId.isEmpty()) {
+                instance.versionId = fabricVersionId;
+                instance.maybeWrite();
+            }
+        }
+        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                instance, includeIrisShaders ? "fps-iris-pack" : "zero-lag-fps-pack");
+        InstallSummary summary = installFpsBoostPack(instance, includeIrisShaders, cb);
+        boolean isPvp = Instance.PRESET_MAX_FPS.equalsIgnoreCase(instance.performancePreset)
+                && instance.name != null
+                && instance.name.toLowerCase(Locale.ROOT).contains("pvp");
+        git.artdeell.mojo.utils.GameOptionsUtils.applyZeroLagFpsOptions(
+                instance.getGameDirectory(), isPvp);
+        String enrichedMsg = summary.message + " • Optimized options.txt applied (RD:8, VSync OFF).";
+        return new InstallSummary(
+                summary.installedCount,
+                summary.dependencyCount,
+                summary.skippedCount,
+                summary.installedFiles,
+                enrichedMsg);
+    }
+
+    /**
+     * Installs a single verified Modrinth mod by project slug (e.g. {@code fabric-api},
+     * {@code cloth-config}, {@code indium}) matched to the instance's Minecraft version &amp; loader.
+     * Powers Crash Doctor's 1-Tap Missing Dependency Fix.
+     */
+    @NonNull
+    public static InstallSummary installModBySlug(@NonNull Instance instance,
+                                                  @NonNull String slug,
+                                                  @Nullable ProgressCallback cb) throws IOException {
+        String cleanSlug = slug.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9\\-_]", "");
+        if (cleanSlug.isEmpty()) {
+            throw new IOException("Invalid Modrinth project slug.");
+        }
+        String mcVer = extractMinecraftVersion(instance.versionId);
+        String loader = extractModLoader(instance.versionId);
+        if (mcVer == null) {
+            throw new IOException("Could not detect Minecraft version from instance '" + instance.versionId + "'.");
+        }
+        if (loader == null) {
+            loader = "fabric";
+        }
+        File modsDir = new File(instance.getGameDirectory(), "mods");
+        if (!modsDir.exists() && !modsDir.mkdirs()) {
+            throw new IOException("Could not create mods directory.");
+        }
+        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                instance, "install-" + cleanSlug);
+        if (cb != null) {
+            cb.onProgress("Resolving " + cleanSlug + " for " + loader + " " + mcVer + "…");
+        }
+        File downloaded = downloadBestProjectVersion(cleanSlug, mcVer, loader, modsDir, cb);
+        if (downloaded == null) {
+            throw new IOException("No compatible release of '" + cleanSlug + "' found for " + loader + " " + mcVer + ".");
+        }
+        List<String> files = new ArrayList<>();
+        files.add(downloaded.getName());
+        return new InstallSummary(1, 0, 0, files,
+                "Installed " + downloaded.getName() + " for " + loader + " " + mcVer + ".");
+    }
+
     /**
      * Installs a single Mod, Shader Pack, or Resource Pack directly into {@code instance}, and for
      * Modrinth mods automatically resolves and downloads required dependencies (e.g. Fabric API).
@@ -115,6 +219,10 @@ public final class ModrinthContentInstaller {
                                                        @NonNull String downloadUrl,
                                                        @Nullable String expectedSha1,
                                                        @Nullable ProgressCallback cb) throws IOException {
+        if (TYPE_MOD.equalsIgnoreCase(projectType)) {
+            git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                    instance, "mod-install");
+        }
         requireHttps(downloadUrl);
         File gameDir = instance.getGameDirectory();
         File targetDir;
@@ -278,7 +386,9 @@ public final class ModrinthContentInstaller {
             return new InstallSummary(0, 0, 0, new ArrayList<>(), "No enabled .jar mods to update.");
         }
 
-        if (cb != null) cb.onProgress("Hashing " + jars.length + " installed mod(s)…");
+        if (cb != null) cb.onProgress("Saving safety snapshot & hashing " + jars.length + " installed mod(s)…");
+        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                instance, "batch-mod-update");
         Map<String, File> sha1ToFile = new LinkedHashMap<>();
         for (File jar : jars) {
             String sha1 = computeSha1Hex(jar);

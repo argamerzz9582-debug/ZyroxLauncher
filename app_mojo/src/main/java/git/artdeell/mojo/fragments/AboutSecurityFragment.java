@@ -431,9 +431,8 @@ public class AboutSecurityFragment extends Fragment {
     }
 
     private void copyText(@NonNull String label, @NonNull String text, @NonNull String toastMsg) {
-        ClipboardManager cm = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        if (cm != null) {
-            cm.setPrimaryClip(ClipData.newPlainText(label, text));
+        if (git.artdeell.mojo.security.LogRedactor.copyRedactedToClipboard(
+                requireContext(), label, text)) {
             Toast.makeText(requireContext(), toastMsg, Toast.LENGTH_SHORT).show();
         }
     }

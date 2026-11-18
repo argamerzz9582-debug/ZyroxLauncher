@@ -1,11 +1,10 @@
 package git.artdeell.mojo;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -14,10 +13,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import git.artdeell.mojo.diagnostics.ZyroxCrashAnalyzer;
 import git.artdeell.mojo.security.LogRedactor;
 import git.artdeell.mojo.ui.ZyroxLogHighlighter;
+import git.artdeell.mojo.utils.lifecycle.AppTaskGuard;
 
 /**
- * Zyrox 2.0 Fatal Crash Report Inspector with Zyrox Guard smart diagnosis,
- * automatic secret/token redaction on clipboard & share, and syntax-highlighted stack trace.
+ * Beginner-friendly Fatal Crash Screen with a plain-English Diagnosis Card, executable
+ * <b>1-Tap Fix &amp; Relaunch</b> action, collapsed "Technical Details" stacktrace accordion,
+ * and strict {@link LogRedactor} token/UUID/session stripping on every copy and share path.
  */
 public class FatalErrorActivity extends AppCompatActivity {
 
@@ -25,13 +26,13 @@ public class FatalErrorActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Bundle extras = getIntent().getExtras();
+        Bundle extras = getIntent() != null ? getIntent().getExtras() : null;
         if (extras == null) {
             finishAndRemoveTask();
             return;
         }
         setContentView(R.layout.activity_zyrox_crash_report);
-        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
+        AppTaskGuard.pruneDuplicateTasks(this);
 
         boolean storageAllow = extras.getBoolean("storageAllow", false);
         Throwable throwable = (Throwable) extras.getSerializable("throwable");
@@ -44,35 +45,27 @@ public class FatalErrorActivity extends AppCompatActivity {
 
         TextView subtitle = findViewById(R.id.tv_crash_subtitle);
         TextView traceView = findViewById(R.id.tv_crash_stacktrace);
+        ScrollView scrollView = findViewById(R.id.sv_crash_terminal);
         subtitle.setText(errHeader);
         traceView.setText(ZyroxLogHighlighter.highlightBlock(redactedTrace));
 
-        // Zyrox Guard local crash classification
-        ZyroxCrashAnalyzer.Diagnosis diag = ZyroxCrashAnalyzer.analyze(redactedTrace);
-        View guardBox = findViewById(R.id.layout_zyrox_guard);
-        TextView guardSummary = findViewById(R.id.tv_zyrox_guard_summary);
-        if (guardBox != null && guardSummary != null
-                && diag.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
-            guardBox.setVisibility(View.VISIBLE);
-            guardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
-        }
+        final ZyroxCrashAnalyzer.Diagnosis diag = ZyroxCrashAnalyzer.analyze(redactedTrace);
+        ShowErrorActivity.bindCrashReportCard(this, diag, scrollView);
 
         findViewById(R.id.btn_crash_close).setOnClickListener(v -> finishAndRemoveTask());
         findViewById(R.id.btn_crash_copy).setOnClickListener(v -> {
-            ClipboardManager mgr = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (mgr != null) {
-                mgr.setPrimaryClip(ClipData.newPlainText("zyrox_crash",
-                        diag.formatCompactSummary() + "\n\n" + redactedTrace));
+            String payload = diag.formatCompactSummary() + "\n\n" + redactedTrace;
+            if (LogRedactor.copyRedactedToClipboard(this, "zyrox_crash", payload)) {
                 Toast.makeText(this, R.string.zyrox_log_copied, Toast.LENGTH_SHORT).show();
             }
         });
-        View shareBtn = findViewById(R.id.btn_crash_share);
-        shareBtn.setOnClickListener(v -> {
+        findViewById(R.id.btn_crash_share).setOnClickListener(v -> {
+            String safeShare = LogRedactor.redact(
+                    errHeader + "\n\n" + diag.formatCompactSummary() + "\n\n" + redactedTrace);
             Intent share = new Intent(Intent.ACTION_SEND);
             share.setType("text/plain");
             share.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.zyrox_title_crash_report));
-            share.putExtra(Intent.EXTRA_TEXT,
-                    errHeader + "\n\n" + diag.formatCompactSummary() + "\n\n" + redactedTrace);
+            share.putExtra(Intent.EXTRA_TEXT, safeShare);
             startActivity(Intent.createChooser(share, getString(R.string.zyrox_share_log)));
         });
         findViewById(R.id.btn_crash_relaunch).setOnClickListener(v -> {

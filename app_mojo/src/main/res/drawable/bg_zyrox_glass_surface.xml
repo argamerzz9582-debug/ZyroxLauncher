@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox High-Contrast 2-Layer Liquid Glass Surface:
+     Layer 1: #660B0F17 WCAG dark contrast scrim for snow/desert/shader legibility
+     Layer 2: Top-to-bottom specular border highlight (#4DFFFFFF -> #0DFFFFFF) + refractive dome -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Layer 1: Outer Specular Border Gradient (#4DFFFFFF top -> #0DFFFFFF bottom) -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#4DFFFFFF"
+                android:centerColor="#24E6F2FF"
+                android:endColor="#0DFFFFFF" />
+            <corners android:radius="14dp" />
+        </shape>
+    </item>
+    <!-- Layer 2: Inset High-Contrast Dark Scrim (#660B0F17) -->
+    <item
+        android:left="1.1dp"
+        android:top="1.1dp"
+        android:right="1.1dp"
+        android:bottom="1.1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#660B0F17" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+    <!-- Layer 3: Subtle Frosted Gradient Tint (Zero-Overhead Adaptive Fallback Sheen) -->
+    <item
+        android:left="1.1dp"
+        android:top="1.1dp"
+        android:right="1.1dp"
+        android:bottom="1.1dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#24F4F9FF"
+                android:centerColor="#080B0F17"
+                android:endColor="#12D4E6FA" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+    <!-- Top Specular Micro-Filament -->
+    <item
+        android:left="16dp"
+        android:top="1.5dp"
+        android:right="16dp"
+        android:height="1dp"
+        android:gravity="top">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#00FFFFFF"
+                android:centerColor="#66FFFFFF"
+                android:endColor="#00FFFFFF" />
+            <corners android:radius="1dp" />
+        </shape>
+    </item>
+</layer-list>

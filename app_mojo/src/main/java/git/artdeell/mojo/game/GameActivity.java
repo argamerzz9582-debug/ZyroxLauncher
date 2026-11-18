@@ -399,8 +399,16 @@ public class GameActivity extends BaseActivity
             String rTag = (mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null)
                     ? mGameRenderer.getCurrentRenderer().tag()
                     : instance.getLaunchRenderer();
-            mHudCoordinator.attach(contentFrame, mControlLayout, mDrawerPullButton, mHotbarView,
-                    rTag, instance.getEffectiveRamAllocationMb());
+            mHudCoordinator.attach(
+                    contentFrame,
+                    mControlLayout,
+                    mDrawerPullButton,
+                    mHotbarView,
+                    rTag,
+                    instance.getEffectiveRamAllocationMb(),
+                    this::openQuickSettings,
+                    git.artdeell.mojo.servers.ServerListManager.getLastActiveServerAddress(
+                            instance.getGameDirectory()));
         }
     }
 

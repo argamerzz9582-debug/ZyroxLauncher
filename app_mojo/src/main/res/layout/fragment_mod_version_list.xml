@@ -29,6 +29,56 @@
             style="@style/ThickDivider"
             android:layout_marginVertical="8dp" />
 
+        <!-- Modern Recommendation & Scraper Fallback Card (Sodium + Iris on MC 1.16+ or scrape failure) -->
+        <LinearLayout
+            android:id="@+id/mod_dl_sodium_iris_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_zyrox_glass_surface"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_sodium_iris_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="MODERN MOBILE SHADERS + 2X FPS"
+                    android:textColor="@color/zyrox_firefly_gold"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_sodium_iris_subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="On Minecraft 1.16+, Sodium + Iris delivers higher FPS, faster chunk loading, and full shader compatibility than OptiFine."
+                    android:textColor="@color/zyrox_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_install_sodium_iris"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/btn_zyrox_play"
+                android:paddingHorizontal="12dp"
+                android:text="Install Sodium + Iris (Recommended)"
+                android:textAllCaps="false"
+                android:textColor="@color/zyrox_lg_text"
+                android:textSize="11sp" />
+        </LinearLayout>
+
         <ExpandableListView
             android:id="@+id/mod_dl_expandable_version_list"
             android:layout_width="match_parent"

@@ -17,26 +17,54 @@ import git.artdeell.mojo.game.GameActivity;
 
 import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.ui.ZyroxGifDecoder;
+import git.artdeell.mojo.ui.ZyroxLoopingVideoView;
+import git.artdeell.mojo.ui.ZyroxSeamlessGifView;
+import git.artdeell.mojo.ui.ZyroxShaderBackgroundView;
 import git.artdeell.mojo.utils.NotificationUtils;
 
 import java.lang.ref.WeakReference;
 
 public class GameService extends Service {
-    private static final WeakReference<Service> sGameService = new WeakReference<>(null);
+    private static volatile WeakReference<GameService> sGameService = new WeakReference<>(null);
     private final LocalBinder mLocalBinder = new LocalBinder();
+
+    /** Returns {@code true} while the foreground Minecraft runtime service is running. */
+    public static boolean isGameServiceActive() {
+        GameService svc = sGameService.get();
+        return svc != null && svc.mLocalBinder.isActive;
+    }
+
+    /** Purges every background launcher GIF/video/shader media allocation to prevent LMK kills. */
+    private static void reclaimLauncherMediaMemory() {
+        try {
+            ZyroxGifDecoder.cancelAllActiveDecodes();
+            ZyroxSeamlessGifView.purgeAllActiveInstances(false);
+            ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+            ZyroxShaderBackgroundView.releaseAllForGameStart();
+        } catch (Throwable ignored) {
+        }
+    }
 
     @Override
     public void onCreate() {
+        sGameService = new WeakReference<>(this);
+        reclaimLauncherMediaMemory();
         Tools.buildNotificationChannel(getApplicationContext());
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent != null && intent.getBooleanExtra("kill", false)) {
+            mLocalBinder.isActive = false;
             stopSelf();
             Process.killProcess(Process.myPid());
             return START_NOT_STICKY;
         }
+        // Immediately stop, recycle, and release any launcher background GIF/video/shader decoders
+        // so 4 GB–6 GB RAM devices keep maximum free headroom for the JVM & GPU driver.
+        reclaimLauncherMediaMemory();
+        mLocalBinder.isActive = true;
         Intent killIntent = new Intent(getApplicationContext(), GameService.class);
         killIntent.putExtra("kill", true);
         PendingIntent pendingKillIntent = PendingIntent.getService(this, NotificationUtils.PENDINGINTENT_CODE_KILL_GAME_SERVICE
@@ -61,6 +89,25 @@ public class GameService extends Service {
             startForeground(NotificationUtils.NOTIFICATION_ID_GAME_SERVICE, notification);
         }
         return START_NOT_STICKY; // non-sticky so android wont try restarting the game after the user uses the "Quit" button
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        reclaimLauncherMediaMemory();
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        reclaimLauncherMediaMemory();
+    }
+
+    @Override
+    public void onDestroy() {
+        mLocalBinder.isActive = false;
+        sGameService = new WeakReference<>(null);
+        super.onDestroy();
     }
 
     @Override

@@ -26,6 +26,10 @@ public class Instance extends DisplayInstance {
     public static final String VERSION_LATEST_RELEASE = "latest_release";
     public static final String VERSION_LATEST_SNAPSHOT = "latest_snapshot";
 
+    public static final String PRESET_BATTERY = "battery";
+    public static final String PRESET_BALANCED = "balanced";
+    public static final String PRESET_MAX_FPS = "max_fps";
+
     // Core Mojo/Zyrox v1 fields (preserved 100% intact for backward compatibility)
     public InstanceInstaller installer;
     public String renderer;
@@ -48,10 +52,37 @@ public class Instance extends DisplayInstance {
     public String groupTag;
     /**
      * Optional per-instance Vulkan / Adreno Turnip ({@code .adpkg}) driver folder ID;
-     * {@code null} or blank inherits global {@code LauncherPreferences.PREF_DRIVER}, while
+     * {@code null} or blank inherits global {@code LauncherPreferences.PREF_VULKAN_DRIVER}, while
      * {@code "default"} explicitly forces the device system Vulkan ICD.
      */
     public String vulkanDriver;
+    /**
+     * When {@code true}, the user explicitly locked {@link #selectedRuntime} in Pro Mode so
+     * {@code JavaRuntimeAdvisor} will never overwrite it during silent pre-launch checks.
+     */
+    public boolean runtimeLocked;
+    /**
+     * When {@code true}, the user explicitly locked {@link #renderer} in Pro Mode so
+     * {@code GraphicsAdvisor} will preserve it during silent pre-launch checks.
+     */
+    public boolean rendererLocked;
+    /**
+     * Simple-Mode performance preset ({@code "battery"}, {@code "balanced"}, or {@code "max_fps"});
+     * {@code null} inherits {@code "balanced"} / global optimizer mode.
+     */
+    public String performancePreset;
+    /**
+     * Optional per-instance resolution scale percentage ({@code 50..100}, e.g. {@code 75} or
+     * {@code 100}); {@code 0} inherits the global resolution scale preference.
+     */
+    public int resolutionScalePercent;
+    /**
+     * Optional one-shot flag set by Onboarding / OptiFine fallback so the Zero-Lag FPS Pack
+     * (and optional Iris shader mod when {@link #pendingAutoIncludeIris} is true) installs
+     * automatically once the modloader finishes installing.
+     */
+    public boolean pendingAutoFpsPack;
+    public boolean pendingAutoIncludeIris;
 
     protected Instance() {
         this.schemaVersion = CURRENT_SCHEMA_VERSION;
@@ -96,6 +127,46 @@ public class Instance extends DisplayInstance {
                 vulkanDriver = trimmed;
             }
         }
+        if (performancePreset != null) {
+            String p = performancePreset.trim().toLowerCase(java.util.Locale.ROOT);
+            if (PRESET_BATTERY.equals(p) || PRESET_BALANCED.equals(p) || PRESET_MAX_FPS.equals(p)) {
+                performancePreset = p;
+            } else {
+                performancePreset = null;
+            }
+        }
+        if (resolutionScalePercent < 0) {
+            resolutionScalePercent = 0;
+        } else if (resolutionScalePercent > 0 && resolutionScalePercent < 50) {
+            resolutionScalePercent = 50;
+        } else if (resolutionScalePercent > 100) {
+            resolutionScalePercent = 100;
+        }
+        if (!Tools.isValidString(selectedRuntime)) {
+            runtimeLocked = false;
+        }
+        if (!Tools.isValidString(renderer)) {
+            rendererLocked = false;
+        }
+    }
+
+    /** Returns the normalized Simple-Mode preset ({@code battery}, {@code balanced}, {@code max_fps}). */
+    @NonNull
+    public String getEffectivePerformancePreset() {
+        if (PRESET_BATTERY.equals(performancePreset)
+                || PRESET_BALANCED.equals(performancePreset)
+                || PRESET_MAX_FPS.equals(performancePreset)) {
+            return performancePreset;
+        }
+        return PRESET_BALANCED;
+    }
+
+    /** Returns the effective render resolution scale percentage ({@code 50..100}) for this instance. */
+    public int getEffectiveResolutionScalePercent() {
+        if (resolutionScalePercent >= 50 && resolutionScalePercent <= 100) {
+            return resolutionScalePercent;
+        }
+        return Math.max(50, Math.min(100, Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f)));
     }
 
     private void sanitizeArgs() {

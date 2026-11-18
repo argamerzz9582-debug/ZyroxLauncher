@@ -70,6 +70,8 @@ import git.artdeell.mojo.utils.lifecycle.ContextExecutor;
 
 public class LauncherActivity extends BaseActivity implements PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
     public static final String SETTING_FRAGMENT_TAG = "SETTINGS_FRAGMENT";
+    /** Intent extra set by 1-Tap Crash Auto-Fixers to immediately relaunch the active instance. */
+    public static final String EXTRA_AUTO_LAUNCH_ON_START = "zyrox_auto_launch_on_start";
 
     private FragmentContainerView mFragmentView;
     private ImageButton mSettingsButton;
@@ -242,12 +244,32 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         }
         String normalizedVersionId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
         JVersionList.Version mcVersion = MoJsonExtras.getListedVersion(normalizedVersionId);
-        Runnable startLaunch = () -> new MoJsonDownloader().start(
-                this.getAssets(),
-                mcVersion,
-                normalizedVersionId,
-                new ContextAwareDoneListener(this, normalizedVersionId)
-        );
+        final Context appCtx = getApplicationContext();
+        Runnable startLaunch = () -> {
+            // Run silent pre-launch advisors (InstanceHealthInspector, JavaRuntimeAdvisor,
+            // GraphicsAdvisor, GameOptimizer) off the UI thread, then verify/download & boot game.
+            MojoApplication.sExecutorService.execute(() -> {
+                try {
+                    git.artdeell.mojo.utils.jre.GameRunner.runPreFlightAdvisors(
+                            appCtx, selectedInstance, normalizedVersionId);
+                } catch (Throwable t) {
+                    android.util.Log.w("LauncherActivity",
+                            "Pre-flight advisor warning: " + t.getMessage());
+                }
+                Tools.runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (mShaderBackground != null) {
+                        mShaderBackground.onPause();
+                    }
+                    new MoJsonDownloader().start(
+                            LauncherActivity.this.getAssets(),
+                            mcVersion,
+                            normalizedVersionId,
+                            new ContextAwareDoneListener(LauncherActivity.this, normalizedVersionId)
+                    );
+                });
+            });
+        };
         java.io.File versionJar = new java.io.File(Tools.DIR_HOME_VERSION,
                 normalizedVersionId + "/" + normalizedVersionId + ".jar");
         long freeBytes = git.artdeell.mojo.utils.NetworkPolicyHelper.queryFreeDiskBytes(
@@ -401,6 +423,28 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             mShaderBackground.onResume();
         }
         applyEdgeToEdgeCutoutGuides();
+        consumePendingAutoLaunchIntent();
+    }
+
+    private void consumePendingAutoLaunchIntent() {
+        Intent intent = getIntent();
+        if (intent == null || !intent.getBooleanExtra(EXTRA_AUTO_LAUNCH_ON_START, false)) {
+            return;
+        }
+        intent.removeExtra(EXTRA_AUTO_LAUNCH_ON_START);
+        Tools.MAIN_HANDLER.postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+            }
+        }, 280L);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent != null) {
+            setIntent(intent);
+        }
     }
 
     @Override
@@ -454,9 +498,23 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        if (level >= TRIM_MEMORY_UI_HIDDEN && mShaderBackground != null) {
+        if (level >= TRIM_MEMORY_UI_HIDDEN
+                || level == TRIM_MEMORY_RUNNING_LOW
+                || level == TRIM_MEMORY_RUNNING_CRITICAL) {
+            if (mShaderBackground != null) {
+                mShaderBackground.onStop();
+            }
+            ZyroxShaderBackgroundView.releaseAllForGameStart();
+        }
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        if (mShaderBackground != null) {
             mShaderBackground.onStop();
         }
+        ZyroxShaderBackgroundView.releaseAllForGameStart();
     }
 
     /**
@@ -493,6 +551,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         if (mShaderBackground != null) {
             mShaderBackground.onStop();
         }
+        ZyroxShaderBackgroundView.releaseAllForGameStart();
         android.hardware.display.DisplayManager dm =
                 (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null) {

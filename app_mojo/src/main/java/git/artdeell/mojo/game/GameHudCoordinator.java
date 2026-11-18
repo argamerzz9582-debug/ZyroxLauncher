@@ -30,6 +30,8 @@ public final class GameHudCoordinator {
     @Nullable
     private PerformanceHudOverlay mOverlay;
     @Nullable
+    private ContextInventoryHelperBar mInventoryHelperBar;
+    @Nullable
     private ControlLayout mControlLayout;
     @Nullable
     private View mDrawerPullButton;
@@ -37,6 +39,18 @@ public final class GameHudCoordinator {
     private View mHotbarView;
     private final int[] mParentLoc = new int[2];
     private final int[] mViewLoc = new int[2];
+
+    private final git.artdeell.mojo.game.platform.input.PlatformGrabListener mContextGrabListener =
+            grabbing -> mActivity.runOnUiThread(() -> {
+                if (mInventoryHelperBar == null) return;
+                if (grabbing) {
+                    // First grabbed frame confirms player entered a world/server gameplay session
+                    mInventoryHelperBar.setGameSessionReady(true);
+                }
+                boolean inEditor = mControlLayout != null && mControlLayout.getModifiable();
+                mInventoryHelperBar.onContextStateChanged(grabbing, inEditor);
+                onControlsLayoutChanged();
+            });
 
     public GameHudCoordinator(@NonNull Activity activity) {
         mActivity = activity;
@@ -48,6 +62,18 @@ public final class GameHudCoordinator {
                        @Nullable View hotbarView,
                        @NonNull String rendererTag,
                        int effectiveHeapMb) {
+        attach(contentFrame, controlLayout, drawerPullButton, hotbarView,
+                rendererTag, effectiveHeapMb, null, null);
+    }
+
+    public void attach(@Nullable ViewGroup contentFrame,
+                       @Nullable ControlLayout controlLayout,
+                       @Nullable View drawerPullButton,
+                       @Nullable View hotbarView,
+                       @NonNull String rendererTag,
+                       int effectiveHeapMb,
+                       @Nullable Runnable onQuickSettingsTap,
+                       @Nullable String activeServerAddress) {
         if (contentFrame == null) return;
         mControlLayout = controlLayout;
         mDrawerPullButton = drawerPullButton;
@@ -56,6 +82,17 @@ public final class GameHudCoordinator {
         PerformanceHudOverlay hud = new PerformanceHudOverlay(mActivity);
         hud.configureSession(rendererTag, effectiveHeapMb);
         hud.setObstacleProvider(outRects -> collectLiveObstacles(contentFrame, outRects));
+        hud.setOnQuickSettingsAction(onQuickSettingsTap);
+        hud.setPingTargetAddress(activeServerAddress);
+        hud.setOnHudHiddenAction(() -> {
+            LauncherPreferences.PREF_ZYROX_PERF_HUD = false;
+            if (LauncherPreferences.DEFAULT_PREF != null) {
+                LauncherPreferences.DEFAULT_PREF.edit().putBoolean("zyroxPerfHud", false).apply();
+            }
+            if (mOverlay != null) {
+                mOverlay.setHudEnabled(false);
+            }
+        });
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -64,12 +101,27 @@ public final class GameHudCoordinator {
         contentFrame.addView(hud, lp);
         mOverlay = hud;
         hud.setHudEnabled(LauncherPreferences.PREF_ZYROX_PERF_HUD);
+
+        // Phase 4.4 — Context-Aware Inventory & GUI Helper Bar (auto-appears when ungrabbed in-world)
+        ContextInventoryHelperBar invBar = new ContextInventoryHelperBar(
+                mActivity, () -> QuickMacroDialog.show(mActivity));
+        int topMargin = Math.round(6f * Math.max(1f, mActivity.getResources().getDisplayMetrics().density));
+        FrameLayout.LayoutParams invLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        invLp.topMargin = topMargin;
+        contentFrame.addView(invBar, invLp);
+        mInventoryHelperBar = invBar;
+        git.artdeell.mojo.game.platform.Platform.addGrabListener(mContextGrabListener);
     }
 
     private void collectLiveObstacles(@NonNull ViewGroup hudParent, @NonNull List<RectF> outRects) {
         hudParent.getLocationOnScreen(mParentLoc);
         // 1. Top menu/toolbar drawer button exclusion zone
         appendViewRectIfVisible(mDrawerPullButton, mParentLoc, outRects);
+        // 1b. Context-Aware Inventory Helper Bar exclusion zone
+        appendViewRectIfVisible(mInventoryHelperBar, mParentLoc, outRects);
         // 2. Interactive hotbar overlay exclusion zone
         appendViewRectIfVisible(mHotbarView, mParentLoc, outRects);
         // 3. All visible custom control buttons, drawers, and joysticks inside ControlLayout
@@ -93,14 +145,28 @@ public final class GameHudCoordinator {
 
     /** Applies display cutout + system bar safe-area insets to the HUD overlay. */
     public void onWindowInsetsChanged(@NonNull WindowInsetsCompat insets) {
-        if (mOverlay == null) return;
         Insets safe = insets.getInsets(
                 WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.systemBars());
-        mOverlay.setSafeAreaInsets(safe.left, safe.top, safe.right, safe.bottom);
+        if (mOverlay != null) {
+            mOverlay.setSafeAreaInsets(safe.left, safe.top, safe.right, safe.bottom);
+        }
+        if (mInventoryHelperBar != null
+                && mInventoryHelperBar.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams lp =
+                    (FrameLayout.LayoutParams) mInventoryHelperBar.getLayoutParams();
+            int base = Math.round(6f * Math.max(1f, mActivity.getResources().getDisplayMetrics().density));
+            lp.topMargin = Math.max(base, safe.top + base / 2);
+            mInventoryHelperBar.setLayoutParams(lp);
+        }
     }
 
     /** Re-clamps HUD coordinates when controls load, exit editor, or screen orientation changes. */
     public void onControlsLayoutChanged() {
+        if (mInventoryHelperBar != null) {
+            boolean inEditor = mControlLayout != null && mControlLayout.getModifiable();
+            mInventoryHelperBar.onContextStateChanged(
+                    git.artdeell.mojo.game.platform.Platform.isGrabbing(), inEditor);
+        }
         if (mOverlay != null && mOverlay.isHudEnabled()) {
             mOverlay.post(mOverlay::applyClampedCollisionFreePlacement);
         }
@@ -145,12 +211,20 @@ public final class GameHudCoordinator {
     }
 
     public void onPause() {
+        if (mInventoryHelperBar != null) {
+            mInventoryHelperBar.releaseLatchedModifiers();
+        }
         if (mOverlay != null) {
             mOverlay.stopMonitoring(false);
         }
     }
 
     public void onDestroy() {
+        git.artdeell.mojo.game.platform.Platform.removeGrabListener(mContextGrabListener);
+        if (mInventoryHelperBar != null) {
+            mInventoryHelperBar.releaseLatchedModifiers();
+            mInventoryHelperBar = null;
+        }
         if (mOverlay != null) {
             mOverlay.stopMonitoring(true);
             mOverlay = null;

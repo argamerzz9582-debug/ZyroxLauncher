@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Zyrox High-Contrast Liquid Glass Info / Status Banner Pill -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#4DFFFFFF"
+                android:endColor="#0DFFFFFF" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item
+        android:left="1dp"
+        android:top="1dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#800B0F17" />
+            <corners android:radius="9dp" />
+        </shape>
+    </item>
+</layer-list>

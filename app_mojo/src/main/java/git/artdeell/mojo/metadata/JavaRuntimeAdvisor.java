@@ -87,9 +87,11 @@ public final class JavaRuntimeAdvisor {
             // Mojang year-based releases (26.1+) require Java 25
             if (major >= 26) return 25;
             if (major == 1) {
+                // 1.20.5+ and 1.21.x require Java 21
                 if (minor >= 21 || (minor == 20 && patch >= 5)) return 21;
-                if (minor >= 18) return 17;
-                if (minor == 17) return 16;
+                // 1.17 – 1.20.4 target Java 17 on Android OpenJDK runtimes
+                if (minor >= 17) return 17;
+                // <= 1.16.5 target Java 8
                 return 8;
             }
         } catch (NumberFormatException ignored) {
@@ -266,6 +268,7 @@ public final class JavaRuntimeAdvisor {
 
         if (instance != null) {
             instance.selectedRuntime = best.name;
+            instance.runtimeLocked = false;
             instance.maybeWrite();
         } else {
             git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULT_RUNTIME = best.name;
@@ -276,6 +279,49 @@ public final class JavaRuntimeAdvisor {
             }
         }
         return best;
+    }
+
+    /**
+     * Silent pre-flight runtime selector: automatically resolves the exact required OpenJDK runtime
+     * (Java 8 for {@code <= 1.16.5}, Java 17 for {@code 1.17–1.20.4}, Java 21 for {@code 1.20.5+},
+     * Java 25 for {@code 26.x+}) unless the user explicitly locked a valid custom runtime in Pro Mode.
+     */
+    @Nullable
+    public static Runtime autoSelectForLaunch(
+            @Nullable git.artdeell.mojo.instances.Instance instance,
+            int requiredJavaMajor,
+            @Nullable Runtime currentlySelected,
+            @Nullable List<Runtime> installedRuntimes,
+            @Nullable String deviceArch) {
+        int normalizedReq = (requiredJavaMajor == 16) ? 17 : Math.max(8, requiredJavaMajor);
+
+        // Honor an explicit Pro-Mode lock whenever the locked runtime exists on disk & matches ABI
+        if (instance != null && instance.runtimeLocked
+                && currentlySelected != null
+                && currentlySelected.versionString != null
+                && currentlySelected.javaVersion > 0
+                && (deviceArch == null || currentlySelected.arch == null
+                || deviceArch.equalsIgnoreCase(currentlySelected.arch))) {
+            return currentlySelected;
+        }
+
+        // Prefer exact major match (crucial for <= 1.16.5 Forge/legacy expecting Java 8, not Java 21)
+        Runtime best = pickBestInstalledRuntime(normalizedReq, installedRuntimes, deviceArch);
+        if (best == null && requiredJavaMajor == 16) {
+            best = pickBestInstalledRuntime(16, installedRuntimes, deviceArch);
+        }
+        if (best == null && deviceArch != null) {
+            best = pickBestInstalledRuntime(normalizedReq, installedRuntimes, null);
+        }
+        if (best != null) return best;
+
+        // Fall back to currently selected runtime if usable
+        if (currentlySelected != null
+                && currentlySelected.versionString != null
+                && currentlySelected.javaVersion >= Math.max(8, requiredJavaMajor)) {
+            return currentlySelected;
+        }
+        return null;
     }
 
     /** Extracts embedded MC version from loader profile IDs like {@code fabric-loader-0.16.9-1.21.4} or {@code neoforge-26.1.0}. */

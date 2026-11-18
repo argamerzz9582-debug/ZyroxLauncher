@@ -331,6 +331,151 @@ public final class ZyroxHttpClient {
         return body.byteStream();
     }
 
+    /** Typed HTTPS text response surfacing HTTP status &amp; {@code Retry-After} for fallback UI. */
+    public static final class StatusTextResponse {
+        public final int statusCode;
+        @Nullable public final String body;
+        public final long retryAfterMs;
+
+        public StatusTextResponse(int statusCode, @Nullable String body, long retryAfterMs) {
+            this.statusCode = statusCode;
+            this.body = body;
+            this.retryAfterMs = Math.max(0L, retryAfterMs);
+        }
+
+        public boolean isSuccessful() {
+            return statusCode >= 200 && statusCode < 300 && body != null;
+        }
+
+        public boolean isRateLimitedOrForbidden() {
+            return statusCode == 401 || statusCode == 403 || statusCode == 429;
+        }
+    }
+
+    /**
+     * Executes an HTTPS GET returning status code, UTF-8 body, and parsed {@code Retry-After}
+     * cooldown so callers (such as {@code CurseForgeProvider}) can gracefully switch to fallback
+     * providers on rate limits or invalid API keys without stalling or crashing.
+     */
+    @NonNull
+    public static StatusTextResponse getStringWithStatus(@NonNull String url,
+                                                         @Nullable Map<String, String> headers) {
+        if (!isStrictHttpsUrl(url)) {
+            Log.w(TAG, "Blocked non-HTTPS GET request");
+            return new StatusTextResponse(-1, null, 0L);
+        }
+        int lastCode = -1;
+        long lastRetryAfterMs = 0L;
+        for (int attempt = 1; attempt <= DEFAULT_MAX_ATTEMPTS; attempt++) {
+            if (Thread.currentThread().isInterrupted()) {
+                return new StatusTextResponse(lastCode, null, lastRetryAfterMs);
+            }
+            Request.Builder req = new Request.Builder()
+                    .url(url.trim())
+                    .get()
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json");
+            applyHeaders(req, headers);
+            try (Response resp = apiClient().newCall(req.build()).execute()) {
+                if (!"https".equalsIgnoreCase(resp.request().url().scheme())) {
+                    Log.w(TAG, "Blocked HTTPS->HTTP downgrade redirect");
+                    return new StatusTextResponse(-1, null, 0L);
+                }
+                int code = resp.code();
+                lastCode = code;
+                lastRetryAfterMs = parseRetryAfterMs(resp.header("Retry-After"));
+                if (code >= 200 && code < 300) {
+                    ResponseBody body = resp.body();
+                    return new StatusTextResponse(code, body != null ? body.string() : "", 0L);
+                }
+                if (code == 401 || code == 403 || (code == 429 && lastRetryAfterMs > MAX_BACKOFF_MS)) {
+                    return new StatusTextResponse(code, null, lastRetryAfterMs);
+                }
+                if (isRetryableStatus(code) && attempt < DEFAULT_MAX_ATTEMPTS) {
+                    if (!sleepBackoff(attempt, resp.header("Retry-After"))) {
+                        return new StatusTextResponse(code, null, lastRetryAfterMs);
+                    }
+                    continue;
+                }
+                return new StatusTextResponse(code, null, lastRetryAfterMs);
+            } catch (IOException e) {
+                if (attempt >= DEFAULT_MAX_ATTEMPTS) {
+                    Log.w(TAG, "HTTPS GET with status failed after " + attempt + " attempts", e);
+                    return new StatusTextResponse(lastCode, null, lastRetryAfterMs);
+                }
+                if (!sleepBackoff(attempt, null)) {
+                    return new StatusTextResponse(lastCode, null, lastRetryAfterMs);
+                }
+            }
+        }
+        return new StatusTextResponse(lastCode, null, lastRetryAfterMs);
+    }
+
+    /**
+     * Fetches an HTTPS HTML document with bounded timeout, automatic retry, and strict redirect
+     * scheme validation (used by resilient {@code OptiFineScraper} / {@code OFDownloadPageScraper}).
+     */
+    @NonNull
+    public static String getHtmlOrThrow(@NonNull String url) throws IOException {
+        String normalized = url.trim();
+        if (normalized.startsWith("http://optifine.net/")
+                || normalized.startsWith("http://www.optifine.net/")) {
+            normalized = "https://" + normalized.substring("http://".length());
+        }
+        if (!isStrictHttpsUrl(normalized)) {
+            throw new IOException("Blocked non-HTTPS scrape URL");
+        }
+        IOException lastErr = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            Request req = new Request.Builder()
+                    .url(normalized)
+                    .get()
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
+                    .build();
+            try (Response resp = apiClient().newCall(req).execute()) {
+                if (!"https".equalsIgnoreCase(resp.request().url().scheme())) {
+                    throw new IOException("Blocked insecure redirect to HTTP");
+                }
+                if (resp.isSuccessful()) {
+                    ResponseBody body = resp.body();
+                    String html = body != null ? body.string() : "";
+                    if (!html.trim().isEmpty()) {
+                        return html;
+                    }
+                    throw new IOException("Empty HTML response from " + resp.request().url().host());
+                }
+                lastErr = new HttpStatusException(resp.code(),
+                        "HTTP " + resp.code() + " from " + resp.request().url().host());
+                if (!isRetryableStatus(resp.code()) || attempt >= 2) {
+                    throw lastErr;
+                }
+                if (!sleepBackoff(attempt, resp.header("Retry-After"))) {
+                    throw lastErr;
+                }
+            } catch (IOException e) {
+                lastErr = e;
+                if (attempt >= 2 || !sleepBackoff(attempt, null)) {
+                    throw lastErr;
+                }
+            }
+        }
+        throw lastErr != null ? lastErr : new IOException("Failed to download HTML page");
+    }
+
+    /** Parses an HTTP {@code Retry-After} header (seconds) into clamped milliseconds. */
+    public static long parseRetryAfterMs(@Nullable String retryAfterHeader) {
+        if (retryAfterHeader == null || retryAfterHeader.trim().isEmpty()) return 0L;
+        try {
+            long secs = Long.parseLong(retryAfterHeader.trim());
+            if (secs > 0L) {
+                return Math.min(300_000L, secs * 1000L);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return 0L;
+    }
+
     public static boolean isRetryableStatus(int code) {
         return code == 408 || code == 429 || code == 500 || code == 502 || code == 503 || code == 504;
     }

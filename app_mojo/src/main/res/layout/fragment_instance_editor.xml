@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Page 2: Zyrox Instance & Profile Studio — 2-Column Horizontal Split -->
+<!-- Zyrox Instance & Profile Studio — 2-Column Split + 4-Tab Simple / Pro Mode Architecture -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -9,10 +9,10 @@
     android:background="#300B1326"
     android:padding="12dp">
 
-    <!-- LEFT RAIL (230dp): Saved Profiles / Instances + Quick + NEW Button -->
+    <!-- LEFT RAIL (220dp): Saved Profiles / Instances + Quick + NEW Button -->
     <LinearLayout
         android:id="@+id/zyrox_instance_left_rail"
-        android:layout_width="230dp"
+        android:layout_width="220dp"
         android:layout_height="0dp"
         android:orientation="vertical"
         android:background="@drawable/bg_zyrox_glass_card"
@@ -59,7 +59,7 @@
             app:fontFamily="@font/minecraft_pixel" />
     </LinearLayout>
 
-    <!-- RIGHT PANE: Scrollable Glass Instance Editor Form + Sticky Action Bar -->
+    <!-- RIGHT PANE: 4-Tab Liquid Glass Instance Editor (Overview | Content | Engine | Controls) -->
     <LinearLayout
         android:id="@+id/zyrox_instance_right_pane"
         android:layout_width="0dp"
@@ -72,6 +72,49 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toEndOf="@id/zyrox_instance_left_rail"
         app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- 4-Tab Liquid Glass Navigation Header -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tab_inst_overview"
+                    style="@style/Zyrox.FilterChip"
+                    android:layout_height="30dp"
+                    android:text="Overview" />
+
+                <TextView
+                    android:id="@+id/tab_inst_content"
+                    style="@style/Zyrox.FilterChip"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:text="Content (Mods/Packs)" />
+
+                <TextView
+                    android:id="@+id/tab_inst_engine"
+                    style="@style/Zyrox.FilterChip"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:text="Engine" />
+
+                <TextView
+                    android:id="@+id/tab_inst_controls"
+                    style="@style/Zyrox.FilterChip"
+                    android:layout_height="30dp"
+                    android:layout_marginStart="6dp"
+                    android:text="Controls" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <ScrollView
             android:layout_width="match_parent"
@@ -86,173 +129,506 @@
                 android:orientation="vertical"
                 android:paddingEnd="4dp">
 
-                <!-- Row 1: Icon Picker + Profile Name -->
+                <!-- =================================================================== -->
+                <!-- TAB 1: OVERVIEW (Simple Mode Essentials + 1-Tap Snapshot Rollback)  -->
+                <!-- =================================================================== -->
                 <LinearLayout
+                    android:id="@+id/panel_inst_overview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="vertical">
 
-                    <FrameLayout
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:background="@drawable/bg_zyrox_input"
-                        android:padding="6dp">
+                    <!-- Icon Picker + Profile Name -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                        <ImageView
-                            android:id="@+id/vprof_editor_instance_icon"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="fitCenter"
-                            tools:src="@drawable/ic_zyrox_grass_block" 
-            android:importantForAccessibility="no"/>
+                        <FrameLayout
+                            android:layout_width="54dp"
+                            android:layout_height="54dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:padding="6dp">
 
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_gravity="bottom|end"
-                            android:src="@drawable/ic_px_edit"
-                            app:tint="@color/zyrox_amber"
-                            android:background="@drawable/bg_zyrox_badge"
-                            android:padding="2dp" 
-            android:importantForAccessibility="no"/>
-                    </FrameLayout>
+                            <ImageView
+                                android:id="@+id/vprof_editor_instance_icon"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitCenter"
+                                android:importantForAccessibility="no"
+                                tools:src="@drawable/ic_zyrox_grass_block" />
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="bottom|end"
+                                android:src="@drawable/ic_px_edit"
+                                app:tint="@color/zyrox_amber"
+                                android:background="@drawable/bg_zyrox_badge"
+                                android:padding="2dp"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="12dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/vprof_editor_profile_name_sub"
+                                style="@style/Zyrox.SectionLabel"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/profiles_profile_name" />
+
+                            <EditText
+                                android:id="@+id/vprof_editor_instance_name"
+                                android:layout_width="match_parent"
+                                android:layout_height="38dp"
+                                android:layout_marginTop="4dp"
+                                android:background="@drawable/bg_zyrox_input"
+                                android:hint="@string/unnamed"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textColorHint="@color/zyrox_text_muted"
+                                android:textSize="13sp"
+                                android:singleLine="true"
+                                android:imeOptions="flagNoExtractUi|actionDone"
+                                android:inputType="textPersonName"
+                                android:paddingHorizontal="12dp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Minecraft Version Selector -->
+                    <TextView
+                        android:id="@+id/textView4"
+                        style="@style/Zyrox.SectionLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/profiles_profile_version" />
 
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal">
 
                         <TextView
-                            android:id="@+id/vprof_editor_profile_name_sub"
+                            android:id="@+id/vprof_editor_version_spinner"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:hint="@string/version_select_hint"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textColorHint="@color/zyrox_text_muted"
+                            android:paddingHorizontal="12dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:textSize="12.5sp" />
+
+                        <Button
+                            android:id="@+id/vprof_editor_version_button"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:paddingHorizontal="14dp"
+                            android:background="@drawable/btn_zyrox_secondary"
+                            android:textColor="@color/zyrox_amber"
+                            android:text="@string/global_select" />
+                    </LinearLayout>
+
+                    <!-- Simple Mode Card: Performance Preset + Resolution Scale + Control Layout -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_zyrox_glass_surface"
+                        android:orientation="vertical"
+                        android:padding="10dp">
+
+                        <TextView
                             style="@style/Zyrox.SectionLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/profiles_profile_name" />
+                            android:text="PERFORMANCE PRESET" />
 
-                        <EditText
-                            android:id="@+id/vprof_editor_instance_name"
+                        <LinearLayout
                             android:layout_width="match_parent"
-                            android:layout_height="38dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:id="@+id/chip_preset_battery"
+                                style="@style/Zyrox.FilterChip"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:text="Battery" />
+
+                            <TextView
+                                android:id="@+id/chip_preset_balanced"
+                                style="@style/Zyrox.FilterChip"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_marginHorizontal="6dp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:text="Balanced" />
+
+                            <TextView
+                                android:id="@+id/chip_preset_max_fps"
+                                style="@style/Zyrox.FilterChip"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:text="Max FPS" />
+                        </LinearLayout>
+
+                        <!-- Row: Resolution Scale (75% / 100%) + Control Layout Shortcut -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:baselineAligned="false"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="6dp"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    style="@style/Zyrox.SectionLabel"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="RESOLUTION SCALE" />
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:orientation="horizontal">
+
+                                    <TextView
+                                        android:id="@+id/chip_scale_75"
+                                        style="@style/Zyrox.FilterChip"
+                                        android:layout_width="0dp"
+                                        android:layout_height="32dp"
+                                        android:layout_marginEnd="5dp"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:text="75% Fast" />
+
+                                    <TextView
+                                        android:id="@+id/chip_scale_100"
+                                        style="@style/Zyrox.FilterChip"
+                                        android:layout_width="0dp"
+                                        android:layout_height="32dp"
+                                        android:layout_weight="1"
+                                        android:gravity="center"
+                                        android:text="100% Crisp" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    style="@style/Zyrox.SectionLabel"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/default_control" />
+
+                                <TextView
+                                    android:id="@+id/tv_overview_control_quick"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="32dp"
+                                    android:layout_marginTop="4dp"
+                                    android:background="@drawable/bg_zyrox_input"
+                                    android:ellipsize="end"
+                                    android:gravity="center_vertical"
+                                    android:paddingHorizontal="10dp"
+                                    android:singleLine="true"
+                                    android:text="Global Default (Tap to change)"
+                                    android:textColor="@color/zyrox_text_primary"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Shared Directory Toggle + 1-Tap Snapshot Rollback Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <CheckBox
+                            android:id="@+id/vprof_editor_data_checkbox_container"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
                             android:background="@drawable/bg_zyrox_input"
-                            android:hint="@string/unnamed"
+                            android:paddingHorizontal="10dp"
+                            android:buttonTint="@color/zyrox_amber"
+                            android:text="@string/instance_shared_data_off"
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/btn_inst_quick_rollback"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/btn_zyrox_secondary"
+                            android:paddingHorizontal="12dp"
+                            android:text="1-Tap Rollback"
+                            android:textAllCaps="false"
                             android:textColor="@color/zyrox_text_primary"
-                            android:textColorHint="@color/zyrox_text_muted"
-                            android:textSize="13sp"
-                            android:singleLine="true"
-                            android:imeOptions="flagNoExtractUi|actionDone"
-                            android:inputType="textPersonName"
-                            android:paddingHorizontal="12dp" />
+                            android:textSize="11sp" />
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Row 2: Minecraft Version Selector -->
-                <TextView
-                    android:id="@+id/textView4"
-                    style="@style/Zyrox.SectionLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/profiles_profile_version" />
-
+                <!-- =================================================================== -->
+                <!-- TAB 2: CONTENT (MODS / PACKS / SHADERS + 1-TAP FPS + ROLLBACK)      -->
+                <!-- =================================================================== -->
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="38dp"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/vprof_editor_version_spinner"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:gravity="center_vertical"
-                        android:background="@drawable/bg_zyrox_input"
-                        android:hint="@string/version_select_hint"
-                        android:textColor="@color/zyrox_text_primary"
-                        android:textColorHint="@color/zyrox_text_muted"
-                        android:paddingHorizontal="12dp"
-                        android:singleLine="true"
-                        android:ellipsize="end"
-                        android:textSize="12.5sp" />
-
-                    <Button
-                        android:id="@+id/vprof_editor_version_button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="match_parent"
-                        android:paddingHorizontal="14dp"
-                        android:background="@drawable/btn_zyrox_secondary"
-                        android:textColor="@color/zyrox_amber"
-                        android:text="@string/global_select" />
-                </LinearLayout>
-
-                <!-- Row 3: Graphics Renderer + Compatibility Subtitle -->
-                <TextView
-                    android:id="@+id/textView3"
-                    style="@style/Zyrox.SectionLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/pedit_renderer" />
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="38dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_zyrox_input">
-
-                    <Spinner
-                        android:id="@+id/vprof_editor_instance_renderer"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@android:color/transparent"
-                        android:popupBackground="@drawable/bg_zyrox_glass_modal"
-                        android:paddingEnd="28dp" />
-
-                    <ImageView
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_gravity="end|center_vertical"
-                        android:layout_marginEnd="10dp"
-                        android:rotation="180"
-                        android:src="@drawable/spinner_arrow"
-                        app:tint="@color/zyrox_amber" 
-            android:importantForAccessibility="no"/>
-                </FrameLayout>
-
-                <TextView
-                    android:id="@+id/tv_renderer_hint"
+                    android:id="@+id/panel_inst_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="@string/zyrox_renderer_hint_default"
-                    android:textColor="@color/zyrox_text_muted"
-                    android:textSize="10.5sp" />
-
-                <!-- Row 4: 2-Column Java Runtime + Control Layout -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal"
-                    android:baselineAligned="false">
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="6dp"
-                        android:orientation="vertical">
+                        android:background="@drawable/bg_zyrox_glass_surface"
+                        android:orientation="vertical"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Instance Mods, Shaders &amp; Resource Packs"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_inst_content_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="Scanning installed content &amp; pre-mod safety snapshots…"
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11.5sp" />
+
+                        <Button
+                            android:id="@+id/btn_inst_install_fps_pack"
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="10dp"
+                            android:background="@drawable/btn_zyrox_play"
+                            android:text="⚡ Install 1-Tap Zero-Lag FPS Pack (Sodium + Lithium + FerriteCore)"
+                            android:textAllCaps="false"
+                            android:textColor="@color/zyrox_lg_text"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_inst_manage_mods"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:text="Manage Mods &amp; Shaders"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textSize="11sp" />
+
+                            <Button
+                                android:id="@+id/btn_inst_browse_store"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:text="Browse Modrinth Store"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_inst_manage_worlds"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:text="Worlds &amp; Saves"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textSize="11sp" />
+
+                            <Button
+                                android:id="@+id/btn_inst_content_rollback"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:text="1-Tap Pre-Mod Rollback"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_firefly_gold"
+                                android:textSize="11sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- =================================================================== -->
+                <!-- TAB 3: ENGINE (Auto-Calibrated Summary + Expandable Pro Mode)       -->
+                <!-- =================================================================== -->
+                <LinearLayout
+                    android:id="@+id/panel_inst_engine"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_zyrox_glass_surface"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Smart Pre-Launch Engine (Automatic)"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_engine_simple_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Java runtime (8 / 17 / 21), GPU renderer (Turnip / Zink / LTW), and safe JVM RAM are automatically calibrated on every launch."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/btn_engine_auto_calibrate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/btn_zyrox_play"
+                            android:paddingHorizontal="14dp"
+                            android:text="Re-Calibrate GPU, Java &amp; RAM (Recommended)"
+                            android:textAllCaps="false"
+                            android:textColor="@color/zyrox_lg_text"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Expandable Advanced / Pro Mode Header -->
+                    <TextView
+                        android:id="@+id/btn_toggle_pro_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/btn_zyrox_secondary"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="12dp"
+                        android:text="▸ Advanced / Pro Mode (Renderer, Java, RAM Slider, JVM &amp; Env Flags)"
+                        android:textColor="@color/zyrox_text_primary"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <!-- Pro Mode Container (Hidden by default in Simple Mode) -->
+                    <LinearLayout
+                        android:id="@+id/layout_engine_pro_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/textView3"
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/pedit_renderer" />
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_zyrox_input">
+
+                            <Spinner
+                                android:id="@+id/vprof_editor_instance_renderer"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:background="@android:color/transparent"
+                                android:popupBackground="@drawable/bg_zyrox_glass_modal"
+                                android:paddingEnd="28dp" />
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_gravity="end|center_vertical"
+                                android:layout_marginEnd="10dp"
+                                android:rotation="180"
+                                android:src="@drawable/spinner_arrow"
+                                app:tint="@color/zyrox_amber"
+                                android:importantForAccessibility="no" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tv_renderer_hint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="@string/zyrox_renderer_hint_default"
+                            android:textColor="@color/zyrox_text_muted"
+                            android:textSize="10.5sp" />
 
                         <TextView
                             android:id="@+id/textView2"
                             style="@style/Zyrox.SectionLabel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
                             android:text="@string/pedit_java_runtime" />
 
                         <FrameLayout
@@ -276,17 +652,138 @@
                                 android:layout_marginEnd="8dp"
                                 android:rotation="180"
                                 android:src="@drawable/spinner_arrow"
-                                app:tint="@color/zyrox_amber" 
-            android:importantForAccessibility="no"/>
+                                app:tint="@color/zyrox_amber"
+                                android:importantForAccessibility="no" />
                         </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="horizontal">
+
+                            <CheckBox
+                                android:id="@+id/cb_lock_runtime"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:buttonTint="@color/zyrox_amber"
+                                android:text="Lock Java override"
+                                android:textColor="@color/zyrox_text_secondary"
+                                android:textSize="10.5sp" />
+
+                            <CheckBox
+                                android:id="@+id/cb_lock_renderer"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:buttonTint="@color/zyrox_amber"
+                                android:text="Lock GPU override"
+                                android:textColor="@color/zyrox_text_secondary"
+                                android:textSize="10.5sp" />
+                        </LinearLayout>
+
+                        <!-- JVM RAM Slider -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                style="@style/Zyrox.SectionLabel"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/zyrox_jvm_ram_label" />
+
+                            <TextView
+                                android:id="@+id/tv_vprof_ram_value"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:paddingHorizontal="8dp"
+                                android:paddingVertical="2dp"
+                                android:background="@drawable/bg_zyrox_badge"
+                                android:textColor="@color/zyrox_amber"
+                                android:textSize="10sp"
+                                android:fontFamily="@font/minecraft_pixel"
+                                app:fontFamily="@font/minecraft_pixel"
+                                tools:text="2048 MB" />
+                        </LinearLayout>
+
+                        <SeekBar
+                            android:id="@+id/vprof_ram_seekbar"
+                            style="@style/MojoLauncher.SeekBar"
+                            android:layout_width="match_parent"
+                            android:layout_height="28dp"
+                            android:layout_marginTop="2dp" />
+
+                        <!-- Raw JVM Launch Arguments -->
+                        <TextView
+                            android:id="@+id/textView6"
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/pvc_jvmArgs" />
+
+                        <EditText
+                            android:id="@+id/vprof_editor_jre_args"
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:hint="@string/use_global_default"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textColorHint="@color/zyrox_text_muted"
+                            android:imeOptions="flagNoExtractUi|actionDone"
+                            android:inputType="text"
+                            android:singleLine="true"
+                            android:paddingHorizontal="12dp"
+                            android:textSize="12sp" />
+
+                        <!-- Custom Environment Variables (KEY=VALUE) -->
+                        <TextView
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="ENVIRONMENT VARIABLES (PRO)" />
+
+                        <EditText
+                            android:id="@+id/vprof_editor_env_vars"
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="4dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:hint="KEY=VALUE (space or comma separated)"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textColorHint="@color/zyrox_text_muted"
+                            android:imeOptions="flagNoExtractUi|actionDone"
+                            android:inputType="textNoSuggestions"
+                            android:singleLine="true"
+                            android:paddingHorizontal="12dp"
+                            android:textSize="11.5sp" />
                     </LinearLayout>
+                </LinearLayout>
+
+                <!-- =================================================================== -->
+                <!-- TAB 4: CONTROLS (Layout Picker, Context Controls & Setup Codes)     -->
+                <!-- =================================================================== -->
+                <LinearLayout
+                    android:id="@+id/panel_inst_controls"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="6dp"
-                        android:orientation="vertical">
+                        android:background="@drawable/bg_zyrox_glass_surface"
+                        android:orientation="vertical"
+                        android:padding="12dp">
 
                         <TextView
                             android:id="@+id/textView7"
@@ -298,7 +795,7 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="38dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="5dp"
                             android:orientation="horizontal">
 
                             <TextView
@@ -306,7 +803,7 @@
                                 android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
-                                android:layout_marginEnd="6dp"
+                                android:layout_marginEnd="8dp"
                                 android:gravity="center_vertical"
                                 android:background="@drawable/bg_zyrox_input"
                                 android:hint="@string/use_global_default"
@@ -315,94 +812,88 @@
                                 android:paddingHorizontal="10dp"
                                 android:singleLine="true"
                                 android:ellipsize="end"
-                                android:textSize="11.5sp" />
+                                android:textSize="12sp" />
 
                             <Button
                                 android:id="@+id/vprof_editor_ctrl_button"
                                 android:layout_width="wrap_content"
                                 android:layout_height="match_parent"
-                                android:minWidth="56dp"
-                                android:paddingHorizontal="10dp"
+                                android:paddingHorizontal="14dp"
                                 android:background="@drawable/btn_zyrox_secondary"
                                 android:textColor="@color/zyrox_amber"
-                                android:textSize="10sp"
+                                android:textSize="10.5sp"
                                 android:text="@string/global_select" />
+                        </LinearLayout>
+
+                        <CheckBox
+                            android:id="@+id/cb_inst_context_controls"
+                            android:layout_width="match_parent"
+                            android:layout_height="36dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:buttonTint="@color/zyrox_amber"
+                            android:paddingHorizontal="10dp"
+                            android:text="Auto-show Inventory Helper buttons (Shift-Click, Quick-Move, Drop Stack)"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/btn_inst_open_hud_editor"
+                            android:layout_width="match_parent"
+                            android:layout_height="36dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/btn_zyrox_secondary"
+                            android:text="Open Touch Controls &amp; HUD Layout Editor"
+                            android:textAllCaps="false"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            style="@style/Zyrox.SectionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:text="SHAREABLE ZYROX SETUP CODES (ZYROX:// &amp; .ZYROX)" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Share or import your control layout, touch sensitivity, gyroscope tuning, and active mod list in one tap."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal">
+
+                            <Button
+                                android:id="@+id/btn_inst_export_setup_code"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_play"
+                                android:text="Share Setup Code"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_lg_text"
+                                android:textSize="11sp" />
+
+                            <Button
+                                android:id="@+id/btn_inst_import_setup_code"
+                                android:layout_width="0dp"
+                                android:layout_height="36dp"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/btn_zyrox_secondary"
+                                android:text="Import Setup Code"
+                                android:textAllCaps="false"
+                                android:textColor="@color/zyrox_text_primary"
+                                android:textSize="11sp" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
-
-                <!-- Row 5: JVM RAM Slider (live numeric badge) -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        style="@style/Zyrox.SectionLabel"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/zyrox_jvm_ram_label" />
-
-                    <TextView
-                        android:id="@+id/tv_vprof_ram_value"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="2dp"
-                        android:background="@drawable/bg_zyrox_badge"
-                        android:textColor="@color/zyrox_amber"
-                        android:textSize="10sp"
-                        android:fontFamily="@font/minecraft_pixel"
-                        app:fontFamily="@font/minecraft_pixel"
-                        tools:text="2048 MB" />
-                </LinearLayout>
-
-                <SeekBar
-                    android:id="@+id/vprof_ram_seekbar"
-                    style="@style/MojoLauncher.SeekBar"
-                    android:layout_width="match_parent"
-                    android:layout_height="28dp"
-                    android:layout_marginTop="2dp" />
-
-                <!-- Row 6: JVM Launch Arguments + Shared Directory -->
-                <TextView
-                    android:id="@+id/textView6"
-                    style="@style/Zyrox.SectionLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/pvc_jvmArgs" />
-
-                <EditText
-                    android:id="@+id/vprof_editor_jre_args"
-                    android:layout_width="match_parent"
-                    android:layout_height="38dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_zyrox_input"
-                    android:hint="@string/use_global_default"
-                    android:textColor="@color/zyrox_text_primary"
-                    android:textColorHint="@color/zyrox_text_muted"
-                    android:imeOptions="flagNoExtractUi|actionDone"
-                    android:inputType="text"
-                    android:singleLine="true"
-                    android:paddingHorizontal="12dp"
-                    android:textSize="12sp" />
-
-                <CheckBox
-                    android:id="@+id/vprof_editor_data_checkbox_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="36dp"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="4dp"
-                    android:background="@drawable/bg_zyrox_input"
-                    android:paddingHorizontal="12dp"
-                    android:buttonTint="@color/zyrox_amber"
-                    android:text="@string/instance_shared_data_off"
-                    android:textColor="@color/zyrox_text_secondary"
-                    android:textSize="11.5sp" />
 
             </LinearLayout>
         </ScrollView>

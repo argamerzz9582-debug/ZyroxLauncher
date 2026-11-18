@@ -189,6 +189,18 @@
             android:indeterminate="true"
             android:indeterminateTint="@color/zyrox_amber"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tv_store_provider_banner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_zyrox_badge_info"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/zyrox_text_primary"
+            android:textSize="11sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 2-Column Horizontal Glass Mod Grid -->

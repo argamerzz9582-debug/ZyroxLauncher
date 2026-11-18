@@ -228,7 +228,7 @@ public class ModPlatformRepository {
                                        @NonNull SearchFilters filters,
                                        int offset,
                                        int pageSize) {
-        if (!CurseForgeProvider.isApiKeyConfigured(apiKey)) return null;
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey)) return null;
         int safeOffset = Math.max(0, offset);
         int safePage = Math.max(1, Math.min(50, pageSize <= 0 ? DEFAULT_PAGE_SIZE : pageSize));
 
@@ -248,7 +248,7 @@ public class ModPlatformRepository {
         }
 
         String url = buildUrl(CURSEFORGE_API_BASE, "mods/search", params);
-        JsonObject response = fetchJsonCached(url, curseForgeHeaders(apiKey), JsonObject.class);
+        JsonObject response = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
         if (response == null) return null;
         JsonArray data = GsonJsonUtils.getJsonArraySafe(response, "data");
         if (data == null) return null;
@@ -262,12 +262,11 @@ public class ModPlatformRepository {
 
     @Nullable
     public ModDetail getCurseForgeDetails(@Nullable String apiKey, @Nullable ModItem item) {
-        if (!CurseForgeProvider.isApiKeyConfigured(apiKey)
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey)
                 || item == null || item.id == null || item.id.trim().isEmpty()) {
             return null;
         }
         String modId = encodePathSegment(item.id.trim());
-        Map<String, String> headers = curseForgeHeaders(apiKey);
         ArrayList<JsonObject> allFiles = new ArrayList<>();
         int index = 0;
         int maxPages = 10; // Safety ceiling (up to 500 file entries)
@@ -276,7 +275,7 @@ public class ModPlatformRepository {
             params.put("index", Integer.toString(index));
             params.put("pageSize", Integer.toString(DEFAULT_PAGE_SIZE));
             String url = buildUrl(CURSEFORGE_API_BASE, "mods/" + modId + "/files", params);
-            JsonObject response = fetchJsonCached(url, headers, JsonObject.class);
+            JsonObject response = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
             JsonArray data = GsonJsonUtils.getJsonArraySafe(response, "data");
             if (data == null) return null;
             for (int i = 0; i < data.size(); i++) {
@@ -291,21 +290,21 @@ public class ModPlatformRepository {
 
     @Nullable
     public JsonObject getCurseForgeFileMetadata(@Nullable String apiKey, long projectId, long fileId) {
-        if (!CurseForgeProvider.isApiKeyConfigured(apiKey) || projectId <= 0 || fileId <= 0) {
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey) || projectId <= 0 || fileId <= 0) {
             return null;
         }
         String url = CURSEFORGE_API_BASE + "/mods/" + projectId + "/files/" + fileId;
-        JsonObject root = fetchJsonCached(url, curseForgeHeaders(apiKey), JsonObject.class);
+        JsonObject root = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
         return GsonJsonUtils.getJsonObjectSafe(root, "data");
     }
 
     @Nullable
     public String getCurseForgeFileDownloadUrl(@Nullable String apiKey, long projectId, long fileId) {
-        if (!CurseForgeProvider.isApiKeyConfigured(apiKey) || projectId <= 0 || fileId <= 0) {
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey) || projectId <= 0 || fileId <= 0) {
             return null;
         }
         String url = CURSEFORGE_API_BASE + "/mods/" + projectId + "/files/" + fileId + "/download-url";
-        JsonObject root = fetchJsonCached(url, curseForgeHeaders(apiKey), JsonObject.class);
+        JsonObject root = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
         if (root == null) return null;
         JsonElement data = root.get("data");
         if (data != null && data.isJsonPrimitive()) {
@@ -317,9 +316,9 @@ public class ModPlatformRepository {
 
     @Nullable
     public JsonObject getCurseForgeModMetadata(@Nullable String apiKey, long projectId) {
-        if (!CurseForgeProvider.isApiKeyConfigured(apiKey) || projectId <= 0) return null;
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey) || projectId <= 0) return null;
         String url = CURSEFORGE_API_BASE + "/mods/" + projectId;
-        JsonObject root = fetchJsonCached(url, curseForgeHeaders(apiKey), JsonObject.class);
+        JsonObject root = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
         return GsonJsonUtils.getJsonObjectSafe(root, "data");
     }
 
@@ -370,6 +369,43 @@ public class ModPlatformRepository {
         if (raw == null) {
             raw = ZyroxHttpClient.getString(url, headers);
             if (raw == null || raw.trim().isEmpty()) return null;
+            if (raw.length() <= 512 * 1024) {
+                mResponseCache.put(url, new CacheEntry(raw, now + CACHE_TTL_MS));
+            }
+        }
+        try {
+            return GSON.fromJson(raw, type);
+        } catch (JsonSyntaxException e) {
+            mResponseCache.remove(url);
+            return null;
+        }
+    }
+
+    @Nullable
+    private <T> T fetchCurseForgeJsonCached(@NonNull String url,
+                                            @Nullable String apiKey,
+                                            @NonNull Class<T> type) {
+        if (!CurseForgeProvider.canQueryCurseForge(apiKey)) return null;
+        long now = System.currentTimeMillis();
+        CacheEntry cached = mResponseCache.get(url);
+        String raw = null;
+        if (cached != null) {
+            if (cached.expiresAtMs > now) {
+                raw = cached.payload;
+            } else {
+                mResponseCache.remove(url);
+            }
+        }
+        if (raw == null) {
+            ZyroxHttpClient.StatusTextResponse resp =
+                    ZyroxHttpClient.getStringWithStatus(url, curseForgeHeaders(apiKey));
+            if (!resp.isSuccessful() || resp.body == null || resp.body.trim().isEmpty()) {
+                if (resp.statusCode > 0) {
+                    CurseForgeProvider.recordUpstreamFailure(resp.statusCode, resp.retryAfterMs);
+                }
+                return null;
+            }
+            raw = resp.body;
             if (raw.length() <= 512 * 1024) {
                 mResponseCache.put(url, new CacheEntry(raw, now + CACHE_TTL_MS));
             }

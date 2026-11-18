@@ -6,6 +6,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import git.artdeell.mojo.Architecture;
@@ -13,12 +14,17 @@ import git.artdeell.mojo.JVersionList;
 import git.artdeell.mojo.Logger;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.authenticator.accounts.Account;
+import git.artdeell.mojo.content.ModrinthContentInstaller;
+import git.artdeell.mojo.diagnostics.GraphicsAdvisor;
 import git.artdeell.mojo.game.GameActivity;
 import git.artdeell.mojo.game.renderer.def.Renderers;
 import git.artdeell.mojo.game.renderer.impl.GLESRenderSpec;
 import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceHealthInspector;
 import git.artdeell.mojo.instances.InstanceManager;
+import git.artdeell.mojo.metadata.JavaRuntimeAdvisor;
 import git.artdeell.mojo.metadata.MojangVersionProvider;
+import git.artdeell.mojo.performance.GameOptimizer;
 import git.artdeell.mojo.security.LogRedactor;
 import git.artdeell.mojo.servers.ServerListManager;
 import git.artdeell.mojo.utils.DownloadUtils;
@@ -153,9 +159,182 @@ public class GameRunner {
         }
     }
 
+    /** Result snapshot returned by silent pre-launch auto-advisor execution. */
+    public static final class PreFlightReport {
+        public final int requiredJavaMajor;
+        @NonNull public final String selectedRuntimeName;
+        @NonNull public final String selectedRendererId;
+        @NonNull public final String optimizerMode;
+        public final int appliedScalePercent;
+        public final int repairedIssuesCount;
+        @NonNull public final String summary;
+
+        public PreFlightReport(int requiredJavaMajor,
+                               @NonNull String selectedRuntimeName,
+                               @NonNull String selectedRendererId,
+                               @NonNull String optimizerMode,
+                               int appliedScalePercent,
+                               int repairedIssuesCount,
+                               @NonNull String summary) {
+            this.requiredJavaMajor = requiredJavaMajor;
+            this.selectedRuntimeName = selectedRuntimeName;
+            this.selectedRendererId = selectedRendererId;
+            this.optimizerMode = optimizerMode;
+            this.appliedScalePercent = appliedScalePercent;
+            this.repairedIssuesCount = repairedIssuesCount;
+            this.summary = summary;
+        }
+    }
+
+    /**
+     * Runs {@link InstanceHealthInspector}, {@link JavaRuntimeAdvisor}, {@link GraphicsAdvisor},
+     * and {@link GameOptimizer} silently before launching {@link GameActivity} so missing folders,
+     * crash-loop renderers, mismatched JRE versions, and untuned GPU/preset settings self-heal
+     * without ever overwriting an explicit Pro-Mode user lock.
+     */
+    @NonNull
+    public static PreFlightReport runPreFlightAdvisors(@NonNull Context context,
+                                                       @NonNull Instance instance,
+                                                       @Nullable String resolvedVersionId) {
+        String versionToken = Tools.isValidString(resolvedVersionId)
+                ? resolvedVersionId : instance.versionId;
+
+        // 1. Resolve required Java major version (8 for <=1.16.5, 17 for 1.17-1.20.4, 21 for 1.20.5+, 25 for 26+)
+        JVersionList.Version localVerJson = null;
+        if (Tools.isValidString(versionToken)) {
+            try {
+                File verFile = new File(Tools.DIR_HOME_VERSION, versionToken + "/" + versionToken + ".json");
+                if (verFile.isFile()) {
+                    localVerJson = Tools.getVersionInfo(versionToken);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        int requiredJava = JavaRuntimeAdvisor.resolveRequiredJava(localVerJson, versionToken);
+
+        // 2. InstanceHealthInspector: audit & silently repair missing subfolders / dangling control refs / crash loops
+        int repairedCount = 0;
+        try {
+            String curRtName = Tools.getSelectedRuntime(instance);
+            Runtime curRt = curRtName != null ? MultiRTUtils.read(curRtName) : null;
+            int selectedJavaMajor = curRt != null ? curRt.javaVersion : 0;
+            File versionsDir = Tools.DIR_HOME_VERSION != null ? new File(Tools.DIR_HOME_VERSION) : null;
+            File controlsDir = Tools.CTRLMAP_PATH != null ? new File(Tools.CTRLMAP_PATH) : null;
+
+            InstanceManager.HealthReport health = InstanceHealthInspector.checkHealth(
+                    instance, versionsDir, controlsDir, requiredJava, selectedJavaMajor);
+            if (health.status != InstanceManager.HealthStatus.HEALTHY || !health.availableRepairs.isEmpty()) {
+                List<String> repairs = InstanceHealthInspector.repairInstance(instance, controlsDir);
+                repairedCount = repairs.size();
+            } else {
+                // Always guarantee standard folders exist before launch
+                File gameDir = instance.getGameDirectory();
+                if (gameDir != null && !new File(gameDir, "config").isDirectory()) {
+                    InstanceHealthInspector.repairInstance(instance, controlsDir);
+                }
+            }
+        } catch (Throwable t) {
+            Log.w("GameRunner", "InstanceHealthInspector pre-flight skipped: " + t.getMessage());
+        }
+
+        // 3. JavaRuntimeAdvisor: auto-select optimal installed JRE unless locked in Pro Mode
+        String chosenRtName = "";
+        try {
+            List<Runtime> installed = MultiRTUtils.getRuntimes();
+            String curName = Tools.getSelectedRuntime(instance);
+            Runtime current = curName != null ? MultiRTUtils.read(curName) : null;
+            String deviceArch = Architecture.archAsString(Architecture.getDeviceArchitecture());
+            Runtime selected = JavaRuntimeAdvisor.autoSelectForLaunch(
+                    instance, requiredJava, current, installed, deviceArch);
+            if (selected != null) {
+                chosenRtName = selected.name;
+                if (!instance.runtimeLocked && !selected.name.equals(instance.selectedRuntime)) {
+                    instance.selectedRuntime = selected.name;
+                    instance.maybeWrite();
+                }
+            } else if (curName != null) {
+                chosenRtName = curName;
+            }
+        } catch (Throwable t) {
+            Log.w("GameRunner", "JavaRuntimeAdvisor pre-flight skipped: " + t.getMessage());
+        }
+
+        // 4. GraphicsAdvisor + GpuUtils: auto-select Turnip+Zink/LTW on Adreno, LTW/ANGLE/GL4ES on Mali/PowerVR
+        String chosenRenderer = instance.getLaunchRenderer();
+        try {
+            GraphicsAdvisor.RendererPreset gpuPreset =
+                    GraphicsAdvisor.ensureOptimalInstanceRenderer(context, instance, versionToken);
+            chosenRenderer = Tools.isValidString(instance.renderer)
+                    ? instance.renderer : gpuPreset.rendererId;
+        } catch (Throwable t) {
+            Log.w("GameRunner", "GraphicsAdvisor pre-flight skipped: " + t.getMessage());
+        }
+
+        // 5. GameOptimizer: resolve Simple-Mode performance preset & per-instance resolution scale
+        String optMode = resolveInstanceOptimizerMode(instance);
+        int scalePercent = instance.getEffectiveResolutionScalePercent();
+        if (instance.resolutionScalePercent >= 50 && instance.resolutionScalePercent <= 100) {
+            LauncherPreferences.PREF_SCALE_FACTOR = instance.resolutionScalePercent / 100f;
+        } else if (Instance.PRESET_BATTERY.equals(instance.performancePreset)) {
+            scalePercent = Math.min(scalePercent, 75);
+            LauncherPreferences.PREF_SCALE_FACTOR = scalePercent / 100f;
+            LauncherPreferences.PREF_FORCE_VSYNC = true;
+            LauncherPreferences.PREF_SUSTAINED_PERFORMANCE = false;
+        } else if (Instance.PRESET_MAX_FPS.equals(instance.performancePreset)) {
+            LauncherPreferences.PREF_FORCE_VSYNC = false;
+            LauncherPreferences.PREF_SUSTAINED_PERFORMANCE = true;
+        }
+
+        // 6. Fulfill deferred one-shot Zero-Lag FPS Pack installation if queued by Onboarding/OptiFine flow
+        if (instance.pendingAutoFpsPack && ModrinthContentInstaller.extractModLoader(versionToken) != null) {
+            boolean wantIris = instance.pendingAutoIncludeIris;
+            instance.pendingAutoFpsPack = false;
+            instance.pendingAutoIncludeIris = false;
+            instance.maybeWrite();
+            try {
+                ModrinthContentInstaller.InstallSummary fpsSum =
+                        ModrinthContentInstaller.installZeroLagFpsPack(instance, wantIris, null);
+                Logger.appendToLog("Zyrox Pre-Flight: " + fpsSum.message);
+            } catch (Throwable t) {
+                Logger.appendToLog("Zyrox Pre-Flight: deferred FPS pack skipped (" + t.getMessage() + ")");
+            }
+        }
+
+        String summary = "Java " + requiredJava + " (" + (chosenRtName.isEmpty() ? "auto" : chosenRtName)
+                + "), renderer=" + chosenRenderer + ", mode=" + optMode
+                + ", scale=" + scalePercent + "%, repairs=" + repairedCount;
+        Logger.appendToLog("Zyrox Pre-Flight Advisor: " + summary);
+        return new PreFlightReport(
+                requiredJava, chosenRtName, chosenRenderer, optMode, scalePercent, repairedCount, summary);
+    }
+
+    /** Maps per-instance Simple-Mode preset cleanly onto {@link GameOptimizer} execution modes. */
+    @NonNull
+    public static String resolveInstanceOptimizerMode(@Nullable Instance instance) {
+        if (instance != null && Tools.isValidString(instance.performancePreset)) {
+            if (Instance.PRESET_MAX_FPS.equals(instance.performancePreset)) {
+                return GameOptimizer.MODE_MAX_FPS;
+            }
+            if (Instance.PRESET_BATTERY.equals(instance.performancePreset)
+                    || Instance.PRESET_BALANCED.equals(instance.performancePreset)) {
+                return GameOptimizer.MODE_BALANCED;
+            }
+        }
+        return GameOptimizer.normalizeMode(LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE);
+    }
+
     public static void launchGame(final AppCompatActivity activity, Account account,
                                   Instance instance, String versionId, File[] classpath, GameRenderer gameRenderer) throws Throwable {
         if(!performAuthPing(activity, account)) account = account.toLocal();
+
+        // Silent pre-flight check (InstanceHealthInspector + JavaRuntimeAdvisor + GraphicsAdvisor + GameOptimizer)
+        PreFlightReport preFlight = runPreFlightAdvisors(activity, instance, versionId);
+        if (!instance.rendererLocked && Tools.isValidString(instance.renderer)) {
+            RenderSpec advisedSpec = GameRenderer.getKnownRenderer(instance.renderer);
+            if (advisedSpec != null && advisedSpec.compatibleDevice(activity)) {
+                gameRenderer.setCurrentRenderer(advisedSpec);
+            }
+        }
 
         int freeDeviceMemory = Tools.getFreeDeviceMemory(activity);
         int localeString;
@@ -221,6 +400,8 @@ public class GameRunner {
             }
         }
 
+        // Re-read active renderer after compatibility auto-switches
+        renderer = gameRenderer.getCurrentRenderer();
         boolean isLtw = renderer instanceof GLESRenderSpec.LTWRenderSpec;
 
         if(isLtw && checkRenderDistance(versionInfo, gamedir)) {
@@ -317,10 +498,10 @@ public class GameRunner {
 
         // Zyrox Mobile Game Optimizer: inject safe low-pause GC/JVM flags & smart first-run options.txt
         int totalRamMb = Tools.getTotalDeviceMemory(activity);
-        int installedModCount = git.artdeell.mojo.performance.GameOptimizer.countInstalledMods(gamedir);
-        boolean shaderInstalled = git.artdeell.mojo.performance.GameOptimizer.hasShaderModInstalled(gamedir);
-        String optMode = LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE;
-        List<String> zyroxOptFlags = git.artdeell.mojo.performance.GameOptimizer.buildOptimizedJvmFlags(
+        int installedModCount = GameOptimizer.countInstalledMods(gamedir);
+        boolean shaderInstalled = GameOptimizer.hasShaderModInstalled(gamedir);
+        String optMode = preFlight.optimizerMode;
+        List<String> zyroxOptFlags = GameOptimizer.buildOptimizedJvmFlags(
                 optMode,
                 javaArgList,
                 runtime.javaVersion,
@@ -545,12 +726,35 @@ public class GameRunner {
 
     public static @NonNull String pickRuntime(Instance instance, int targetJavaVersion) {
         String runtime = Tools.getSelectedRuntime(instance);
-        String profileRuntime = instance.selectedRuntime;
-        Runtime pickedRuntime = MultiRTUtils.read(runtime);
-        if(runtime == null || pickedRuntime.javaVersion == 0 || pickedRuntime.javaVersion < targetJavaVersion) {
+        Runtime current = runtime != null ? MultiRTUtils.read(runtime) : null;
+        String deviceArch = Architecture.archAsString(Architecture.getDeviceArchitecture());
+
+        Runtime advised = JavaRuntimeAdvisor.autoSelectForLaunch(
+                instance,
+                targetJavaVersion,
+                current,
+                MultiRTUtils.getRuntimes(),
+                deviceArch);
+
+        if (advised != null && Tools.isValidString(advised.name)) {
+            if (instance != null && !instance.runtimeLocked
+                    && !advised.name.equals(instance.selectedRuntime)) {
+                instance.selectedRuntime = advised.name;
+                instance.maybeWrite();
+            }
+            return advised.name;
+        }
+
+        // Final fallback through MultiRTUtils nearest match
+        if (runtime == null || current == null || current.javaVersion == 0
+                || current.javaVersion < targetJavaVersion) {
             String preferredRuntime = MultiRTUtils.getNearestJreName(targetJavaVersion);
-            if(preferredRuntime == null) throw new RuntimeException("Failed to autopick runtime!");
-            if(profileRuntime != null) {
+            if (preferredRuntime == null) {
+                throw new RuntimeException(
+                        "Java " + targetJavaVersion + " runtime is required for this Minecraft version. "
+                                + "Install OpenJDK " + targetJavaVersion + " in Java Runtime Manager and relaunch.");
+            }
+            if (instance != null && !instance.runtimeLocked && instance.selectedRuntime != null) {
                 instance.selectedRuntime = preferredRuntime;
                 instance.maybeWrite();
             }

@@ -10,31 +10,41 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
+import git.artdeell.mojo.contracts.OpenDocumentWithExtension;
+import git.artdeell.mojo.input.ControlProfileManager;
 import git.artdeell.mojo.input.LayoutBitmaps;
 import git.artdeell.mojo.utils.FileUtils;
 
 /**
- * Activity dedicated to importing control layout files safely with canonical path containment
- * and bounded input stream validation.
+ * Android 14–16 Scoped Storage compatible Activity for importing {@code .json} control layouts
+ * and shareable {@code .zyrox} Setup Bundles with strict programmatic extension checks, canonical
+ * path containment, and bounded stream validation.
  */
 public class ImportControlActivity extends Activity {
+    private static final String TAG = "ImportControlActivity";
     private static final long MAX_IMPORT_BYTES = 25L * 1024L * 1024L;
     private static final String TMP_IMPORT_NAME = "TMP_IMPORT_FILE.json";
 
     private Uri mUriData;
     private boolean mHasIntentChanged = true;
     private volatile boolean mIsFileVerified = false;
+    private volatile boolean mIsZyroxSetupBundle = false;
+    @Nullable
+    private volatile String mPendingZyroxPayload = null;
 
     private EditText mEditText;
 
@@ -57,6 +67,7 @@ public class ImportControlActivity extends Activity {
 
     @Override
     protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
         if (intent != null) setIntent(intent);
         mHasIntentChanged = true;
     }
@@ -69,18 +80,34 @@ public class ImportControlActivity extends Activity {
         }
         if (!mHasIntentChanged) return;
         mIsFileVerified = false;
+        mIsZyroxSetupBundle = false;
+        mPendingZyroxPayload = null;
         getUriData();
         if (mUriData == null) {
             finishAndRemoveTask();
             return;
         }
-        String detectedName = Tools.getFileName(this, mUriData);
+
+        String detectedName = OpenDocumentWithExtension.resolveFileName(this, mUriData);
+        if (detectedName != null && !detectedName.isEmpty()
+                && !OpenDocumentWithExtension.hasAllowedExtension(
+                detectedName, "json", "zyrox", "zip")) {
+            Toast.makeText(
+                    this,
+                    "Unsupported file type. Select a .json or .zyrox control profile.",
+                    Toast.LENGTH_LONG
+            ).show();
+            finishAndRemoveTask();
+            return;
+        }
+
         mEditText.setText(trimFileName(detectedName != null ? detectedName : ""));
         mHasIntentChanged = false;
+        final String ext = OpenDocumentWithExtension.extractExtension(detectedName);
 
-        new Thread(() -> {
-            boolean imported = importControlFile();
-            if (imported && verify()) {
+        MojoApplication.sExecutorService.execute(() -> {
+            boolean ok = importAndVerifyAsync(ext);
+            if (ok) {
                 mIsFileVerified = true;
             } else {
                 cleanupTempFile();
@@ -92,10 +119,11 @@ public class ImportControlActivity extends Activity {
                     finishAndRemoveTask();
                 });
             }
-        }).start();
+        });
 
         Tools.MAIN_HANDLER.postDelayed(() -> {
-            InputMethodManager imm = (InputMethodManager) getApplicationContext().getSystemService(INPUT_METHOD_SERVICE);
+            InputMethodManager imm = (InputMethodManager)
+                    getApplicationContext().getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null && mEditText != null) {
                 imm.showSoftInput(mEditText, InputMethodManager.SHOW_IMPLICIT);
                 mEditText.setSelection(mEditText.getText().length());
@@ -110,13 +138,35 @@ public class ImportControlActivity extends Activity {
     }
 
     public void startImport(View view) {
-        String fileName = trimFileName(mEditText.getText().toString());
+        final String fileName = trimFileName(mEditText.getText().toString());
         if (!isFileNameValid(fileName)) {
             Toast.makeText(this, getText(R.string.import_control_invalid_name), Toast.LENGTH_SHORT).show();
             return;
         }
         if (!mIsFileVerified) {
             Toast.makeText(this, getText(R.string.import_control_verifying_file), Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (mIsZyroxSetupBundle && mPendingZyroxPayload != null) {
+            final String payload = mPendingZyroxPayload;
+            final android.content.Context appCtx = getApplicationContext();
+            MojoApplication.sExecutorService.execute(() -> {
+                try {
+                    ControlProfileManager.SetupImportResult res =
+                            ControlProfileManager.importZyroxSetupCode(payload, fileName + ".json", true);
+                    cleanupTempFile();
+                    runOnUiThread(() -> {
+                        Toast.makeText(appCtx, res.summary, Toast.LENGTH_LONG).show();
+                        finishAndRemoveTask();
+                    });
+                } catch (IOException e) {
+                    runOnUiThread(() -> Toast.makeText(
+                            appCtx,
+                            "Import failed: " + e.getMessage(),
+                            Toast.LENGTH_LONG).show());
+                }
+            });
             return;
         }
 
@@ -136,6 +186,61 @@ public class ImportControlActivity extends Activity {
 
         Toast.makeText(getApplicationContext(), getText(R.string.import_control_done), Toast.LENGTH_SHORT).show();
         finishAndRemoveTask();
+    }
+
+    private boolean importAndVerifyAsync(@NonNull String ext) {
+        if (mUriData == null || !"content".equalsIgnoreCase(mUriData.getScheme())) {
+            return false;
+        }
+        if (!importControlFile()) {
+            return false;
+        }
+        File tmpFile = new File(Tools.CTRLMAP_PATH, TMP_IMPORT_NAME);
+        if ("zyrox".equals(ext) || looksLikeZyroxSetupFile(tmpFile)) {
+            try {
+                String text = readBoundedUtf8(tmpFile, 2 * 1024 * 1024);
+                if (ControlProfileManager.isValidZyroxSetupCode(text)) {
+                    mIsZyroxSetupBundle = true;
+                    mPendingZyroxPayload = text;
+                    return true;
+                }
+            } catch (IOException e) {
+                Log.w(TAG, "Failed to validate .zyrox setup bundle");
+            }
+        }
+        return verify();
+    }
+
+    private static boolean looksLikeZyroxSetupFile(@NonNull File file) {
+        if (!file.isFile() || file.length() <= 8 || file.length() > 2 * 1024 * 1024) {
+            return false;
+        }
+        try {
+            String head = readBoundedUtf8(file, 32).trim();
+            return head.startsWith(ControlProfileManager.SETUP_CODE_PREFIX)
+                    || head.contains("\"zyroxSetupVersion\"");
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    @NonNull
+    private static String readBoundedUtf8(@NonNull File file, int maxBytes) throws IOException {
+        try (InputStream in = new java.io.FileInputStream(file);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[4096];
+            int total = 0;
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                int take = Math.min(n, maxBytes - total);
+                if (take > 0) {
+                    out.write(buf, 0, take);
+                    total += take;
+                }
+                if (total >= maxBytes) break;
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
     }
 
     private boolean importControlFile() {
@@ -162,7 +267,7 @@ public class ImportControlActivity extends Activity {
                 return total > 0;
             }
         } catch (IOException | SecurityException e) {
-            Log.w("ImportControlActivity", "Failed to read control file");
+            Log.w(TAG, "Failed to read control file");
             return false;
         }
     }
@@ -182,7 +287,9 @@ public class ImportControlActivity extends Activity {
     private static String trimFileName(String fileName) {
         if (fileName == null) return "";
         return fileName
+                .replace(".zyrox", "")
                 .replace(".json", "")
+                .replace(".zip", "")
                 .replaceAll("%..", "")
                 .replace("\0", "")
                 .replace("..", "")
@@ -206,11 +313,12 @@ public class ImportControlActivity extends Activity {
 
     private static boolean verify() {
         try {
-            LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(new File(Tools.CTRLMAP_PATH, TMP_IMPORT_NAME));
+            LayoutBitmaps.ControlsContainer layout = LayoutBitmaps.load(
+                    new File(Tools.CTRLMAP_PATH, TMP_IMPORT_NAME));
             JSONObject layoutJobj = new JSONObject(layout.mControlsJson);
             return layoutJobj.has("version") && layoutJobj.has("mControlDataList");
         } catch (IOException | JSONException e) {
-            Log.w("ImportControlActivity", "Failed to validate layout");
+            Log.w(TAG, "Failed to validate layout");
             return false;
         }
     }
