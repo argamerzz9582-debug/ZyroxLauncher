@@ -11,9 +11,9 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag to publish (e.g. v2.3.0)"
+        description: "Release tag to publish (e.g. v2.4.0)"
         required: false
-        default: "v2.3.0"
+        default: "v2.4.0"
         type: string
 
 # Default least-privilege token across all jobs; only publish-release escalates to contents:write.
@@ -244,17 +244,18 @@ jobs:
               fail(f"aapt2 dump badging failed: {badging_proc.stderr[:400]}")
           badging = badging_proc.stdout
           pkg_line = badging.splitlines()[0] if badging else "empty"
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.3.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.4.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
               if expected not in badging:
                   fail(f"Missing {expected} in badging ({pkg_line})")
           if "application-debuggable" in badging:
               fail("APK has android:debuggable=true!")
           if "application-testOnly" in badging:
               fail("APK has android:testOnly=true!")
-          # Verify Android 15/16 16 KB ELF page alignment on Zyrox arm64-v8a native libs
+          # Verify Android 15/16 16 KB ELF page alignment & uncompressed MP4 streaming assets
           import zipfile, struct
           with zipfile.ZipFile(apk, "r") as zf:
               elf_checked = 0
+              mp4_stored = 0
               for zi in zf.infolist():
                   if zi.filename in ("lib/arm64-v8a/libmojoexec.so", "lib/x86_64/libmojoexec.so"):
                       elf = zf.read(zi.filename)
@@ -268,14 +269,20 @@ jobs:
                               if p_align < 16384:
                                   fail(f"{zi.filename} PT_LOAD align={p_align} (< 16384)")
                       elf_checked += 1
+                  elif zi.filename.endswith(".mp4") and zi.filename.startswith("res/raw"):
+                      if zi.compress_type != zipfile.ZIP_STORED:
+                          fail(f"{zi.filename} is compressed (type={zi.compress_type}); must be ZIP_STORED for openRawResourceFd")
+                      mp4_stored += 1
               if elf_checked == 0:
                   fail("lib/arm64-v8a/libmojoexec.so missing from arm64-v8a APK")
+              if mp4_stored < 2:
+                  fail(f"Expected 2 bundled ZIP_STORED MP4 backdrops in res/raw, found {mp4_stored}")
           h = hashlib.sha256()
           with open(apk, "rb") as fh:
               for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                   h.update(chunk)
           sha = h.hexdigest()
-          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.3.0 abi=arm64-v8a targetSdk=36 debuggable=false size={size_mb:.1f}MB sha256={sha}")
+          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.4.0 abi=arm64-v8a targetSdk=36 debuggable=false mp4_stored={mp4_stored} size={size_mb:.1f}MB sha256={sha}")
           PY
 
       - name: Upload Unsigned Release CI Artifact
@@ -442,7 +449,7 @@ jobs:
               fail(f"Continuity certificate SHA-256 mismatch: expected {expected_continuity}, got {cert_sha256}")
 
           badging = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True, check=True).stdout
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.3.0'", "targetSdkVersion:'36'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.4.0'", "targetSdkVersion:'36'"):
               if expected not in badging:
                   fail(f"Missing {expected} in signed APK badging")
           if "application-debuggable" in badging or "application-testOnly" in badging:
@@ -456,14 +463,14 @@ jobs:
 
           with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
               cf.write("Package: com.zyrox.launcher\n")
-              cf.write("Version: 2.3.0 (arm64-v8a)\n")
+              cf.write("Version: 2.4.0 (arm64-v8a)\n")
               cf.write("Signature Schemes: v1 + v2 + v3 (RSA-4096)\n")
               cf.write(f"Certificate DN: {cert_dn}\n")
               cf.write(f"Certificate SHA-256: {cert_sha256}\n")
               cf.write(f"APK SHA-256: {apk_sha}\n")
 
           size_mb = os.path.getsize(apk) / (1024 * 1024)
-          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.3.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
+          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.4.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
           PY
 
       - name: Upload Verified Signed Release Bundle
@@ -508,7 +515,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${INPUT_TAG:-v2.3.0}"
+            TAG="${INPUT_TAG:-v2.4.0}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
             echo "::error title=InvalidReleaseTag::Refusing invalid tag format: $TAG"
@@ -516,17 +523,16 @@ jobs:
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           {
-            echo "## Zyrox Launcher ${TAG} — Architecture, Renderer & Pro Controls Overhaul"
+            echo "## Zyrox Launcher ${TAG} — Full-HD Live Video Backdrops, Official Zyrox Identity, Crisp Controls & 120Hz Smoothness"
             echo ""
-            echo "### What's New in 2.3.0"
-            echo "- **4K Zero-Loss Animated GIF Engine:** Native Android API 28+ hardware \`ImageDecoder\` / \`AnimatedImageDrawable\` + lossless \`ARGB_8888\` fallback with selectable **Pixel-Exact Nearest-Neighbor** and **Catmull-Rom Bicubic** (API 33+ AGSL GPU shader) upscaling, strict foreground-only Liquid Glass blur isolation, and seamless instant synchronization across Home and Loading screens."
-            echo "- **Draggable, Collision-Free Pro Telemetry HUD:** Smooth drag-to-reposition overlay with magnetic edge snapping, notch/cutout safe-area clamping, normalized X/Y layout persistence, Lock/Unlock, 50–150% scale, 10–100% opacity, Mini-Pill compact mode, live FPS + 1% Low FPS, Canvas frametime graph, Java Heap + ART GC counters, native \`VmRSS\`, device RAM, and thermal/battery °C telemetry."
-            echo "- **Turnip \`.adpkg\` Store, Mesa/Zink Pipeline & 1-Tap Crash Auto-Fix:** Fine-grained GPU architecture classifier & Smart Auto-Preset (*Adreno 6xx/7xx/8xx Elite, Mali Valhall/Immortalis, Samsung Xclipse RDNA, PowerVR*), 1-click AdrenoTools Turnip (\`.adpkg\` / \`.zip\`) & OpenJDK JRE 8/17/21/25 Store with per-instance Vulkan driver binding, isolated Mesa/Zink/Freedreno shader caches, and intelligent crash analyzer with 1-tap automatic remediation."
-            echo "- **120Hz/144Hz Unbuffered Touch, Gyro Fusion & Pro Studios:** Sensor-fused \`TYPE_GAME_ROTATION_VECTOR\` gyroscope aiming with continuous radial deadzone & 1-Euro smoothing, unbuffered high-refresh touch with cubic Hermite sub-step interpolation, ZXing QR + \`ZYROXCTRL1:\` control profile sharing, multi-step macro sequencer, real-time OpenGL ES 2.0 3D rotatable Skin + Ely.by/OptiFine Cape Studio, lossless \`level.dat\` NBT world editor + SHA-256 ZIP backups, and multiplexed HTTP/2 downloader with automatic Mojang/BMCLAPI failover."
-            echo "- **Clean Modular Architecture & Dedicated \`arm64-v8a\` Build:** Eliminated legacy bundled JARs and file-picker dead code in favor of Maven artifacts, decomposed core launcher classes, and packaged as a lean Android 15/16 16 KB page-aligned \`arm64-v8a\` APK."
+            echo "### What's New in 2.4.0"
+            echo "- **Full-HD 1080p Live Home & Loading MP4 Engine:** New hardware-accelerated \`ZyroxLoopingVideoView\` powers full-bleed 1080p30 seamless looping video backdrops on both the **Home Screen** and **Minecraft Loading Screen**, with uncompressed zero-copy APK streaming (\`+faststart\`), instant frame-0 WebP posters (zero black frames), distortion-free GPU center-crop across 16:9 to 21:9 & tablet displays, muted playback with zero audio-focus theft, foreground-only Liquid Glass isolation, and off-UI-thread decoder release so zero VPU/RAM stays allocated while in-game."
+            echo "- **Official Zyrox Launcher Brand & Adaptive Icon Suite:** Official faceted crystal **Z** logo deployed across all Android densities (\`mdpi\`–\`xxxhdpi\`) for Adaptive (\`ic_launcher_foreground\` + \`#071020\` background), Round (\`ic_launcher_round\`), Square (\`ic_launcher\`), Material You Monochrome (\`ic_launcher_monochrome\`), and in-app Home hero crest, sub-page header, Loading HUD, About/Security Center, and Crash Report screens."
+            echo "- **Arrow Buttons & Unclipped Button Labels Everywhere:** Added crisp directional vector arrow drawables (\`ic_zyrox_arrow_{up,down,left,right}\`), rebuilt the Java GUI installer pan pad into a clean inverted-T vector D-pad, upgraded in-game touch HUD directional arrows/glyphs with broader Unicode + variation-selector + unlabeled-key coverage and bold high-contrast etching, added automatic fallback labels + system-font glyph fallback on custom controls, replaced all missing-font UI glyphs, and fixed inherited AppCompat button \`minWidth\`/\`minHeight\`/vertical padding across every screen so zero button labels clip or disappear."
+            echo "- **120Hz/144Hz Full-Stack Launcher Smoothness:** Unlocked native high-refresh-rate UI modes (90/120/144/165 Hz) on Android 6+, cached process-wide display/headline \`Typeface\` instances with background pre-warming, added a compiled \`exp4j\` LRU cache for 10x faster HUD control positioning, eliminated redundant per-layout Liquid Glass shader rebuilds & \`GrabListener\` leaks, eliminated per-frame allocations in 3D Skin Preview, batched live console log flushes, added silky GPU-composited fragment transitions, and tuned RecyclerView pools."
             echo ""
             echo "### Download & Upgrade"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.3.x\` / \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
             echo ""
             echo "### Signing & SHA-256 Verification"
             echo '```'
