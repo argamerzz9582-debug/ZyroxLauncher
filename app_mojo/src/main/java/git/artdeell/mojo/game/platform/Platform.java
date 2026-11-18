@@ -245,7 +245,18 @@ public class Platform {
      * @param pgl Grab listener
      */
     public static void addGrabListener(PlatformGrabListener pgl) {
-        grabListeners.add(pgl);
+        if (pgl != null && !grabListeners.contains(pgl)) {
+            grabListeners.add(pgl);
+        }
+    }
+
+    /**
+     * Unregister Platform grab listener to prevent Activity/Sensor leaks across lifecycle pauses.
+     */
+    public static void removeGrabListener(PlatformGrabListener pgl) {
+        if (pgl != null) {
+            grabListeners.remove(pgl);
+        }
     }
 
     /**

@@ -783,7 +783,7 @@ public final class QuickMacroDialog {
     }
 
     private static void performHaptic(@NonNull View v) {
-        if (LauncherPreferences.PREF_ZYROX_HAPTICS) {
+        if (LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS) {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         }
     }
