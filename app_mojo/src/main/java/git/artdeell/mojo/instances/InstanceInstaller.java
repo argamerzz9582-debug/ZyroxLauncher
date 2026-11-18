@@ -170,7 +170,8 @@ public class InstanceInstaller implements ContextExecutorTask {
         Tools.runOnUiThread(() -> NotificationUtils.sendBasicNotification(context,
                 R.string.modpack_install_notification_title,
                 R.string.modpack_install_notification_success,
-                new Intent(context, LauncherActivity.class),
+                new Intent(context, LauncherActivity.class)
+                        .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 NotificationUtils.PENDINGINTENT_CODE_DOWNLOAD_SERVICE,
                 NotificationUtils.NOTIFICATION_ID_DOWNLOAD_LISTENER
         ));

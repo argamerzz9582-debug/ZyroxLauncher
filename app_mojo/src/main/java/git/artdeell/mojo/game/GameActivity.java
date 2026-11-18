@@ -147,11 +147,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
         instance = Instances.loadSelectedInstance();
         account = Accounts.getCurrent();
         if(instance == null) {
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
-            finish();
+            finishAndRemoveTask();
             return;
         }
         mGameRenderer = new GameRenderer(instance.getLaunchRenderer());

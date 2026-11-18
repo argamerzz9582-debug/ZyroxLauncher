@@ -25,10 +25,25 @@ public class TestStorageActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (git.artdeell.mojo.utils.lifecycle.AppTaskGuard.resumeExistingAppTask(this)) {
+            return;
+        }
         mPermsDialogShown = false;
         if(Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 29 && !isStorageAllowed(this)) {
             mPermsRequired = true;
         } else exit();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (git.artdeell.mojo.utils.lifecycle.AppTaskGuard.resumeExistingAppTask(this)) {
+            return;
+        }
+        if (!mPermsRequired) {
+            exit();
+        }
     }
 
     @Override
@@ -87,7 +102,13 @@ public class TestStorageActivity extends Activity {
 
     private void exit() {
         if(!Tools.checkStorageRoot(this)) {
-            startActivity(new Intent(this, MissingStorageActivity.class));
+            Intent missingIntent = new Intent(this, MissingStorageActivity.class);
+            missingIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(missingIntent);
+            finishAndRemoveTask();
+            overridePendingTransition(0, 0);
             return;
         }
         //Initialize constants (implicitly) and preferences after we confirm that we have storage.
@@ -96,8 +117,11 @@ public class TestStorageActivity extends Activity {
         AsyncAssetManager.unpackSingleFiles(this);
 
         Intent intent = new Intent(this, LauncherActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
-        finish();
+        finishAndRemoveTask();
+        overridePendingTransition(0, 0);
     }
 }

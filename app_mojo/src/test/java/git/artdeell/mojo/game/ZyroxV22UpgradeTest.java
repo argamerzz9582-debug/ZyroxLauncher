@@ -191,6 +191,72 @@ public class ZyroxV22UpgradeTest {
         assertFalse("Unused legacy assets/mojo.png must be removed", legacyMojoPng.exists());
     }
 
+    @Test
+    public void preventsDuplicateRecentsTasksInManifestAndAppTaskGuard() throws Exception {
+        File manifestFile = resolveModuleFile("src/main/AndroidManifest.xml");
+        assertTrue(manifestFile.isFile());
+        String manifest = readUtf8(manifestFile);
+
+        // TestStorageActivity is a StrandHogg-isolated launch trampoline and MUST be excluded from Recents
+        // (and auto-removed on finishAndRemoveTask) so it NEVER leaves a second black card in Android Recents.
+        int tsStart = manifest.indexOf("android:name=\".TestStorageActivity\"");
+        assertTrue(tsStart > 0);
+        int tsEnd = manifest.indexOf("<intent-filter>", tsStart);
+        String tsTag = manifest.substring(tsStart, tsEnd);
+        assertTrue("TestStorageActivity must set excludeFromRecents=true to prevent duplicate black Recents card",
+                tsTag.contains("android:excludeFromRecents=\"true\""));
+        assertTrue("TestStorageActivity must set autoRemoveFromRecents=true",
+                tsTag.contains("android:autoRemoveFromRecents=\"true\""));
+        assertTrue("TestStorageActivity must remain StrandHogg-hardened with empty taskAffinity",
+                tsTag.contains("android:taskAffinity=\"\""));
+
+        // LauncherActivity and GameActivity must enforce StrandHogg-safe singleTop + autoRemoveFromRecents
+        assertFalse("Must never introduce StrandHogg-vulnerable singleTask",
+                manifest.contains("android:launchMode=\"singleTask\""));
+        int laStart = manifest.indexOf("android:name=\".LauncherActivity\"");
+        String laTag = manifest.substring(laStart, manifest.indexOf("/>", laStart));
+        assertTrue(laTag.contains("android:launchMode=\"singleTop\""));
+        assertTrue(laTag.contains("android:autoRemoveFromRecents=\"true\""));
+
+        int gaStart = manifest.indexOf("android:name=\".game.GameActivity\"");
+        String gaTag = manifest.substring(gaStart, manifest.indexOf("/>", gaStart));
+        assertTrue(gaTag.contains("android:launchMode=\"singleTop\""));
+        assertTrue(gaTag.contains("android:autoRemoveFromRecents=\"true\""));
+
+        // ShowErrorActivity and ImportControlActivity must stay excluded from Recents
+        int seStart = manifest.indexOf("android:name=\".ShowErrorActivity\"");
+        String seTag = manifest.substring(seStart, manifest.indexOf("/>", seStart));
+        assertTrue(seTag.contains("android:excludeFromRecents=\"true\""));
+
+        // Verify AppTaskGuard deduplication decision matrix
+        String launcher = "git.artdeell.mojo.LauncherActivity";
+        String trampoline = "git.artdeell.mojo.TestStorageActivity";
+        String game = "git.artdeell.mojo.game.GameActivity";
+        String exit = "git.artdeell.mojo.ExitActivity";
+        String awt = "git.artdeell.mojo.awt.AWTActivity";
+
+        // Empty zombie black cards are always pruned
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 0, trampoline, null));
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 1, trampoline, trampoline));
+        // Duplicate Launcher or old Exit card is pruned when Launcher opens
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 1, launcher, launcher));
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 1, exit, exit));
+        // Live GameActivity or AWTActivity is NEVER killed by LauncherActivity
+        assertFalse(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 1, game, game));
+        assertFalse(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                launcher, 1, awt, awt));
+        // When GameActivity starts, any orphaned separate Launcher/trampoline card is removed
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                game, 1, launcher, launcher));
+        assertTrue(git.artdeell.mojo.utils.lifecycle.AppTaskGuard.shouldPruneOtherTask(
+                game, 1, trampoline, launcher));
+    }
+
     private static File resolveModuleFile(String rel) {
         File direct = new File(rel);
         if (direct.exists()) return direct;

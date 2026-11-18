@@ -30,7 +30,7 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
         Intent mainIntent = new Intent(context, GameActivity.class);
         mainIntent.putExtra(INTENT_LAUNCH_VERSION, mNormalizedVersionid);
         mainIntent.putExtra(INTENT_LAUNCH_CLASSPATH, classpath);
-        mainIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        mainIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return mainIntent;
     }
 
@@ -51,6 +51,7 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
             Intent gameStartIntent = createGameStartIntent(activity);
             activity.startActivity(gameStartIntent);
             activity.finish();
+            activity.overridePendingTransition(0, 0);
             android.os.Process.killProcess(android.os.Process.myPid()); //You should kill yourself, NOW!
         } catch (Throwable e) {
             Tools.showError(activity.getBaseContext(), e);

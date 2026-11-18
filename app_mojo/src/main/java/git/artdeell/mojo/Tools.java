@@ -425,6 +425,8 @@ public final class Tools {
                         if(exitIfOk) {
                             if (ctx instanceof GameActivity) {
                                 fullyExit();
+                            } else if (ctx instanceof ShowErrorActivity) {
+                                ((Activity) ctx).finishAndRemoveTask();
                             } else if (ctx instanceof Activity) {
                                 ((Activity) ctx).finish();
                             }
@@ -440,7 +442,9 @@ public final class Tools {
                         if(exitIfOk) {
                             if (ctx instanceof GameActivity) {
                                 fullyExit();
-                            } else {
+                            } else if (ctx instanceof ShowErrorActivity) {
+                                ((Activity) ctx).finishAndRemoveTask();
+                            } else if (ctx instanceof Activity) {
                                 ((Activity) ctx).finish();
                             }
                         }

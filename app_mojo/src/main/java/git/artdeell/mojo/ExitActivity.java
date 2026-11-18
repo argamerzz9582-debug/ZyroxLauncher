@@ -46,6 +46,7 @@ public class ExitActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_zyrox_crash_report);
+        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
 
         String message = isSignal ? getString(R.string.mcn_abort_title) : getString(R.string.mcn_exit_title, code);
         TextView subtitle = findViewById(R.id.tv_crash_subtitle);
@@ -74,7 +75,7 @@ public class ExitActivity extends AppCompatActivity {
             }
         }
 
-        findViewById(R.id.btn_crash_close).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_crash_close).setOnClickListener(v -> finishAndRemoveTask());
         findViewById(R.id.btn_crash_copy).setOnClickListener(v -> {
             ClipboardManager mgr = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (mgr != null) {
@@ -86,7 +87,7 @@ public class ExitActivity extends AppCompatActivity {
         findViewById(R.id.btn_crash_share).setOnClickListener(v -> shareLog(this));
         findViewById(R.id.btn_crash_relaunch).setOnClickListener(v -> {
             Tools.restartLauncherActivity(this);
-            finish();
+            finishAndRemoveTask();
         });
     }
 

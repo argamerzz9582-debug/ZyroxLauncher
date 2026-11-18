@@ -60,16 +60,21 @@
 
         <activity
             android:name=".MissingStorageActivity"
+            android:autoRemoveFromRecents="true"
             android:exported="false"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".TestStorageActivity"
+            android:autoRemoveFromRecents="true"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/app_short_name"
             android:launchMode="singleInstance"
             android:screenOrientation="sensorLandscape"
-            android:taskAffinity="">
+            android:taskAffinity=""
+            android:theme="@style/Zyrox.DialogActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -79,13 +84,16 @@
 
         <activity
             android:name=".LauncherActivity"
+            android:autoRemoveFromRecents="true"
             android:exported="false"
             android:label="@string/app_short_name"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ImportControlActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboard|keyboardHidden"
             android:excludeFromRecents="true"
             android:exported="true"
@@ -110,36 +118,46 @@
 
         <activity
             android:name=".FatalErrorActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
             android:exported="false"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
 
         <activity
             android:name=".ShowErrorActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
+            android:excludeFromRecents="true"
             android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/Zyrox.DialogActivity" />
 
         <activity
             android:name=".ExitActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
             android:exported="false"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape"
             android:theme="@style/MojoLauncher.AppTheme" />
 
         <activity
             android:name=".awt.AWTActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
             android:exported="false"
+            android:launchMode="singleTop"
             android:process=":gui_installer"
             android:screenOrientation="sensorLandscape" />
 
         <activity
             android:name=".CustomControlsActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|keyboard|navigation"
             android:exported="false"
+            android:launchMode="singleTop"
             android:screenOrientation="sensorLandscape">
             <intent-filter>
                 <action android:name=".CustomControlsActivity" />
@@ -150,6 +168,7 @@
 
         <activity
             android:name=".game.GameActivity"
+            android:autoRemoveFromRecents="true"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode"
             android:exported="false"
             android:launchMode="singleTop"

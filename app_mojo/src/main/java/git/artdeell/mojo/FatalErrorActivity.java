@@ -27,10 +27,11 @@ public class FatalErrorActivity extends AppCompatActivity {
 
         Bundle extras = getIntent().getExtras();
         if (extras == null) {
-            finish();
+            finishAndRemoveTask();
             return;
         }
         setContentView(R.layout.activity_zyrox_crash_report);
+        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
 
         boolean storageAllow = extras.getBoolean("storageAllow", false);
         Throwable throwable = (Throwable) extras.getSerializable("throwable");
@@ -56,7 +57,7 @@ public class FatalErrorActivity extends AppCompatActivity {
             guardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
         }
 
-        findViewById(R.id.btn_crash_close).setOnClickListener(v -> finish());
+        findViewById(R.id.btn_crash_close).setOnClickListener(v -> finishAndRemoveTask());
         findViewById(R.id.btn_crash_copy).setOnClickListener(v -> {
             ClipboardManager mgr = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (mgr != null) {
@@ -75,10 +76,8 @@ public class FatalErrorActivity extends AppCompatActivity {
             startActivity(Intent.createChooser(share, getString(R.string.zyrox_share_log)));
         });
         findViewById(R.id.btn_crash_relaunch).setOnClickListener(v -> {
-            Intent intent = new Intent(FatalErrorActivity.this, LauncherActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            finish();
+            Tools.restartLauncherActivity(FatalErrorActivity.this);
+            finishAndRemoveTask();
         });
     }
 

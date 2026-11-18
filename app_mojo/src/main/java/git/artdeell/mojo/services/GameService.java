@@ -42,8 +42,9 @@ public class GameService extends Service {
         PendingIntent pendingKillIntent = PendingIntent.getService(this, NotificationUtils.PENDINGINTENT_CODE_KILL_GAME_SERVICE
                 , killIntent, Build.VERSION.SDK_INT >=23 ? PendingIntent.FLAG_IMMUTABLE : 0);
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
-                new Intent(this, GameActivity.class).setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-                 PendingIntent.FLAG_IMMUTABLE);
+                new Intent(this, GameActivity.class)
+                        .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, "channel_id")
                 .setContentTitle(getString(R.string.lazy_service_default_title))
