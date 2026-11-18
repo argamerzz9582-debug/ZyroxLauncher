@@ -93,7 +93,7 @@ public class ZyroxPhase1To4EcosystemTest {
         assertFalse(OpenDocumentWithExtension.isSupportedLauncherFile("malware.apk"));
         assertFalse(OpenDocumentWithExtension.isSupportedLauncherFile("script.sh"));
         assertTrue(OpenDocumentWithExtension.hasAllowedExtension(
-                "hud.ZYROX", Arrays.asList("json", "zyrox")));
+                "hud.ZYROX", "json", "zyrox"));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -150,7 +150,7 @@ public class ZyroxPhase1To4EcosystemTest {
         assertNotNull(lan);
         assertEquals("Alex - Survival Base", lan.motd);
         assertEquals(54321, lan.port);
-        assertEquals("192.168.1.42:54321", lan.address());
+        assertEquals("192.168.1.42:54321", lan.address);
 
         assertNull(ServerPinger.parseLanAnnouncement("garbage packet", "192.168.1.42"));
         assertNull(ServerPinger.parseLanAnnouncement("[MOTD]Bad[/MOTD][AD]99999[/AD]", "192.168.1.42"));
