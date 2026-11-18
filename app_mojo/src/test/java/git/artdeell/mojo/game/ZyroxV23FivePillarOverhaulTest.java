@@ -72,7 +72,7 @@ public class ZyroxV23FivePillarOverhaulTest {
 
     @Test
     public void pillar1_gifNearestVsCatmullRomBicubicAndFilterParsing() {
-        assertEquals(ZyroxSeamlessGifView.ScalingFilter.NEAREST,
+        assertEquals(ZyroxSeamlessGifView.ScalingFilter.NEAREST_NEIGHBOR,
                 ZyroxSeamlessGifView.ScalingFilter.fromPreference("nearest"));
         assertEquals(ZyroxSeamlessGifView.ScalingFilter.BICUBIC,
                 ZyroxSeamlessGifView.ScalingFilter.fromPreference("bicubic"));
@@ -183,7 +183,7 @@ public class ZyroxV23FivePillarOverhaulTest {
                 GpuUtils.detectArchitecture("Qualcomm", "Adreno (TM) 750"));
         assertEquals(GpuArchitecture.ADRENO_6XX,
                 GpuUtils.detectArchitecture("Qualcomm", "Adreno (TM) 650"));
-        assertEquals(GpuArchitecture.MALI_IMMORTALIS,
+        assertEquals(GpuArchitecture.ARM_IMMORTALIS,
                 GpuUtils.detectArchitecture("ARM", "Immortalis-G720 MC12"));
         assertEquals(GpuArchitecture.SAMSUNG_XCLIPSE,
                 GpuUtils.detectArchitecture("Samsung Electronics Co., Ltd.", "ANGLE (Samsung Xclipse 940)"));
@@ -192,7 +192,7 @@ public class ZyroxV23FivePillarOverhaulTest {
 
         // Optimal preset gives Adreno 7xx with Turnip + Vulkan -> Zink + custom Turnip driver
         GraphicsAdvisor.RendererPreset adrenoPreset = GraphicsAdvisor.computeOptimalPreset(
-                GpuArchitecture.ADRENO_7XX, 3, true, true, true, false, true, 12288);
+                GpuArchitecture.ADRENO_7XX, "Adreno (TM) 750", 3, true, true, true, false, true, 12288);
         assertEquals("vulkan_zink", adrenoPreset.rendererId);
         assertFalse(adrenoPreset.preferSystemVulkan);
 
@@ -216,15 +216,16 @@ public class ZyroxV23FivePillarOverhaulTest {
         assertNotEquals(cacheA, cacheB);
 
         Map<String, String> env = new HashMap<>();
-        MesaRenderSpec.applyArchitectureTuning(env, "vulkan_zink", GpuArchitecture.ADRENO_7XX, true);
-        assertFalse(env.isEmpty());
+        MesaRenderSpec.applyArchitectureTuning(
+                env, GpuArchitecture.ADRENO_7XX, "Adreno (TM) 750", true, true, false, false);
+        assertEquals("true", env.get("mesa_glthread"));
 
         // Turnip & JRE GitHub catalog parsers (strictly HTTPS)
         String turnipJson = "[{\"tag_name\":\"v25.1.0-R3\",\"name\":\"Turnip v25.1.0 R3\",\"assets\":["
                 + "{\"name\":\"turnip_v25.1.0_r3_gmem.adpkg\",\"size\":4194304,"
                 + "\"browser_download_url\":\"https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/v25.1.0/turnip.adpkg\"}]}]";
         List<RuntimeDriverStoreDialog.CatalogAsset> drivers =
-                RuntimeDriverStoreDialog.parseTurnipReleases(turnipJson, "K11MCH1");
+                RuntimeDriverStoreDialog.parseTurnipReleases(turnipJson, GpuArchitecture.ADRENO_7XX);
         assertEquals(1, drivers.size());
         assertTrue(drivers.get(0).downloadUrl.startsWith("https://"));
 
@@ -236,12 +237,12 @@ public class ZyroxV23FivePillarOverhaulTest {
 
         // Crash analyzer one-tap auto-fix generation
         ZyroxCrashAnalyzer.Diagnosis oomDiag = ZyroxCrashAnalyzer.analyze(
-                "java.lang.OutOfMemoryError: Java heap space\n\tat net.minecraft.client.Minecraft.run", -1);
+                "java.lang.OutOfMemoryError: Java heap space\n\tat net.minecraft.client.Minecraft.run");
         assertFalse(oomDiag.autoFixes.isEmpty());
         assertEquals(ZyroxCrashAnalyzer.AutoFixType.ADJUST_JVM_HEAP, oomDiag.autoFixes.get(0).type);
 
         ZyroxCrashAnalyzer.Diagnosis vkDiag = ZyroxCrashAnalyzer.analyze(
-                "ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)", 134);
+                "ZINK: vkCreateInstance failed (VK_ERROR_INCOMPATIBLE_DRIVER)");
         assertFalse(vkDiag.autoFixes.isEmpty());
         assertEquals(ZyroxCrashAnalyzer.AutoFixType.APPLY_SAFE_RENDERER, vkDiag.autoFixes.get(0).type);
     }
@@ -301,7 +302,7 @@ public class ZyroxV23FivePillarOverhaulTest {
         ControlProfileManager.DecodedShareProfile decoded =
                 ControlProfileManager.decodeSharePayload(scannedToken);
         assertEquals("PvP Pro", decoded.profileName);
-        assertEquals(sampleControlJson, decoded.jsonContent);
+        assertEquals(sampleControlJson, decoded.jsonText);
 
         // Multi-step macro sequence script parser & JSON persistence round-trip
         List<QuickMacroDialog.MacroStep> steps = QuickMacroDialog.parseSequenceScript(
@@ -311,7 +312,7 @@ public class ZyroxV23FivePillarOverhaulTest {
         String json = QuickMacroDialog.serializeSequencesJson(Collections.singletonList(seq));
         List<QuickMacroDialog.MacroSequence> loaded = QuickMacroDialog.deserializeSequencesJson(json);
         assertEquals(1, loaded.size());
-        assertEquals("Combo", loaded.get(0).name);
+        assertEquals("Combo", loaded.get(0).label);
         assertEquals(6, loaded.get(0).steps.size());
     }
 
