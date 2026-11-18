@@ -315,7 +315,7 @@ public class ContentManagerFragment extends Fragment {
             String sub = mod.file.getName() + " • " + ZyroxStudioUi.formatBytes(mod.sizeBytes)
                     + " • " + mod.loader.name();
             if (!mod.warnings.isEmpty()) {
-                sub += "\n⚠ " + mod.warnings.get(0);
+                sub += "\n[!] " + mod.warnings.get(0);
             } else if (!mod.description.isEmpty()) {
                 String shortDesc = mod.description.length() > 90
                         ? mod.description.substring(0, 87) + "..." : mod.description;
@@ -387,7 +387,7 @@ public class ContentManagerFragment extends Fragment {
             String sub = item.file.getName() + " • " + ZyroxStudioUi.formatBytes(item.sizeBytes)
                     + (item.subtitle.isEmpty() ? "" : " • " + item.subtitle);
             if (!item.warning.isEmpty()) {
-                sub += "\n⚠ " + item.warning;
+                sub += "\n[!] " + item.warning;
             }
             info.addView(ZyroxStudioUi.createSubtitle(ctx, sub));
             row.addView(info, iLp);

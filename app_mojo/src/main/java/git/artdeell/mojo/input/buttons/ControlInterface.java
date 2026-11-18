@@ -341,18 +341,19 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
             @Override
             public void onViewAttachedToWindow(@NonNull View v) {
                 Platform.addGrabListener(ControlInterface.this);
-                getControlView().removeOnAttachStateChangeListener(this);
             }
 
             @Override
-            public void onViewDetachedFromWindow(@NonNull View v) {}
+            public void onViewDetachedFromWindow(@NonNull View v) {
+                Platform.removeGrabListener(ControlInterface.this);
+            }
         });
 
 
     }
 
     default void injectProperties() {
-        getControlView().post(() -> getControlView().setTranslationZ(10));
+        getControlView().setTranslationZ(10f);
     }
 
     /**
@@ -408,7 +409,11 @@ public interface ControlInterface extends View.OnLongClickListener, PlatformGrab
     }
 
     default void injectLayoutParamBehavior() {
-        getControlView().addOnLayoutChangeListener((v, l, t, r, b, ol, or, ot, ob) -> setBackground());
+        getControlView().addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if ((r - l) != (or - ol) || (b - t) != (ob - ot) || v.getBackground() == null) {
+                setBackground();
+            }
+        });
     }
 
     @Override

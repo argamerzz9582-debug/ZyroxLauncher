@@ -27,8 +27,15 @@
     <!-- Right: Compact Glowing Amber INSTALL Button -->
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/mod_install_button"
-        android:layout_width="74dp"
+        android:layout_width="wrap_content"
+        android:minWidth="74dp"
+        android:minHeight="0dp"
         android:layout_height="30dp"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="0dp"
+        android:gravity="center"
+        android:singleLine="true"
+        android:includeFontPadding="false"
         android:background="@drawable/btn_zyrox_play"
         android:text="@string/zyrox_install"
         android:textColor="@color/zyrox_text_primary"

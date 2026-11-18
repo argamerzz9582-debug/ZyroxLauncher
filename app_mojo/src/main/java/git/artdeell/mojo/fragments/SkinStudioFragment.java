@@ -133,7 +133,16 @@ public class SkinStudioFragment extends Fragment {
         mBtnModelToggle.setOnClickListener(v -> toggleSelectedModel());
         leftBtns.addView(mBtnModelToggle, new LinearLayout.LayoutParams(0, ZyroxStudioUi.dp(ctx, 35), 1f));
 
-        mBtnCape = ZyroxStudioUi.createSecondaryButton(ctx, "Cape ▾", true);
+        mBtnCape = ZyroxStudioUi.createSecondaryButton(ctx, "Cape", true);
+        android.graphics.drawable.Drawable arrowDown =
+                androidx.core.content.ContextCompat.getDrawable(ctx, git.artdeell.mojo.R.drawable.ic_zyrox_arrow_down);
+        if (arrowDown != null) {
+            arrowDown = arrowDown.mutate();
+            int sz = ZyroxStudioUi.dp(ctx, 10);
+            arrowDown.setBounds(0, 0, sz, sz);
+            mBtnCape.setCompoundDrawablesRelative(null, null, arrowDown, null);
+            mBtnCape.setCompoundDrawablePadding(ZyroxStudioUi.dp(ctx, 4));
+        }
         mBtnCape.setOnClickListener(v -> showCapeSwitcherDialog());
         mBtnCape.setOnLongClickListener(v -> {
             clearCapePreview();
@@ -229,16 +238,16 @@ public class SkinStudioFragment extends Fragment {
         if (mBtnCape == null) return;
         switch (mActiveCapeSource) {
             case ELY_BY:
-                mBtnCape.setText("Ely.by ▾");
+                mBtnCape.setText("Ely.by");
                 break;
             case OPTIFINE:
-                mBtnCape.setText("OptiFine ▾");
+                mBtnCape.setText("OptiFine");
                 break;
             case CUSTOM_LOCAL:
-                mBtnCape.setText("PNG Cape ▾");
+                mBtnCape.setText("PNG Cape");
                 break;
             default:
-                mBtnCape.setText("Cape ▾");
+                mBtnCape.setText("Cape");
                 break;
         }
     }

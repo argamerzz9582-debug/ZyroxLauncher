@@ -175,81 +175,104 @@
         <!-- Bottom-Left Glass Mouse Buttons -->
         <Button
             android:id="@+id/installmod_mouse_pri"
-            android:layout_width="64dp"
-            android:layout_height="36dp"
+            android:layout_width="68dp"
+            android:layout_height="38dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="0dp"
+            android:gravity="center"
+            android:singleLine="true"
+            android:includeFontPadding="false"
             android:layout_marginStart="8dp"
             android:layout_marginBottom="6dp"
             android:background="@drawable/control_button"
             android:text="@string/control_primary"
             android:textColor="@color/zyrox_text_primary"
-            android:textSize="10sp"
+            android:textSize="10.5sp"
             app:layout_constraintBottom_toTopOf="@+id/installmod_mouse_sec"
             app:layout_constraintStart_toStartOf="parent" />
 
         <Button
             android:id="@+id/installmod_mouse_sec"
-            android:layout_width="64dp"
-            android:layout_height="36dp"
+            android:layout_width="68dp"
+            android:layout_height="38dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="0dp"
+            android:gravity="center"
+            android:singleLine="true"
+            android:includeFontPadding="false"
             android:layout_marginStart="8dp"
             android:layout_marginBottom="8dp"
             android:background="@drawable/control_button"
             android:text="@string/control_secondary"
             android:textColor="@color/zyrox_text_primary"
-            android:textSize="10sp"
+            android:textSize="10.5sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 
-        <!-- Bottom-Right Glass Window Pan Pad -->
-        <Button
-            android:id="@+id/installmod_window_moveleft"
-            android:layout_width="42dp"
-            android:layout_height="36dp"
+        <!-- Bottom-Right Intuitive Inverted-T Vector Arrow Window Pan Pad -->
+        <ImageButton
+            android:id="@+id/installmod_window_moveright"
+            android:layout_width="44dp"
+            android:layout_height="38dp"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
             android:background="@drawable/control_button"
-            android:text="◀"
-            android:textColor="@color/zyrox_amber"
+            android:src="@drawable/ic_zyrox_arrow_right"
+            app:tint="@color/zyrox_lg_text"
+            android:contentDescription="@string/control_right"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:ignore="HardcodedText" />
+            app:layout_constraintEnd_toEndOf="parent" />
 
-        <Button
-            android:id="@+id/installmod_window_moveright"
-            android:layout_width="42dp"
-            android:layout_height="36dp"
-            android:layout_marginBottom="4dp"
-            android:background="@drawable/control_button"
-            android:text="▶"
-            android:textColor="@color/zyrox_amber"
-            app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
-            app:layout_constraintEnd_toEndOf="@+id/installmod_window_moveleft"
-            tools:ignore="HardcodedText" />
-
-        <Button
-            android:id="@+id/installmod_window_moveup"
-            android:layout_width="42dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="4dp"
-            android:layout_marginBottom="4dp"
-            android:background="@drawable/control_button"
-            android:text="▲"
-            android:textColor="@color/zyrox_amber"
-            app:layout_constraintBottom_toTopOf="@+id/installmod_window_moveleft"
-            app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveright"
-            tools:ignore="HardcodedText" />
-
-        <Button
+        <ImageButton
             android:id="@+id/installmod_window_movedown"
-            android:layout_width="42dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="4dp"
+            android:layout_width="44dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="5dp"
             android:layout_marginBottom="8dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
             android:background="@drawable/control_button"
-            android:text="▼"
-            android:textColor="@color/zyrox_amber"
+            android:src="@drawable/ic_zyrox_arrow_down"
+            app:tint="@color/zyrox_lg_text"
+            android:contentDescription="@string/control_down"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveleft"
-            tools:ignore="HardcodedText" />
+            app:layout_constraintEnd_toStartOf="@+id/installmod_window_moveright" />
+
+        <ImageButton
+            android:id="@+id/installmod_window_moveleft"
+            android:layout_width="44dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="5dp"
+            android:layout_marginBottom="8dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/control_button"
+            android:src="@drawable/ic_zyrox_arrow_left"
+            app:tint="@color/zyrox_lg_text"
+            android:contentDescription="@string/control_left"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/installmod_window_movedown" />
+
+        <ImageButton
+            android:id="@+id/installmod_window_moveup"
+            android:layout_width="44dp"
+            android:layout_height="38dp"
+            android:layout_marginBottom="5dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:background="@drawable/control_button"
+            android:src="@drawable/ic_zyrox_arrow_up"
+            app:tint="@color/zyrox_lg_text"
+            android:contentDescription="@string/control_up"
+            app:layout_constraintBottom_toTopOf="@+id/installmod_window_movedown"
+            app:layout_constraintStart_toStartOf="@+id/installmod_window_movedown"
+            app:layout_constraintEnd_toEndOf="@+id/installmod_window_movedown" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- Full-Width Zyrox Syntax-Highlighted Installer Console Overlay -->

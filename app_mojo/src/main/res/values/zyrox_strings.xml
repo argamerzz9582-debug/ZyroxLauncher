@@ -3,7 +3,7 @@
     <!-- Global Zyrox 2.2 Starlight Firefly Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">STARLIGHT  •  LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX STARLIGHT v2.3.0</string>
+    <string name="zyrox_engine_watermark">ZYROX LAUNCHER v2.4.0</string>
     <string name="zyrox_action_import">Import JSON…</string>
     <string name="mcl_option_import_control">Import Control JSON…</string>
     <string name="zyrox_pref_turnip_store_title">Turnip Driver &amp; Java Runtime Store</string>
@@ -12,7 +12,7 @@
     <string name="zyrox_pref_gpu_autopreset_summary">Auto-tune renderer, resolution scale &amp; JVM memory for your Adreno / Mali / Xclipse GPU</string>
     <string name="zyrox_pref_purge_shader_cache_title">Clear Mesa / Zink Shader Cache</string>
     <string name="zyrox_pref_purge_shader_cache_summary">Purge cached Vulkan &amp; Freedreno pipeline caches after switching drivers</string>
-    <string name="zyrox_back">&lt; BACK</string>
+    <string name="zyrox_back">BACK</string>
     <string name="zyrox_home">HOME</string>
 
     <!-- Navigation Stack (Home Hub — Liquid Glass Command Center) -->

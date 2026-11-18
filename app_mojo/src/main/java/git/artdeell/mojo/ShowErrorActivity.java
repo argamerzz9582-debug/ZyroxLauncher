@@ -92,11 +92,13 @@ public class ShowErrorActivity extends Activity {
             final AutoFix fix = fixes.get(i);
             Button btn = new Button(context);
             btn.setAllCaps(false);
-            btn.setText("⚡ " + fix.buttonLabel);
+            btn.setText("Fix: " + fix.buttonLabel);
             btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f);
             btn.setTextColor(Color.WHITE);
             btn.setTypeface(Typeface.DEFAULT_BOLD);
             btn.setBackgroundResource(R.drawable.btn_zyrox_secondary);
+            btn.setIncludeFontPadding(false);
+            btn.setMinWidth(0);
             btn.setPadding(hPad, 0, hPad, 0);
             btn.setMinHeight(btnHeight);
 
@@ -109,7 +111,7 @@ public class ShowErrorActivity extends Activity {
                 AutoFixResult res = ZyroxCrashAnalyzer.executeAutoFix(context, fix, targetInstance);
                 if (res.applied) {
                     btn.setEnabled(false);
-                    btn.setText("✓ " + fix.buttonLabel);
+                    btn.setText("Applied: " + fix.buttonLabel);
                     btn.setAlpha(0.75f);
                 }
                 if (statusFeedbackView != null) {

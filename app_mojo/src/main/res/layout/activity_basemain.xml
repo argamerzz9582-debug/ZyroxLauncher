@@ -83,6 +83,15 @@
 						android:gravity="center_vertical"
 						android:layout_marginBottom="6dp">
 
+						<ImageView
+							android:id="@+id/main_loading_brand_logo"
+							android:layout_width="22dp"
+							android:layout_height="22dp"
+							android:layout_marginEnd="8dp"
+							android:scaleType="fitCenter"
+							android:src="@drawable/ic_zyrox_logo"
+							android:importantForAccessibility="no" />
+
 						<TextView
 							android:id="@+id/main_loading_stage_text"
 							android:layout_width="0dp"

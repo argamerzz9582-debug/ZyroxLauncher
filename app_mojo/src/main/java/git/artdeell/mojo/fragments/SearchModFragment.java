@@ -168,6 +168,9 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mDrawerProgress = view.findViewById(R.id.pb_drawer_versions);
         mDrawerVersionList = view.findViewById(R.id.rv_drawer_versions);
         mDrawerVersionList.setLayoutManager(new LinearLayoutManager(getContext()));
+        mDrawerVersionList.setHasFixedSize(true);
+        mDrawerVersionList.setItemViewCacheSize(12);
+        mDrawerVersionList.setItemAnimator(null);
         view.findViewById(R.id.btn_close_version_drawer).setOnClickListener(v -> closeVersionDrawer());
         mVersionScrim.setOnClickListener(v -> closeVersionDrawer());
 
@@ -182,6 +185,9 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             }
         });
         mRecyclerview.setLayoutManager(gridManager);
+        mRecyclerview.setHasFixedSize(true);
+        mRecyclerview.setItemViewCacheSize(16);
+        mRecyclerview.setItemAnimator(null);
         mRecyclerview.setAdapter(mModItemAdapter);
 
         setupFilterChips(view);

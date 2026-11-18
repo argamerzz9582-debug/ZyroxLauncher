@@ -32,7 +32,26 @@ import java.util.concurrent.TimeUnit;
 
 public class MojoApplication extends Application {
 	public static final String CRASH_REPORT_TAG = "MojoCrashReport";
-	public static final ExecutorService sExecutorService = new ThreadPoolExecutor(4, 4, 500, TimeUnit.MILLISECONDS,  new LinkedBlockingQueue<>());
+	public static final ExecutorService sExecutorService = createWorkerPool();
+
+	private static ExecutorService createWorkerPool() {
+		final java.util.concurrent.atomic.AtomicInteger idx = new java.util.concurrent.atomic.AtomicInteger(1);
+		int cores = Math.max(4, Math.min(6, Runtime.getRuntime().availableProcessors()));
+		ThreadPoolExecutor pool = new ThreadPoolExecutor(
+				cores,
+				cores,
+				15L,
+				TimeUnit.SECONDS,
+				new LinkedBlockingQueue<>(),
+				r -> {
+					Thread t = new Thread(r, "ZyroxWorker-" + idx.getAndIncrement());
+					t.setPriority(Thread.NORM_PRIORITY - 1);
+					return t;
+				}
+		);
+		pool.allowCoreThreadTimeOut(true);
+		return pool;
+	}
 
 	private void installFatalErrorHandler() {
 		Thread.setDefaultUncaughtExceptionHandler((thread, th) -> {
@@ -91,6 +110,11 @@ public class MojoApplication extends Application {
 						.concat("/x86");
 			}
 			AsyncAssetManager.unpackRuntime(getAssets());
+			// Pre-warm primary display & headline fonts off the main UI thread for instant zero-jank layout
+			sExecutorService.execute(() -> {
+				git.artdeell.mojo.ui.ZyroxStudioUi.getDisplayFont(MojoApplication.this);
+				git.artdeell.mojo.ui.ZyroxStudioUi.getPixelFont(MojoApplication.this);
+			});
 		} catch (Throwable throwable) {
 			Intent ferrorIntent = new Intent(this, FatalErrorActivity.class);
 			ferrorIntent.putExtra("throwable", throwable);

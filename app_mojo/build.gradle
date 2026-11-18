@@ -17,7 +17,7 @@ static def getDateSeconds() {
 }
 
 def getVersionName = {
-    return "2.3.0"
+    return "2.4.0"
 }
 
 def getCFApiKey = {
@@ -179,7 +179,7 @@ android {
     }
 
     androidResources {
-        noCompress 'gif'
+        noCompress 'gif', 'mp4'
     }
 
     packagingOptions {

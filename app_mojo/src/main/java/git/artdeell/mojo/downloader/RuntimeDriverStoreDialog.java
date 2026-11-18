@@ -256,7 +256,7 @@ public final class RuntimeDriverStoreDialog {
             Driver drv = drivers.get(i);
             StringBuilder row = new StringBuilder();
             if (DriverManager.isPreferredDriver(drv)) {
-                row.append("★ [GLOBAL] ");
+                row.append("[ACTIVE] ");
             }
             if (targetInstance != null && targetInstance.hasCustomVulkanDriver()) {
                 String tok = targetInstance.getVulkanDriver();
@@ -592,7 +592,7 @@ public final class RuntimeDriverStoreDialog {
                 boolean recommended = matchesGpuArch(combinedLower, gpuArch);
                 String formatBadge = name.toLowerCase(Locale.ROOT).contains(".adpkg")
                         ? " [.adpkg]" : " [AdrenoTools]";
-                String label = (recommended ? "★ " : "")
+                String label = (recommended ? "[REC] " : "")
                         + relTitle + " — " + name + formatBadge
                         + (size > 0 ? " • " + ZyroxStudioUi.formatBytes(size) : "");
                 out.add(new CatalogAsset(label, name, url, size, true, recommended));

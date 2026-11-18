@@ -131,6 +131,9 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
         mRailAdapter = new InstanceRailAdapter();
         mInstanceListRecycler.setLayoutManager(new LinearLayoutManager(context));
+        mInstanceListRecycler.setHasFixedSize(true);
+        mInstanceListRecycler.setItemViewCacheSize(12);
+        mInstanceListRecycler.setItemAnimator(null);
         mInstanceListRecycler.setAdapter(mRailAdapter);
 
         View newInstanceBtn = view.findViewById(R.id.btn_rail_new_instance);

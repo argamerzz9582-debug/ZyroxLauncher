@@ -121,7 +121,7 @@ public final class ContentStudioActions {
                             InstanceContentManager.checkModrinthUpdate(mod.file, mcVer, loader);
                     if (info.updateAvailable) {
                         lines.add("• " + mod.name + " (" + info.currentVersionNumber
-                                + " → " + info.latestVersionNumber + ")");
+                                + " -> " + info.latestVersionNumber + ")");
                     }
                 }
                 Tools.runOnUiThread(() -> {

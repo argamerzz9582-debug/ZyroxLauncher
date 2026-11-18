@@ -197,6 +197,37 @@ public class ControlData {
         return SPECIAL_BUTTON_NAME_ARRAY;
     }
 
+    private static final String[] DYNAMIC_VARS = {
+            "top", "left", "right", "bottom", "width", "height",
+            "screen_width", "screen_height", "margin", "preferred_scale"
+    };
+
+    private static final java.util.LinkedHashMap<String, net.objecthunter.exp4j.Expression> COMPILED_EXPR_CACHE =
+            new java.util.LinkedHashMap<String, net.objecthunter.exp4j.Expression>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, net.objecthunter.exp4j.Expression> eldest) {
+                    return size() > 96;
+                }
+            };
+
+    private static String stripVarPlaceholders(String expr) {
+        if (expr.indexOf('$') < 0) return expr;
+        StringBuilder sb = new StringBuilder(expr.length());
+        for (int i = 0, n = expr.length(); i < n; i++) {
+            char c = expr.charAt(i);
+            if (c == '$' && i + 1 < n && expr.charAt(i + 1) == '{') {
+                int end = expr.indexOf('}', i + 2);
+                if (end > i + 2) {
+                    sb.append(expr, i + 2, end);
+                    i = end;
+                    continue;
+                }
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
     private static float calculate(String math) {
         return (float) new ExpressionBuilder(math)
                 .functions(FN_DP, FN_PX)
@@ -232,11 +263,37 @@ public class ControlData {
     }
 
     public float insertDynamicPos(String dynamicPos, int w, int h) {
-        // Insert value to ${variable}
-        String insertedPos = JSONUtils.insertSingleJSONValue(dynamicPos, fillConversionMap(w, h));
-
-        // Calculate, because the dynamic position contains some math equations
-        return calculate(insertedPos);
+        if (dynamicPos == null || dynamicPos.isEmpty()) return 0f;
+        try {
+            float btnW = getWidth();
+            float btnH = getHeight();
+            float margin = (int) ControlInterface.getMarginDistance();
+            synchronized (COMPILED_EXPR_CACHE) {
+                net.objecthunter.exp4j.Expression expr = COMPILED_EXPR_CACHE.get(dynamicPos);
+                if (expr == null) {
+                    String cleaned = stripVarPlaceholders(dynamicPos);
+                    expr = new ExpressionBuilder(cleaned)
+                            .functions(FN_DP, FN_PX)
+                            .variables(DYNAMIC_VARS)
+                            .build();
+                    COMPILED_EXPR_CACHE.put(dynamicPos, expr);
+                }
+                expr.setVariable("top", 0d);
+                expr.setVariable("left", 0d);
+                expr.setVariable("right", w - btnW);
+                expr.setVariable("bottom", h - btnH);
+                expr.setVariable("width", btnW);
+                expr.setVariable("height", btnH);
+                expr.setVariable("screen_width", w);
+                expr.setVariable("screen_height", h);
+                expr.setVariable("margin", margin);
+                expr.setVariable("preferred_scale", LauncherPreferences.PREF_BUTTONSIZE);
+                return (float) expr.evaluate();
+            }
+        } catch (Throwable fallback) {
+            String insertedPos = JSONUtils.insertSingleJSONValue(dynamicPos, fillConversionMap(w, h));
+            return calculate(insertedPos);
+        }
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")

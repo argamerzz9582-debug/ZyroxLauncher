@@ -99,7 +99,7 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
 
         Preference selectVideoPref = requirePreference("selectBgVideo");
         selectVideoPref.setOnPreferenceClickListener(p -> {
-            mSelectBgVideoLauncher.launch(new String[]{"image/gif", "video/*"});
+            mSelectBgVideoLauncher.launch(new String[]{"video/*", "image/gif"});
             return true;
         });
 

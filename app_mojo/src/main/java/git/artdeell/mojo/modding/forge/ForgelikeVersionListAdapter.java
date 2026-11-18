@@ -132,7 +132,7 @@ public class ForgelikeVersionListAdapter extends BaseExpandableListAdapter imple
         String mc = getGameVersion(i);
         String version = getForgeVersion(i, i1);
         String rec = mRecommendedFullByMc.get(mc);
-        String label = version.equals(rec) ? (version + " ★") : version;
+        String label = version.equals(rec) ? (version + " [REC]") : version;
         ((TextView) convertView).setText(label);
         return convertView;
     }

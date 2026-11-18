@@ -29,24 +29,30 @@
             <ToggleButton
                 android:id="@+id/crop_dialog_hlock"
                 android:layout_weight="1"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_marginBottom="3dp"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:layout_marginBottom="4dp"
                 android:textOn="@string/cropper_lock_horizontal"
                 android:textOff="@string/cropper_lock_horizontal"/>
             <ToggleButton
                 android:id="@+id/crop_dialog_vlock"
                 android:layout_weight="1"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:layout_marginBottom="3dp"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
+                android:layout_marginBottom="4dp"
                 android:textOn="@string/cropper_lock_vertical"
                 android:textOff="@string/cropper_lock_vertical"/>
             <Button
                 android:id="@+id/crop_dialog_reset"
                 android:layout_weight="1"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:minHeight="36dp"
+                android:paddingHorizontal="12dp"
                 android:text="@string/cropper_reset"/>
         </LinearLayout>
     </LinearLayout>

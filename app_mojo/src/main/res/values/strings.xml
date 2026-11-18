@@ -12,7 +12,7 @@
     <string name="login_online_login_label">Login</string>
 
     <!-- Hint -->
-    <string name="hint_control_mapping">Touch the cogwheel icon to open the context menu ⚙\nTap a button to customize: edit, resize, remove, or change its keybinds.</string>
+    <string name="hint_control_mapping">Touch the gear icon at the top to open the menu.\nTap any button to edit, resize, remove, or change its keybinds.</string>
 
     <!-- Warnings -->
     <string name="warning_remove_account">This account will be removed!</string>

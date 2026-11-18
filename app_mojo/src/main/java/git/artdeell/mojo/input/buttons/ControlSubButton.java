@@ -74,7 +74,6 @@ public class ControlSubButton extends ControlButton {
     @Override
     public void removeButton() {
         parentDrawer.drawerData.buttonProperties.remove(getProperties());
-        parentDrawer.drawerData.buttonProperties.remove(getProperties());
         parentDrawer.buttons.remove(this);
 
         parentDrawer.syncButtons();
