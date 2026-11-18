@@ -29,7 +29,14 @@ public class LoggerView extends ConstraintLayout {
     private final SpannableStringBuilder mPendingBatch = new SpannableStringBuilder();
     private boolean mFlushScheduled = false;
 
-    private final Runnable mFlushRunnable = () -> {
+    private Logger.eventLogListener mLogListener;
+    private ToggleButton mLogToggle;
+    private DefocusableScrollView mScrollView;
+    private TextView mLogTextView;
+
+    private final Runnable mFlushRunnable = this::flushPendingBatch;
+
+    private void flushPendingBatch() {
         CharSequence batch;
         synchronized (mBatchLock) {
             mFlushScheduled = false;
@@ -37,7 +44,7 @@ public class LoggerView extends ConstraintLayout {
             batch = new SpannableStringBuilder(mPendingBatch);
             mPendingBatch.clear();
         }
-        if (mLogTextView.getVisibility() != VISIBLE) return;
+        if (mLogTextView == null || mLogTextView.getVisibility() != VISIBLE) return;
         if (mLogTextView.length() + batch.length() > MAX_BUFFER_CHARS) {
             CharSequence cur = mLogTextView.getText();
             int trim = Math.min(cur.length(), Math.max(cur.length() / 3, batch.length()));
@@ -48,15 +55,10 @@ public class LoggerView extends ConstraintLayout {
             }
         }
         mLogTextView.append(batch);
-        if (mScrollView.isKeepFocusing()) {
+        if (mScrollView != null && mScrollView.isKeepFocusing()) {
             mScrollView.fullScroll(View.FOCUS_DOWN);
         }
-    };
-
-    private Logger.eventLogListener mLogListener;
-    private ToggleButton mLogToggle;
-    private DefocusableScrollView mScrollView;
-    private TextView mLogTextView;
+    }
 
     public LoggerView(@NonNull Context context) {
         this(context, null);

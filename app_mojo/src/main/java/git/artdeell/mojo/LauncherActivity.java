@@ -480,7 +480,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 }
             }
             if (best.getModeId() != current.getModeId()) {
-                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
                 lp.preferredDisplayModeId = best.getModeId();
                 getWindow().setAttributes(lp);
             }
