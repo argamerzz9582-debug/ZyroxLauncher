@@ -269,7 +269,7 @@ jobs:
                               if p_align < 16384:
                                   fail(f"{zi.filename} PT_LOAD align={p_align} (< 16384)")
                       elf_checked += 1
-                  elif zi.filename.endswith(".mp4") and zi.filename.startswith("res/raw"):
+                  elif zi.filename.endswith(".mp4") and zi.filename.startswith("res/"):
                       if zi.compress_type != zipfile.ZIP_STORED:
                           fail(f"{zi.filename} is compressed (type={zi.compress_type}); must be ZIP_STORED for openRawResourceFd")
                       mp4_stored += 1
