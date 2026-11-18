@@ -47,8 +47,8 @@ public final class ModrinthContentInstaller {
     public static final String TYPE_SHADER = "shader";
     public static final String TYPE_RESOURCEPACK = "resourcepack";
 
-    private static final String MODRINTH_API = "https://api.modrinth.com/v2";
-    private static final String USER_AGENT = "ZyroxLauncher/2.2.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
+    private static final String MODRINTH_API = git.artdeell.mojo.metadata.ModPlatformRepository.MODRINTH_API_BASE;
+    private static final String USER_AGENT = "ZyroxLauncher/2.3.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
     private static final String BACKUP_DIR_NAME = ".zyrox_mod_backup";
     private static final int CONNECT_TIMEOUT_MS = 12_000;
     private static final int READ_TIMEOUT_MS = 25_000;
@@ -557,47 +557,17 @@ public final class ModrinthContentInstaller {
     @NonNull
     private static String httpGet(@NonNull String httpsUrl) throws IOException {
         requireHttps(httpsUrl);
-        HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Accept", "application/json");
-        try {
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("Modrinth API returned HTTP " + code);
-            }
-            return readStreamUtf8(conn.getInputStream(), 4 * 1024 * 1024);
-        } finally {
-            conn.disconnect();
-        }
+        return git.artdeell.mojo.utils.ZyroxHttpClient.getStringOrThrow(httpsUrl, null);
     }
 
     @NonNull
     private static String httpPostJson(@NonNull String httpsUrl, @NonNull String json) throws IOException {
         requireHttps(httpsUrl);
-        HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        conn.setRequestProperty("Accept", "application/json");
-        try {
-            byte[] payload = json.getBytes(StandardCharsets.UTF_8);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(payload);
-            }
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("Modrinth update API returned HTTP " + code);
-            }
-            return readStreamUtf8(conn.getInputStream(), 8 * 1024 * 1024);
-        } finally {
-            conn.disconnect();
+        String resp = git.artdeell.mojo.utils.ZyroxHttpClient.postJson(httpsUrl, json, null);
+        if (resp == null) {
+            throw new IOException("Modrinth update API request failed");
         }
+        return resp;
     }
 
     @NonNull

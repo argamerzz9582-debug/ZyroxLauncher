@@ -22,10 +22,14 @@ import git.artdeell.mojo.downloader.VerificationException;
 import git.artdeell.mojo.metadata.LocalMetadataCache;
 import git.artdeell.mojo.metadata.VersionMetadataRepository;
 import git.artdeell.mojo.security.LogRedactor;
+import git.artdeell.mojo.tasks.mojson.mirrors.DownloadMirror;
+
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 @SuppressWarnings("IOStreamConstructor")
 public class DownloadUtils {
-    public static final String USER_AGENT = "ZyroxLauncher/2.0";
+    public static final String USER_AGENT = ZyroxHttpClient.USER_AGENT;
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 30_000;
     private static final int MAX_STRING_BYTES = 32 * 1024 * 1024; // 32 MiB response ceiling
@@ -35,6 +39,20 @@ public class DownloadUtils {
     }
 
     public static void download(URL url, OutputStream os) throws IOException {
+        String urlStr = url.toString();
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlStr)) {
+            try (Response resp = ZyroxHttpClient.openDownloadResponse(urlStr, 0L)) {
+                if (!resp.isSuccessful() || resp.body() == null) {
+                    throw new IOException("Server returned HTTP " + resp.code() + ": " + resp.message());
+                }
+                try (InputStream is = resp.body().byteStream()) {
+                    IOUtils.copy(is, os);
+                }
+                return;
+            } catch (IOException e) {
+                throw new IOException("Unable to download from " + LogRedactor.redactUrl(url), e);
+            }
+        }
         HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) url.openConnection();
@@ -58,8 +76,40 @@ public class DownloadUtils {
     }
 
     public static String downloadString(String url) throws IOException {
-        HttpURLConnection conn = null;
+        java.util.List<String> candidates = DownloadMirror.buildFailoverCandidates(url);
+        IOException lastError = null;
+        for (String candidate : candidates) {
+            try {
+                String body = downloadStringSingle(candidate);
+                DownloadMirror.recordEndpointSuccess(candidate);
+                return body;
+            } catch (InterruptedIOException ie) {
+                throw ie;
+            } catch (IOException e) {
+                DownloadMirror.recordEndpointFailure(candidate);
+                lastError = e;
+            }
+        }
+        if (lastError != null) throw lastError;
+        return downloadStringSingle(url);
+    }
+
+    private static String downloadStringSingle(String url) throws IOException {
         URL parsed = new URL(url);
+        if (ZyroxHttpClient.isStrictHttpsUrl(url)) {
+            try (Response resp = ZyroxHttpClient.openDownloadResponse(url, 0L)) {
+                if (!resp.isSuccessful() || resp.body() == null) {
+                    throw new IOException("Server returned HTTP " + resp.code() + ": " + resp.message());
+                }
+                try (InputStream is = resp.body().byteStream()) {
+                    byte[] bytes = ArchiveSecurity.readBytesBounded(is, MAX_STRING_BYTES);
+                    return new String(bytes, StandardCharsets.UTF_8);
+                }
+            } catch (IOException e) {
+                throw new IOException("Unable to download from " + LogRedactor.redactUrl(parsed), e);
+            }
+        }
+        HttpURLConnection conn = null;
         try {
             conn = (HttpURLConnection) parsed.openConnection();
             conn.setRequestProperty("User-Agent", USER_AGENT);
@@ -83,6 +133,26 @@ public class DownloadUtils {
     }
 
     public static void downloadFile(String url, File out) throws IOException {
+        java.util.List<String> candidates = DownloadMirror.buildFailoverCandidates(url);
+        IOException lastError = null;
+        for (String candidate : candidates) {
+            try {
+                downloadFileSingle(candidate, out);
+                DownloadMirror.recordEndpointSuccess(candidate);
+                return;
+            } catch (InterruptedIOException ie) {
+                throw ie;
+            } catch (IOException e) {
+                DownloadMirror.recordEndpointFailure(candidate);
+                lastError = e;
+            }
+        }
+        if (lastError != null) throw lastError;
+        downloadFileSingle(url, out);
+    }
+
+    /** Single-attempt HTTP/2 atomic file download used by {@link DownloadMirror} failover loops. */
+    public static void downloadFileSingle(String url, File out) throws IOException {
         FileUtils.ensureParentDirectory(out);
         File tempFile = new File(out.getParentFile(), out.getName() + ".zyrox.tmp");
         boolean ok = false;
@@ -117,40 +187,76 @@ public class DownloadUtils {
         FileUtils.ensureParentDirectory(outputFile);
         File tempFile = new File(outputFile.getParentFile(), outputFile.getName() + ".zyrox.tmp");
         URL parsed = new URL(urlInput);
-        HttpURLConnection conn = (HttpURLConnection) parsed.openConnection();
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
         boolean success = false;
-        try {
-            int code = conn.getResponseCode();
-            if (code != HttpURLConnection.HTTP_OK) {
-                throw new IOException("Server returned HTTP " + code + " for " + LogRedactor.redactUrl(parsed));
-            }
-            long totalLen = conn.getContentLengthLong();
-            int reportedLen = totalLen > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalLen;
-            try (InputStream readStr = conn.getInputStream();
-                 FileOutputStream fos = new FileOutputStream(tempFile, false)) {
-                int current;
-                long overall = 0L;
-                if (buffer == null) buffer = new byte[65535];
-                while ((current = readStr.read(buffer)) != -1) {
-                    if (Thread.interrupted()) {
-                        throw new InterruptedIOException("Download interrupted");
-                    }
-                    overall += current;
-                    fos.write(buffer, 0, current);
-                    int reportedOverall = overall > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) overall;
-                    monitor.updateProgress(reportedOverall, reportedLen);
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlInput)) {
+            try (Response resp = ZyroxHttpClient.openDownloadResponse(urlInput, 0L)) {
+                if (!resp.isSuccessful()) {
+                    throw new IOException("Server returned HTTP " + resp.code() + " for " + LogRedactor.redactUrl(parsed));
                 }
-                fos.flush();
-                success = true;
+                ResponseBody body = resp.body();
+                if (body == null) {
+                    throw new IOException("Empty response body for " + LogRedactor.redactUrl(parsed));
+                }
+                long totalLen = body.contentLength();
+                int reportedLen = totalLen > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalLen;
+                try (InputStream readStr = body.byteStream();
+                     FileOutputStream fos = new FileOutputStream(tempFile, false)) {
+                    int current;
+                    long overall = 0L;
+                    if (buffer == null) buffer = new byte[65536];
+                    while ((current = readStr.read(buffer)) != -1) {
+                        if (Thread.interrupted()) {
+                            throw new InterruptedIOException("Download interrupted");
+                        }
+                        overall += current;
+                        fos.write(buffer, 0, current);
+                        int reportedOverall = overall > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) overall;
+                        monitor.updateProgress(reportedOverall, reportedLen);
+                    }
+                    fos.flush();
+                    success = true;
+                }
+            } finally {
+                if (!success && tempFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    tempFile.delete();
+                }
             }
-        } finally {
-            conn.disconnect();
-            if (!success && tempFile.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                tempFile.delete();
+        } else {
+            HttpURLConnection conn = (HttpURLConnection) parsed.openConnection();
+            conn.setRequestProperty("User-Agent", USER_AGENT);
+            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(READ_TIMEOUT_MS);
+            try {
+                int code = conn.getResponseCode();
+                if (code != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("Server returned HTTP " + code + " for " + LogRedactor.redactUrl(parsed));
+                }
+                long totalLen = conn.getContentLengthLong();
+                int reportedLen = totalLen > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) totalLen;
+                try (InputStream readStr = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(tempFile, false)) {
+                    int current;
+                    long overall = 0L;
+                    if (buffer == null) buffer = new byte[65536];
+                    while ((current = readStr.read(buffer)) != -1) {
+                        if (Thread.interrupted()) {
+                            throw new InterruptedIOException("Download interrupted");
+                        }
+                        overall += current;
+                        fos.write(buffer, 0, current);
+                        int reportedOverall = overall > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) overall;
+                        monitor.updateProgress(reportedOverall, reportedLen);
+                    }
+                    fos.flush();
+                    success = true;
+                }
+            } finally {
+                conn.disconnect();
+                if (!success && tempFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    tempFile.delete();
+                }
             }
         }
         if (outputFile.exists() && !outputFile.delete()) {

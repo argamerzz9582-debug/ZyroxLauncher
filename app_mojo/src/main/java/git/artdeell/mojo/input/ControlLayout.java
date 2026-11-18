@@ -22,8 +22,6 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 
 import com.google.gson.JsonSyntaxException;
-import com.kdt.pickafile.FileListView;
-import com.kdt.pickafile.FileSelectedListener;
 
 import git.artdeell.mojo.game.GameView;
 
@@ -63,6 +61,38 @@ public class ControlLayout extends FrameLayout {
 	private ControlHandleView mHandleView;
 	private ControlButtonMenuListener mMenuListener;
 	public ActionRow mActionRow = null;
+	private Runnable mExternalDocumentPicker = null;
+	private final int[] mObstacleParentOrigin = new int[2];
+	private final int[] mObstacleChildOrigin = new int[2];
+
+	/** Binds an {@link git.artdeell.mojo.contracts.OpenDocumentWithExtension} trigger for SAF JSON import. */
+	public void setExternalDocumentPicker(Runnable pickerLauncher) {
+		mExternalDocumentPicker = pickerLauncher;
+	}
+
+	/**
+	 * Populates {@code outRects} with bounding rectangles of every currently visible custom control
+	 * button, sub-button, drawer, and virtual joystick expressed in {@code referenceParent} space,
+	 * ensuring {@link git.artdeell.mojo.diagnostics.PerformanceHudOverlay} never overlaps controls.
+	 */
+	public void collectControlObstacleRects(android.view.ViewGroup referenceParent,
+											List<android.graphics.RectF> outRects) {
+		if (referenceParent == null || outRects == null || getVisibility() != VISIBLE) return;
+		referenceParent.getLocationOnScreen(mObstacleParentOrigin);
+		final int childCount = getChildCount();
+		for (int i = 0; i < childCount; i++) {
+			View child = getChildAt(i);
+			if (!(child instanceof ControlInterface)) continue;
+			if (child.getVisibility() != VISIBLE || child.getAlpha() <= 0.02f) continue;
+			int w = child.getWidth();
+			int h = child.getHeight();
+			if (w <= 0 || h <= 0) continue;
+			child.getLocationOnScreen(mObstacleChildOrigin);
+			float left = mObstacleChildOrigin[0] - mObstacleParentOrigin[0];
+			float top = mObstacleChildOrigin[1] - mObstacleParentOrigin[1];
+			outRects.add(new android.graphics.RectF(left, top, left + w, top + h));
+		}
+	}
 	public String mLayoutFileName;
 	private static final int MAX_HISTORY_STEPS = 16;
 	private final java.util.ArrayDeque<String> mUndoStack = new java.util.ArrayDeque<>();
@@ -644,53 +674,44 @@ public class ControlLayout extends FrameLayout {
 	}
 
 	public void openLoadDialog() {
-		AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-		builder.setTitle(R.string.global_load);
-		builder.setPositiveButton(android.R.string.cancel, null);
-
-		final AlertDialog dialog = builder.create();
-		FileListView flv = new FileListView(dialog, "json");
-		if(Build.VERSION.SDK_INT < 29)flv.listFileAt(new File(Tools.CTRLMAP_PATH));
-		else flv.lockPathAt(new File(Tools.CTRLMAP_PATH));
-		flv.setFileSelectedListener(new FileSelectedListener(){
-
-			@Override
-			public void onFileSelected(File file, String path) {
-				try {
-					loadLayout(path);
-				}catch (IOException e) {
-					Tools.showError(getContext(), e);
-				}
-				dialog.dismiss();
-			}
-		});
-		dialog.setView(flv);
-		dialog.show();
+		showControlJsonSelectorDialog(R.string.global_load, false);
 	}
 
 	public void openSetDefaultDialog() {
+		showControlJsonSelectorDialog(R.string.customctrl_selectdefault, true);
+	}
+
+	private void showControlJsonSelectorDialog(int titleRes, boolean applyAsDefault) {
+		List<File> jsonFiles = ControlProfileManager.listControlFiles();
+		String[] labels = new String[jsonFiles.size()];
+		for (int i = 0; i < jsonFiles.size(); i++) {
+			labels[i] = jsonFiles.get(i).getName();
+		}
+
 		AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-		builder.setTitle(R.string.customctrl_selectdefault);
-		builder.setPositiveButton(android.R.string.cancel, null);
-
-		final AlertDialog dialog = builder.create();
-		FileListView flv = new FileListView(dialog, "json");
-		flv.lockPathAt(new File(Tools.CTRLMAP_PATH));
-		flv.setFileSelectedListener(new FileSelectedListener(){
-
-			@Override
-			public void onFileSelected(File file, String path) {
+		builder.setTitle(titleRes);
+		if (labels.length > 0) {
+			builder.setItems(labels, (d, which) -> {
+				File chosen = jsonFiles.get(which);
+				String path = chosen.getAbsolutePath();
 				try {
-					LauncherPreferences.DEFAULT_PREF.edit().putString("defaultCtrl", path).apply();
-					LauncherPreferences.PREF_DEFAULTCTRL_PATH = path;loadLayout(path);
-				}catch (IOException|JsonSyntaxException e) {
+					if (applyAsDefault) {
+						LauncherPreferences.DEFAULT_PREF.edit().putString("defaultCtrl", path).apply();
+						LauncherPreferences.PREF_DEFAULTCTRL_PATH = path;
+					}
+					loadLayout(path);
+				} catch (IOException | JsonSyntaxException e) {
 					Tools.showError(getContext(), e);
 				}
-				dialog.dismiss();
-			}
-		});
-		dialog.setView(flv);
-		dialog.show();
+			});
+		} else {
+			builder.setMessage(R.string.mcl_option_import_control);
+		}
+		if (mExternalDocumentPicker != null) {
+			builder.setNeutralButton(R.string.mcl_option_import_control, (d, w) -> mExternalDocumentPicker.run());
+		}
+		builder.setNegativeButton(android.R.string.cancel, null);
+		builder.show();
 	}
 
 	public void openExitDialog(EditorExitable exitListener) {

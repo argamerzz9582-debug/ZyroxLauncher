@@ -86,6 +86,17 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
         mVisibilityUpdater = this::updateVisibility;
         addPreferencesFromResource(R.xml.pref_misc);
 
+        Preference gifFilterPref = findPreference(git.artdeell.mojo.prefs.LauncherPreferences.KEY_ZYROX_GIF_FILTER);
+        if (gifFilterPref != null) {
+            gifFilterPref.setOnPreferenceChangeListener((pref, newVal) -> {
+                if (newVal instanceof String) {
+                    git.artdeell.mojo.prefs.LauncherPreferences.persistGifFilter((String) newVal);
+                    ExtraCore.setValue(ExtraConstants.REFRESH_BG_VIDEO, true);
+                }
+                return true;
+            });
+        }
+
         Preference selectVideoPref = requirePreference("selectBgVideo");
         selectVideoPref.setOnPreferenceClickListener(p -> {
             mSelectBgVideoLauncher.launch(new String[]{"image/gif", "video/*"});

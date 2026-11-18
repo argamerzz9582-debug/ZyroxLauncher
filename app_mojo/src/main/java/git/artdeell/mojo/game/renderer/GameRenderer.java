@@ -161,17 +161,34 @@ public class GameRenderer {
     }
 
     /**
-     * Enable custom Vulkan driver (Turnip) usage
+     * Enable global custom Vulkan driver (Turnip) usage.
      */
     public void overrideVulkanDriver() {
-        // In most cases we load Turnip so use Turnip environment variables
-        if(LauncherPreferences.PREF_FREEDRENO_SYSMEM) environment.put("TU_DEBUG", "sysmem");
-        if(LauncherPreferences.PREF_UBWC_WORKAROUND) environment.put("FD_DEV_FEATURES", "enable_tp_ubwc_flag_hint=1");
+        overrideVulkanDriver(null);
+    }
 
-        Driver driver = DriverManager.getPreferredDriver();
+    /**
+     * Enables custom Vulkan / Adreno Turnip ({@code .adpkg}) driver usage, honoring any
+     * per-instance GPU driver assignment on {@code instance} before falling back to global default,
+     * and isolating Mesa's disk shader cache by the resolved driver hash.
+     */
+    public void overrideVulkanDriver(@androidx.annotation.Nullable git.artdeell.mojo.instances.Instance instance) {
+        Driver driver = DriverManager.resolveDriverForInstance(instance);
+        MesaRenderSpec.setBoundDriver(driver);
+
+        if (LauncherPreferences.PREF_FREEDRENO_SYSMEM) {
+            environment.put("TU_DEBUG", "noconform,sysmem");
+        }
+        if (LauncherPreferences.PREF_UBWC_WORKAROUND) {
+            environment.put("FD_DEV_FEATURES", "enable_tp_ubwc_flag_hint=1");
+        }
+
         File root = DriverManager.getDriverRoot(driver);
         File config = new File(Tools.DIR_GAME_HOME, "qgl_config.txt");
-        if(config.exists() && config.isFile()) MojoExec.setQglConfigPath(config.getAbsolutePath());
-        MojoExec.configureCustomVulkanDriver(driver.getMainLibrary(), root == null ? null : root.getAbsolutePath());
+        if (config.exists() && config.isFile()) {
+            MojoExec.setQglConfigPath(config.getAbsolutePath());
+        }
+        MojoExec.configureCustomVulkanDriver(
+                driver.getMainLibrary(), root == null ? null : root.getAbsolutePath());
     }
 }

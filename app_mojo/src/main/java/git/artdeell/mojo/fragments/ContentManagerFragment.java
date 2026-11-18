@@ -81,8 +81,10 @@ public class ContentManagerFragment extends Fragment {
     private boolean mHasShaderMod = false;
     @Nullable private File mSelectedDatapackWorld;
 
-    private final ActivityResultLauncher<String[]> mImportLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onFileImported);
+    private final ActivityResultLauncher<Object> mImportJarLauncher =
+            registerForActivityResult(new git.artdeell.mojo.contracts.OpenDocumentWithExtension("jar"), this::onFileImported);
+    private final ActivityResultLauncher<Object> mImportZipLauncher =
+            registerForActivityResult(new git.artdeell.mojo.contracts.OpenDocumentWithExtension("zip"), this::onFileImported);
 
     @Nullable
     @Override
@@ -466,256 +468,53 @@ public class ContentManagerFragment extends Fragment {
                 .show();
     }
 
-    private void openConfigEditor(@NonNull InstanceContentManager.ContentItem item) {
-        MojoApplication.sExecutorService.execute(() -> {
-            try {
-                String content = InstanceContentManager.readConfigFileSafe(item.file);
-                Tools.runOnUiThread(() -> {
-                    if (!isAdded()) return;
-                    EditText editor = new EditText(requireContext());
-                    editor.setText(content);
-                    editor.setTextSize(11f);
-                    editor.setMinLines(8);
-                    editor.setMaxLines(14);
-                    editor.setGravity(Gravity.TOP | Gravity.START);
-                    int p = ZyroxStudioUi.dp(requireContext(), 10);
-                    editor.setPadding(p, p, p, p);
+    private final git.artdeell.mojo.content.ContentStudioActions.UiHost mActionsHost =
+            new git.artdeell.mojo.content.ContentStudioActions.UiHost() {
+                @Override
+                public boolean isHostActive() {
+                    return isAdded();
+                }
 
-                    new AlertDialog.Builder(requireContext())
-                            .setTitle("Edit config/" + item.name + " (auto .bak)")
-                            .setView(editor)
-                            .setPositiveButton("Save", (d, w) -> {
-                                String updated = editor.getText().toString();
-                                MojoApplication.sExecutorService.execute(() -> {
-                                    try {
-                                        File safe = FileUtils.ensureInsideDirectory(
-                                                mInstance.getGameDirectory(), item.file);
-                                        InstanceContentManager.writeConfigFileWithBackup(safe, updated);
-                                        Tools.runOnUiThread(() -> {
-                                            if (!isAdded()) return;
-                                            Toast.makeText(requireContext(),
-                                                    "Saved config (backup written to .bak)", Toast.LENGTH_SHORT).show();
-                                            reloadActiveTab();
-                                        });
-                                    } catch (Exception e) {
-                                        Tools.runOnUiThread(() -> {
-                                            if (isAdded()) Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-                                        });
-                                    }
-                                });
-                            })
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .show();
-                });
-            } catch (Exception e) {
-                Tools.runOnUiThread(() -> {
-                    if (isAdded()) Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-                });
-            }
-        });
+                @Override
+                @Nullable
+                public Context getHostContext() {
+                    return isAdded() ? getContext() : null;
+                }
+
+                @Override
+                public void onContentMutated() {
+                    if (isAdded()) reloadActiveTab();
+                }
+            };
+
+    private void openConfigEditor(@NonNull InstanceContentManager.ContentItem item) {
+        if (mInstance != null) {
+            git.artdeell.mojo.content.ContentStudioActions.openConfigEditor(mActionsHost, mInstance, item);
+        }
     }
 
     private void checkModUpdates() {
-        if (mInstance == null) return;
-        if (mLoadedMods.isEmpty()) {
-            Toast.makeText(requireContext(), "No installed mods to check.", Toast.LENGTH_SHORT).show();
-            return;
+        if (mInstance != null) {
+            git.artdeell.mojo.content.ContentStudioActions.checkModUpdates(mActionsHost, mInstance, mLoadedMods);
         }
-        Toast.makeText(requireContext(), "Checking SHA-1 hashes against Modrinth...", Toast.LENGTH_SHORT).show();
-        final List<ModMetadataParser.ModInfo> snap = new ArrayList<>(mLoadedMods);
-        final String mcVer = mInstance.versionId != null ? mInstance.versionId : "";
-        final ModMetadataParser.LoaderFamily instLoader =
-                ModMetadataParser.inferLoaderFromVersionId(mcVer);
-
-        MojoApplication.sExecutorService.execute(() -> {
-            try {
-                List<String> lines = new ArrayList<>();
-                int limit = Math.min(25, snap.size());
-                for (int i = 0; i < limit; i++) {
-                    ModMetadataParser.ModInfo mod = snap.get(i);
-                    if (!mod.file.isFile() || mod.corruptJar) continue;
-                    ModMetadataParser.LoaderFamily loader =
-                            mod.loader != ModMetadataParser.LoaderFamily.UNKNOWN ? mod.loader : instLoader;
-                    InstanceContentManager.ModUpdateInfo info =
-                            InstanceContentManager.checkModrinthUpdate(mod.file, mcVer, loader);
-                    if (info.updateAvailable) {
-                        lines.add("• " + mod.name + " (" + info.currentVersionNumber
-                                + " → " + info.latestVersionNumber + ")");
-                    }
-                }
-                Tools.runOnUiThread(() -> {
-                    if (!isAdded()) return;
-                    final boolean canRollback = git.artdeell.mojo.content.ModrinthContentInstaller.hasRollbackBackup(mInstance);
-                    if (lines.isEmpty()) {
-                        if (canRollback) {
-                            new AlertDialog.Builder(requireContext())
-                                    .setTitle("All Mods Up To Date")
-                                    .setMessage("All recognized Modrinth mods match the latest verified release.\n\nA backup from your previous batch update is available if you want to roll back.")
-                                    .setNeutralButton("Rollback Backup", (d, w) -> runModRollback())
-                                    .setPositiveButton(android.R.string.ok, null)
-                                    .show();
-                        } else {
-                            Toast.makeText(requireContext(),
-                                    "All recognized Modrinth mods are up to date for this instance.",
-                                    Toast.LENGTH_LONG).show();
-                        }
-                        return;
-                    }
-                    StringBuilder sb = new StringBuilder();
-                    for (String line : lines) sb.append(line).append('\n');
-                    sb.append("\nPrevious .jar files will be backed up automatically for 1-tap rollback.");
-                    AlertDialog.Builder b = new AlertDialog.Builder(requireContext())
-                            .setTitle(lines.size() + " Mod Update(s) Available")
-                            .setMessage(sb.toString().trim())
-                            .setPositiveButton("Update All Now", (d, w) -> runBatchModUpdate())
-                            .setNegativeButton(android.R.string.cancel, null);
-                    if (canRollback) {
-                        b.setNeutralButton("Rollback Last", (d, w) -> runModRollback());
-                    }
-                    b.show();
-                });
-            } catch (Exception e) {
-                Tools.runOnUiThread(() -> {
-                    if (isAdded()) {
-                        Toast.makeText(requireContext(), "Update check failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
-        });
     }
 
     private void showSnapshotMenu() {
-        if (mInstance == null) return;
-        String[] options = {"Save Current Mod Enable/Disable Snapshot", "Restore Last Saved Snapshot"};
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Mod Set Rollback Snapshot")
-                .setItems(options, (d, which) -> MojoApplication.sExecutorService.execute(() -> {
-                    try {
-                        if (which == 0) {
-                            InstanceContentManager.saveModStateSnapshot(mInstance.getGameDirectory());
-                            Tools.runOnUiThread(() -> {
-                                if (isAdded()) Toast.makeText(requireContext(),
-                                        "Mod state snapshot saved!", Toast.LENGTH_SHORT).show();
-                            });
-                        } else {
-                            int changed = InstanceContentManager.restoreLatestModStateSnapshot(mInstance.getGameDirectory());
-                            Tools.runOnUiThread(() -> {
-                                if (!isAdded()) return;
-                                Toast.makeText(requireContext(),
-                                        "Restored snapshot (" + changed + " mod(s) toggled).", Toast.LENGTH_LONG).show();
-                                reloadActiveTab();
-                            });
-                        }
-                    } catch (Exception e) {
-                        Tools.runOnUiThread(() -> {
-                            if (isAdded()) Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-                        });
-                    }
-                }))
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        if (mInstance != null) {
+            git.artdeell.mojo.content.ContentStudioActions.showSnapshotMenu(mActionsHost, mInstance);
+        }
     }
 
     private void runBatchModUpdate() {
-        if (mInstance == null) return;
-        final Instance target = mInstance;
-        final Context appCtx = requireContext().getApplicationContext();
-        Toast.makeText(appCtx, "Updating outdated mods with SHA-1 verification…", Toast.LENGTH_SHORT).show();
-        MojoApplication.sExecutorService.execute(() -> {
-            try {
-                git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary sum =
-                        git.artdeell.mojo.content.ModrinthContentInstaller.batchUpdateAllMods(target, null);
-                Tools.runOnUiThread(() -> {
-                    Toast.makeText(appCtx, sum.message, Toast.LENGTH_LONG).show();
-                    if (isAdded()) reloadActiveTab();
-                });
-            } catch (Exception e) {
-                Tools.runOnUiThread(() -> Toast.makeText(appCtx,
-                        "Batch update failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
-            }
-        });
-    }
-
-    private void runModRollback() {
-        if (mInstance == null) return;
-        final Instance target = mInstance;
-        final Context appCtx = requireContext().getApplicationContext();
-        MojoApplication.sExecutorService.execute(() -> {
-            try {
-                int count = git.artdeell.mojo.content.ModrinthContentInstaller.rollbackLastModUpdate(target);
-                Tools.runOnUiThread(() -> {
-                    Toast.makeText(appCtx, "Restored " + count + " previous mod jar(s).", Toast.LENGTH_LONG).show();
-                    if (isAdded()) reloadActiveTab();
-                });
-            } catch (Exception e) {
-                Tools.runOnUiThread(() -> Toast.makeText(appCtx,
-                        "Rollback failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
-            }
-        });
+        if (mInstance != null) {
+            git.artdeell.mojo.content.ContentStudioActions.runBatchModUpdate(mActionsHost, mInstance);
+        }
     }
 
     private void showGameOptimizerDialog() {
-        if (mInstance == null || !isAdded()) return;
-        final Context ctx = requireContext();
-        final File gameDir = mInstance.getGameDirectory();
-        final boolean hasBak = git.artdeell.mojo.performance.GameOptimizer.hasOptionsBackup(gameDir);
-        final String currentMode = git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE;
-
-        List<String> labels = new ArrayList<>();
-        List<String> modes = new ArrayList<>();
-        labels.add("Auto Smart (JVM GC + Safe Defaults)");
-        modes.add(git.artdeell.mojo.performance.GameOptimizer.MODE_AUTO);
-        labels.add("Competitive Max FPS (90/120 Hz + Fast options.txt)");
-        modes.add(git.artdeell.mojo.performance.GameOptimizer.MODE_MAX_FPS);
-        labels.add("Balanced Smooth (Crisp Visuals + High FPS)");
-        modes.add(git.artdeell.mojo.performance.GameOptimizer.MODE_BALANCED);
-        labels.add("Shader Ready (Tuned for Iris / OptiFine)");
-        modes.add(git.artdeell.mojo.performance.GameOptimizer.MODE_SHADERS);
-        labels.add("Off (Vanilla Unmodified)");
-        modes.add(git.artdeell.mojo.performance.GameOptimizer.MODE_OFF);
-        if (hasBak) {
-            labels.add("Restore Previous options.txt Backup");
-            modes.add("restore_bak");
+        if (mInstance != null && isAdded()) {
+            git.artdeell.mojo.content.ContentStudioActions.showGameOptimizerDialog(requireContext(), mInstance);
         }
-
-        new AlertDialog.Builder(ctx)
-                .setTitle("Zyrox Game Optimizer • "
-                        + git.artdeell.mojo.performance.GameOptimizer.getModeDisplayName(currentMode))
-                .setItems(labels.toArray(new CharSequence[0]), (d, which) -> {
-                    final String chosen = modes.get(which);
-                    if ("restore_bak".equals(chosen)) {
-                        boolean ok = git.artdeell.mojo.performance.GameOptimizer.restoreOptionsBackup(gameDir);
-                        Toast.makeText(ctx, ok ? "Restored previous options.txt backup"
-                                : "No backup found", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE = chosen;
-                    if (git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF != null) {
-                        git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF.edit()
-                                .putString(git.artdeell.mojo.performance.GameOptimizer.PREF_KEY_MODE, chosen)
-                                .apply();
-                    }
-                    if (!git.artdeell.mojo.performance.GameOptimizer.MODE_OFF.equals(chosen)
-                            && !git.artdeell.mojo.performance.GameOptimizer.MODE_AUTO.equals(chosen)) {
-                        final int totalRam = Tools.getTotalDeviceMemory(ctx);
-                        MojoApplication.sExecutorService.execute(() -> {
-                            boolean applied = git.artdeell.mojo.performance.GameOptimizer.applyOptionsPreset(
-                                    gameDir, chosen, totalRam, 120, true);
-                            Tools.runOnUiThread(() -> Toast.makeText(ctx.getApplicationContext(),
-                                    applied
-                                            ? ("Applied " + git.artdeell.mojo.performance.GameOptimizer.getModeDisplayName(chosen)
-                                                    + " (JVM + options.txt tuned, backup saved)")
-                                            : ("Set JVM mode: " + git.artdeell.mojo.performance.GameOptimizer.getModeDisplayName(chosen)),
-                                    Toast.LENGTH_LONG).show());
-                        });
-                    } else {
-                        Toast.makeText(ctx, "Optimizer mode: "
-                                + git.artdeell.mojo.performance.GameOptimizer.getModeDisplayName(chosen),
-                                Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
     }
 
     private void triggerImport() {
@@ -724,7 +523,11 @@ public class ContentManagerFragment extends Fragment {
             Toast.makeText(requireContext(), "Create or import a world first to add datapacks.", Toast.LENGTH_LONG).show();
             return;
         }
-        mImportLauncher.launch(new String[]{"*/*"});
+        if (mActiveKind == TabKind.MODS) {
+            mImportJarLauncher.launch(null);
+        } else {
+            mImportZipLauncher.launch(null);
+        }
     }
 
     private void onFileImported(@Nullable Uri uri) {

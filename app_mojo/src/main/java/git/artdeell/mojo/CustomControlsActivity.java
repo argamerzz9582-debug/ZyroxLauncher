@@ -35,6 +35,35 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
     private ControlLayout mControlLayout;
     private CropperUtils.CropperReceiver mCropperReceiver;
     private ActivityResultLauncher<?> mCropperLauncher;
+    private final ActivityResultLauncher<Object> mOpenControlDocLauncher =
+            registerForActivityResult(
+                    new git.artdeell.mojo.contracts.OpenDocumentWithExtension("json"),
+                    uri -> {
+                        if (uri == null || mControlLayout == null) return;
+                        try {
+                            java.io.File imported = git.artdeell.mojo.input.ControlProfileManager
+                                    .importControlJsonUri(this, uri, null);
+                            mControlLayout.loadLayout(imported.getAbsolutePath());
+                        } catch (Exception e) {
+                            Tools.showError(this, e);
+                        }
+                    });
+    private final ActivityResultLauncher<Object> mOpenControlQrLauncher =
+            registerForActivityResult(
+                    new git.artdeell.mojo.contracts.OpenDocumentWithExtension("png"),
+                    uri -> {
+                        if (uri == null || mControlLayout == null) return;
+                        try {
+                            java.io.File imported = git.artdeell.mojo.input.ControlProfileManager
+                                    .importControlFromQrImageUri(this, uri);
+                            mControlLayout.loadLayout(imported.getAbsolutePath());
+                            android.widget.Toast.makeText(this,
+                                    "Imported control profile: " + imported.getName(),
+                                    android.widget.Toast.LENGTH_SHORT).show();
+                        } catch (Exception e) {
+                            Tools.showError(this, e);
+                        }
+                    });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -142,10 +171,16 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
         View exitBtn = findViewById(R.id.btn_hud_exit);
         if (exitBtn != null) exitBtn.setOnClickListener(v -> mControlLayout.askToExit(this));
 
+        mControlLayout.setExternalDocumentPicker(() -> mOpenControlDocLauncher.launch(null));
+        String[] baseItems = getResources().getStringArray(R.array.menu_customcontrol_customactivity);
+        String[] extendedItems = new String[baseItems.length + 2];
+        System.arraycopy(baseItems, 0, extendedItems, 0, baseItems.length);
+        extendedItems[baseItems.length] = "Share via QR Code / Compact Token";
+        extendedItems[baseItems.length + 1] = "Import from QR Image / Token";
         mDrawerNavigationView.setAdapter(new ArrayAdapter<>(
                 this,
                 R.layout.item_simple_list_1,
-                getResources().getStringArray(R.array.menu_customcontrol_customactivity)));
+                extendedItems));
         mDrawerNavigationView.setOnItemClickListener((parent, view, position, id) -> {
             switch (position) {
                 case 0:
@@ -168,6 +203,27 @@ public class CustomControlsActivity extends BaseActivity implements EditorExitab
                     break;
                 case 6:
                     shareCurrentLayout();
+                    break;
+                case 7:
+                    try {
+                        String savedPath = mControlLayout.saveToDirectory(mControlLayout.mLayoutFileName);
+                        git.artdeell.mojo.input.ControlProfileManager.showShareQrDialog(
+                                this, new java.io.File(savedPath));
+                    } catch (Exception e) {
+                        Tools.showError(this, e);
+                    }
+                    break;
+                case 8:
+                    git.artdeell.mojo.input.ControlProfileManager.showImportQrOrTokenDialog(
+                            this,
+                            () -> mOpenControlQrLauncher.launch(null),
+                            imported -> {
+                                try {
+                                    mControlLayout.loadLayout(imported.getAbsolutePath());
+                                } catch (Exception e) {
+                                    Tools.showError(this, e);
+                                }
+                            });
                     break;
             }
             mDrawerLayout.closeDrawers();

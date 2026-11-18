@@ -15,16 +15,24 @@ import git.artdeell.mojo.BuildConfig;
 import git.artdeell.mojo.R;
 
 import git.artdeell.mojo.contracts.OpenDocumentWithExtension;
+import git.artdeell.mojo.diagnostics.GraphicsAdvisor;
+import git.artdeell.mojo.downloader.RuntimeDriverStoreDialog;
 import git.artdeell.mojo.game.renderer.RendererCache;
 import git.artdeell.mojo.game.renderer.extra.GLESProvider;
+import git.artdeell.mojo.game.renderer.impl.MesaRenderSpec;
+import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.prefs.CustomSeekBarPreference;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.utils.GpuUtils;
+import git.artdeell.mojo.utils.NetworkPolicyHelper;
 import git.artdeell.mojo.vulkan.DriverInstaller;
 import git.artdeell.mojo.vulkan.DriverManager;
 import git.artdeell.mojo.vulkan.driver.BuiltinDriver;
 import git.artdeell.mojo.vulkan.driver.Driver;
 import git.artdeell.mojo.vulkan.ui.DriverConfigDialog;
+
+import android.widget.Toast;
 
 /**
  * Fragment for any settings video related
@@ -33,8 +41,9 @@ public class LauncherPreferenceVideoFragment extends LauncherPreferenceBaseFragm
     private Boolean hasAngle = null;
 
     private DriverConfigDialog mDialogScreen;
+    // Use "adpkg" so OpenDocumentWithExtension resolves to "*/*", allowing both .adpkg and .zip Turnip drivers
     private final ActivityResultLauncher<Object> mInstallDriver =
-            registerForActivityResult(new OpenDocumentWithExtension("zip"), data -> {
+            registerForActivityResult(new OpenDocumentWithExtension("adpkg"), data -> {
                 if(data != null) DriverInstaller.installDriverFromUri(getContext(), data, this::openDriverDialog);
             });
     @Override
@@ -82,6 +91,38 @@ public class LauncherPreferenceVideoFragment extends LauncherPreferenceBaseFragm
         Preference drivers = requirePreference("manageDrivers");
         drivers.setOnPreferenceClickListener(pref -> {
             openDriverDialog();
+            return true;
+        });
+
+        Preference turnipStore = requirePreference("zyroxTurnipStore");
+        turnipStore.setOnPreferenceClickListener(pref -> {
+            RuntimeDriverStoreDialog.showHub(requireContext(), this::updateDriversPref);
+            return true;
+        });
+
+        Preference gpuAuto = requirePreference("zyroxGpuAutoPreset");
+        GpuUtils.GLInfo glInfo = GpuUtils.getGlInfo();
+        gpuAuto.setSummary(glInfo.architecture.displayName + " • Tap to auto-tune renderer, scale & RAM");
+        gpuAuto.setOnPreferenceClickListener(pref -> {
+            Instance inst = Instances.loadSelectedInstance();
+            GraphicsAdvisor.RendererPreset preset = GraphicsAdvisor.applyOptimalPreset(
+                    requireContext(), inst, inst != null ? inst.versionId : null);
+            rendererListPreference.setValue(LauncherPreferences.PREF_RENDERER);
+            resolutionSeekbar.setValue((int) Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f));
+            updateDriversPref();
+            Toast.makeText(requireContext(),
+                    "Applied preset: " + preset.summary, Toast.LENGTH_LONG).show();
+            return true;
+        });
+
+        Preference purgeCache = requirePreference("zyroxPurgeShaderCache");
+        purgeCache.setOnPreferenceClickListener(pref -> {
+            long freed = MesaRenderSpec.purgeShaderCaches();
+            Toast.makeText(requireContext(),
+                    freed > 0L
+                            ? ("Cleared " + NetworkPolicyHelper.formatBytes(freed) + " of Mesa/Zink shader cache")
+                            : "Mesa/Zink shader cache is already clean",
+                    Toast.LENGTH_SHORT).show();
             return true;
         });
         SwitchPreferenceCompat customVk = requirePreference("zinkPreferSystemDriver", SwitchPreferenceCompat.class);

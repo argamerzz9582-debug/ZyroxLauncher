@@ -213,138 +213,16 @@ public final class Tools {
 
 
     public static DisplayMetrics getDisplayMetrics(Activity activity) {
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-
-        if(SDK_INT >= Build.VERSION_CODES.N && (activity.isInMultiWindowMode() || activity.isInPictureInPictureMode())){
-            //For devices with free form/split screen, we need window size, not screen size.
-            displayMetrics = activity.getResources().getDisplayMetrics();
-        }else{
-            if (SDK_INT >= Build.VERSION_CODES.R) {
-                Objects.requireNonNull(activity.getDisplay()).getRealMetrics(displayMetrics);
-            } else { // Removed the clause for devices with unofficial notch support, since it also ruins all devices with virtual nav bars before P
-                activity.getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
-            }
-        }
-        currentDisplayMetrics = displayMetrics;
-        return displayMetrics;
-    }
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    private static void setCutoutMode(Window window, boolean ignoreNotch) {
-        WindowManager.LayoutParams layoutParams = window.getAttributes();
-        if (ignoreNotch) {
-            if (SDK_INT >= Build.VERSION_CODES.R) {
-                layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-            } else {
-                layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            }
-        } else {
-            layoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_NEVER;
-        }
-        window.setAttributes(layoutParams);
-        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-    }
-
-    @SuppressWarnings("deprecation")
-    private static void applyLegacyFullscreenFlags(View insetView) {
-        insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                | View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-    }
-
-    @SuppressWarnings("deprecation")
-    private static void setLegacyFullscreen(View insetView, boolean fullscreen) {
-        View.OnSystemUiVisibilityChangeListener listener = (visibility) -> {
-            if (fullscreen && (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                applyLegacyFullscreenFlags(insetView);
-            } else if (!fullscreen) {
-                insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
-            }
-        };
-        if (fullscreen) {
-            applyLegacyFullscreenFlags(insetView);
-        } else {
-            insetView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
-        }
-        insetView.setOnSystemUiVisibilityChangeListener(listener);
+        return git.artdeell.mojo.utils.SystemWindowHelper.getDisplayMetrics(activity);
     }
 
     /** Re-applies sticky immersive bar hiding when focus returns after popups, dialogs, or IME. */
     public static void hideSystemBars(Activity activity) {
-        if (SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode()) return;
-        Window window = activity.getWindow();
-        if (window == null) return;
-        if (SDK_INT >= Build.VERSION_CODES.R) {
-            WindowInsetsController controller = window.getInsetsController();
-            if (controller != null) {
-                controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                controller.hide(WindowInsets.Type.systemBars());
-            }
-        } else {
-            View insetView = activity.findViewById(android.R.id.content);
-            if (insetView != null) {
-                applyLegacyFullscreenFlags(insetView);
-            }
-        }
+        git.artdeell.mojo.utils.SystemWindowHelper.hideSystemBars(activity);
     }
 
-    @SuppressWarnings("deprecation")
     public static void setInsetsMode(Activity activity, boolean noSystemBars, boolean ignoreNotch) {
-        Window window = activity.getWindow();
-        View insetView = activity.findViewById(android.R.id.content);
-        // Don't ignore system bars in window mode (will put game behind window button bar)
-        if(SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode()) noSystemBars = false;
-
-        int bgColor;
-        if(!noSystemBars) bgColor = activity.getResources().getColor(R.color.background_status_bar);
-        else bgColor = Color.TRANSPARENT;
-
-        // Ensure completely transparent system bars and zero forced OEM scrim
-        window.setStatusBarColor(Color.TRANSPARENT);
-        window.setNavigationBarColor(Color.TRANSPARENT);
-        if (SDK_INT >= Build.VERSION_CODES.Q) {
-            window.setStatusBarContrastEnforced(false);
-            window.setNavigationBarContrastEnforced(false);
-        }
-
-        // Configure edge-to-edge display cutout rendering on all supported API levels (28 through 36+)
-        if(SDK_INT >= Build.VERSION_CODES.P) setCutoutMode(window, ignoreNotch);
-
-        // Use sticky immersive flags for API < 30 (cutout already configured above)
-        if(SDK_INT < Build.VERSION_CODES.R) {
-            setLegacyFullscreen(insetView, noSystemBars);
-            return;
-        }
-
-        // Explicitly draw edge-to-edge across status, navigation, and cutout zones
-        window.setDecorFitsSystemWindows(false);
-
-        WindowInsetsController insetsController = window.getInsetsController();
-        if(insetsController != null) {
-            insetsController.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            if(noSystemBars) insetsController.hide(WindowInsets.Type.systemBars());
-            else insetsController.show(WindowInsets.Type.systemBars());
-        }
-
-        boolean fFullscreen = noSystemBars;
-        insetView.setOnApplyWindowInsetsListener((v, windowInsets) -> {
-            int insetMask = 0;
-            if(!fFullscreen) insetMask |= WindowInsets.Type.systemBars();
-            if(!ignoreNotch) insetMask |= WindowInsets.Type.displayCutout();
-            if(insetMask != 0) {
-                Insets insets = windowInsets.getInsets(insetMask);
-                v.setBackground(new InsetBackground(insets,bgColor));
-                insetView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            } else {
-                insetView.setPadding(0, 0, 0, 0);
-                v.setBackground(null);
-            }
-            return WindowInsets.CONSUMED;
-        });
-        insetView.requestApplyInsets();
+        git.artdeell.mojo.utils.SystemWindowHelper.setInsetsMode(activity, noSystemBars, ignoreNotch);
     }
 
     // Note: this should *NOT* be used for positioning and sizing things on the screen
@@ -379,177 +257,60 @@ public final class Tools {
     }
 
     public static String printToString(Throwable throwable) {
-        StringWriter stringWriter = new StringWriter();
-        PrintWriter printWriter = new PrintWriter(stringWriter);
-        throwable.printStackTrace(printWriter);
-        printWriter.close();
-        return stringWriter.toString();
+        return git.artdeell.mojo.utils.ErrorDialogDispatcher.printStackTrace(throwable);
     }
 
     public static void showError(Context ctx, Throwable e) {
         showError(ctx, e, false);
     }
-
     public static void showError(final Context ctx, final Throwable e, final boolean exitIfOk) {
-        showError(ctx, R.string.global_error, null ,e, exitIfOk, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, R.string.global_error, null, e, exitIfOk, false);
     }
     public static void showError(final Context ctx, final int rolledMessage, final Throwable e) {
-        showError(ctx, R.string.global_error, ctx.getString(rolledMessage), e, false, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, R.string.global_error, ctx.getString(rolledMessage), e, false, false);
     }
     public static void showError(final Context ctx, final String rolledMessage, final Throwable e) {
-        showError(ctx, R.string.global_error, rolledMessage, e, false, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, R.string.global_error, rolledMessage, e, false, false);
     }
     public static void showError(final Context ctx, final String rolledMessage, final Throwable e, boolean exitIfOk) {
-        showError(ctx, R.string.global_error, rolledMessage, e, exitIfOk, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, R.string.global_error, rolledMessage, e, exitIfOk, false);
     }
     public static void showError(final Context ctx, final int title, final String rolledMessage, final Throwable e) {
-        showError(ctx, title, rolledMessage, e, false, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, title, rolledMessage, e, false, false);
     }
     public static void showError(final Context ctx, final int titleId, final Throwable e, final boolean exitIfOk) {
-        showError(ctx, titleId, null, e, exitIfOk, false);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showError(ctx, titleId, null, e, exitIfOk, false);
     }
 
-    private static void showError(final Context ctx, final int titleId, final String rolledMessage, final Throwable e, final boolean exitIfOk, final boolean showMore) {
-        if(e instanceof ContextExecutorTask) {
-            ContextExecutor.execute((ContextExecutorTask) e);
-            return;
-        }
-
-        Runnable runnable = () -> {
-            final String rawMsg = showMore ? printToString(e) : rolledMessage != null ? rolledMessage : e.getMessage();
-            final String errMsg = git.artdeell.mojo.security.LogRedactor.redact(rawMsg);
-            AlertDialog.Builder builder = new AlertDialog.Builder(ctx)
-                    .setTitle(titleId)
-                    .setMessage(errMsg)
-                    .setPositiveButton(android.R.string.ok, (p1, p2) -> {
-                        if(exitIfOk) {
-                            if (ctx instanceof GameActivity) {
-                                fullyExit();
-                            } else if (ctx instanceof ShowErrorActivity) {
-                                ((Activity) ctx).finishAndRemoveTask();
-                            } else if (ctx instanceof Activity) {
-                                ((Activity) ctx).finish();
-                            }
-                        }
-                    })
-                    .setNegativeButton(showMore ? R.string.error_show_less : R.string.error_show_more, (p1, p2) -> showError(ctx, titleId, rolledMessage, e, exitIfOk, !showMore))
-                    .setNeutralButton(android.R.string.copy, (p1, p2) -> {
-                        ClipboardManager mgr = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                        if (mgr != null) {
-                            mgr.setPrimaryClip(ClipData.newPlainText("error",
-                                    git.artdeell.mojo.security.LogRedactor.redact(printToString(e))));
-                        }
-                        if(exitIfOk) {
-                            if (ctx instanceof GameActivity) {
-                                fullyExit();
-                            } else if (ctx instanceof ShowErrorActivity) {
-                                ((Activity) ctx).finishAndRemoveTask();
-                            } else if (ctx instanceof Activity) {
-                                ((Activity) ctx).finish();
-                            }
-                        }
-                    })
-                    .setCancelable(!exitIfOk);
-            builder.show();
-        };
-
-        if (ctx instanceof Activity) {
-            ((Activity) ctx).runOnUiThread(runnable);
-        } else {
-            runnable.run();
-        }
-    }
-
-    /**
-     * Show the error remotely in a context-aware fashion. Has generally the same behaviour as
-     * Tools.showError when in an activity, but when not in one, sends a notification that opens an
-     * activity and calls Tools.showError().
-     * NOTE: If the Throwable is a ContextExecutorTask and when not in an activity,
-     * its executeWithApplication() method will never be called.
-     * @param e the error (throwable)
-     */
     public static void showErrorRemote(Throwable e) {
-        showErrorRemote(null, e);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showErrorRemote(null, e);
     }
     public static void showErrorRemote(Context context, int rolledMessage, Throwable e) {
-        showErrorRemote(context.getString(rolledMessage), e);
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showErrorRemote(context.getString(rolledMessage), e);
     }
     public static void showErrorRemote(String rolledMessage, Throwable e) {
-        // I WILL embrace layer violations because Android's concept of layers is STUPID
-        // We live in the same process anyway, why make it any more harder with this needless
-        // abstraction?
-
-        // Add your Context-related rage here
-        ContextExecutor.execute(new ShowErrorActivity.RemoteErrorTask(e, rolledMessage));
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showErrorRemote(rolledMessage, e);
     }
-
-
 
     public static void dialogOnUiThread(final Activity activity, final CharSequence title, final CharSequence message) {
-        activity.runOnUiThread(()->dialog(activity, title, message));
+        activity.runOnUiThread(() -> dialog(activity, title, message));
     }
-
     public static void dialogOnUiThread(final Activity activity, final int title, final int message) {
-        activity.runOnUiThread(()->dialog(activity, title, message));
+        activity.runOnUiThread(() -> dialog(activity, title, message));
     }
-
     public static void dialog(final Context context, final CharSequence title, final CharSequence message) {
-        new AlertDialog.Builder(context)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showDialog(context, title, message);
     }
-
     public static void dialog(final Context context, final int title, final int message) {
-        new AlertDialog.Builder(context)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.showDialog(context, title, message);
     }
 
     public static void openURL(Activity act, String url) {
-        try {
-            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            act.startActivity(browserIntent);
-        } catch (ActivityNotFoundException e) {
-            Tools.showError(act, e);
-        }
+        git.artdeell.mojo.utils.ErrorDialogDispatcher.openUrl(act, url);
     }
 
     public static void preProcessLibrary(DependentLibrary libItem) {
-        MavenName libName = libItem.name;
-        String[] version = libName.version.split("\\.");
-        if (libName.module.equals("jna") && libName.provider.equals("net.java.dev.jna")) {
-            // Special handling for LabyMod 1.8.9, Forge 1.12.2(?) and oshi
-            // we have libjnidispatch 5.13.0 in jniLibs directory
-            if (Integer.parseInt(version[0]) >= 5 && Integer.parseInt(version[1]) >= 13)
-                return;
-            Log.d(APP_NAME, "Library " + libItem.name + " has been changed to version 5.13.0");
-            createLibraryInfo(libItem);
-            libItem.name = new MavenName(libName.provider, libName.module, "5.13.0");
-            libItem.downloads.artifact.path = "net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar";
-            libItem.downloads.artifact.sha1 = "1200e7ebeedbe0d10062093f32925a912020e747";
-            libItem.downloads.artifact.url = MAVEN_CENTRAL+"net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar";
-            libItem.downloads.artifact.size = 1879325;
-            libItem.replaced = true;
-        } else if (libName.module.equals("oshi-core") && libName.provider.equals("com.github.oshi")) {
-            //if (Integer.parseInt(version[0]) >= 6 && Integer.parseInt(version[1]) >= 3) return;
-            // FIXME: ensure compatibility
-
-            if (Integer.parseInt(version[0]) != 6 || Integer.parseInt(version[1]) != 2)
-                return;
-            Log.d(APP_NAME, "Library " + libItem.name + " has been changed to version 6.3.0");
-            createLibraryInfo(libItem);
-            libItem.name = new MavenName(libName.provider, libName.module, "6.3.0");
-            libItem.downloads.artifact.path = "com/github/oshi/oshi-core/6.3.0/oshi-core-6.3.0.jar";
-            libItem.downloads.artifact.sha1 = "9e98cf55be371cafdb9c70c35d04ec2a8c2b42ac";
-            libItem.downloads.artifact.url = MAVEN_CENTRAL+"com/github/oshi/oshi-core/6.3.0/oshi-core-6.3.0.jar";
-            libItem.downloads.artifact.size = 957945;
-            libItem.replaced = true;
-        }
+        git.artdeell.mojo.utils.VersionManifestResolver.preProcessLibrary(libItem);
     }
 
     public static String read(InputStream is) throws IOException {
@@ -610,102 +371,18 @@ public final class Tools {
     }
 
     public static JVersionList.Version getVersionInfo(String versionName) {
-        return getVersionInfo(versionName, false);
+        return git.artdeell.mojo.utils.VersionManifestResolver.resolveVersionInfo(versionName, false);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
     public static JVersionList.Version getVersionInfo(String versionName, boolean skipInheriting) {
-        try {
-            JVersionList.Version customVer = GLOBAL_GSON.fromJson(read(DIR_HOME_VERSION + "/" + versionName + "/" + versionName + ".json"), JVersionList.Version.class);
-            if (skipInheriting || customVer.inheritsFrom == null || customVer.inheritsFrom.equals(customVer.id)) {
-            } else {
-                JVersionList.Version inheritsVer;
-                //If it won't download, just search for it
-                try{
-                    inheritsVer = GLOBAL_GSON.fromJson(read(DIR_HOME_VERSION + "/" + customVer.inheritsFrom + "/" + customVer.inheritsFrom + ".json"), JVersionList.Version.class);
-                }catch(IOException e) {
-                    throw new RuntimeException("Can't find the source version for "+ versionName +" (req version="+customVer.inheritsFrom+")");
-                }
-                //inheritsVer.inheritsFrom = inheritsVer.id;
-                insertSafety(inheritsVer, customVer,
-                        "assetIndex", "assets", "id",
-                        "mainClass", "minecraftArguments",
-                        "releaseTime", "time", "type", "environment",
-                        "disableRendererChecks"
-                );
-
-
-                // Inheriting Minecraft 1.13+ with append custom args
-                if (inheritsVer.arguments != null && customVer.arguments != null &&
-                    inheritsVer.arguments.game != null && customVer.arguments.game != null) {
-                    List totalArgList = new ArrayList(Arrays.asList(inheritsVer.arguments.game));
-
-                    int nskip = 0;
-                    for (int i = 0; i < customVer.arguments.game.length; i++) {
-                        if (nskip > 0) {
-                            nskip--;
-                            continue;
-                        }
-
-                        Object perCustomArg = customVer.arguments.game[i];
-                        if (perCustomArg instanceof String) {
-                            String perCustomArgStr = (String) perCustomArg;
-                            // Check if there is a duplicate argument on combine
-                            if (perCustomArgStr.startsWith("--") && totalArgList.contains(perCustomArgStr)) {
-                                perCustomArg = customVer.arguments.game[i + 1];
-                                if (perCustomArg instanceof String) {
-                                    perCustomArgStr = (String) perCustomArg;
-                                    // If the next is argument value, skip it
-                                    if (!perCustomArgStr.startsWith("--")) {
-                                        nskip++;
-                                    }
-                                }
-                            } else {
-                                totalArgList.add(perCustomArgStr);
-                            }
-                        } else if (!totalArgList.contains(perCustomArg)) {
-                            totalArgList.add(perCustomArg);
-                        }
-                    }
-
-                    inheritsVer.arguments.game = totalArgList.toArray(new Object[0]);
-                }
-
-                customVer = inheritsVer;
-            }
-
-            // LabyMod 4 sets version instead of majorVersion
-            if (customVer.javaVersion != null && customVer.javaVersion.majorVersion == 0) {
-                customVer.javaVersion.majorVersion = customVer.javaVersion.version;
-            }
-            return customVer;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    // Prevent NullPointerException
-    private static void insertSafety(JVersionList.Version targetVer, JVersionList.Version fromVer, String... keyArr) {
-        for (String key : keyArr) {
-            Object value = null;
-            try {
-                Field fieldA = fromVer.getClass().getDeclaredField(key);
-                value = fieldA.get(fromVer);
-                if (((value instanceof String) && !((String) value).isEmpty()) || value != null) {
-                    Field fieldB = targetVer.getClass().getDeclaredField(key);
-                    fieldB.set(targetVer, value);
-                }
-            } catch (Throwable th) {
-                Log.w(APP_NAME, "Unable to insert " + key + "=" + value, th);
-            }
-        }
+        return git.artdeell.mojo.utils.VersionManifestResolver.resolveVersionInfo(versionName, skipInheriting);
     }
 
     public static String getSelectedRuntime(Instance instance) {
         String runtime = LauncherPreferences.PREF_DEFAULT_RUNTIME;
         String profileRuntime = instance.selectedRuntime;
-        if(profileRuntime != null) {
-            if(MultiRTUtils.forceReread(profileRuntime).versionString != null) {
+        if (profileRuntime != null) {
+            if (MultiRTUtils.forceReread(profileRuntime).versionString != null) {
                 runtime = profileRuntime;
             }
         }
@@ -713,50 +390,27 @@ public final class Tools {
     }
 
     public static void createLibraryInfo(DependentLibrary library) {
-        if(library.downloads == null || library.downloads.artifact == null)
-            library.downloads = new DependentLibrary.LibraryDownloads(new LibraryArtifact());
+        git.artdeell.mojo.utils.VersionManifestResolver.createLibraryInfo(library);
     }
 
     public interface DownloaderFeedback {
         void updateProgress(int curr, int max);
     }
 
-
-    public static int getTotalDeviceMemory(Context ctx){
-        ActivityManager actManager = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-        ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
-        actManager.getMemoryInfo(memInfo);
-        return (int) (memInfo.totalMem / 1048576L);
+    public static int getTotalDeviceMemory(Context ctx) {
+        return git.artdeell.mojo.utils.SystemWindowHelper.getTotalDeviceMemoryMb(ctx);
     }
 
-    public static int getFreeDeviceMemory(Context ctx){
-        ActivityManager actManager = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-        ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
-        actManager.getMemoryInfo(memInfo);
-        return (int) (memInfo.availMem / 1048576L);
-    }
-
-    private static int internalGetMaxContinuousAddressSpaceSize() throws Exception{
-        MemoryHoleFinder memoryHoleFinder = new MemoryHoleFinder();
-        new SelfMapsParser(memoryHoleFinder).run();
-        long largestHole = memoryHoleFinder.getLargestHole();
-        if(largestHole == -1) return -1;
-        else return (int)(largestHole / 1048576L);
+    public static int getFreeDeviceMemory(Context ctx) {
+        return git.artdeell.mojo.utils.SystemWindowHelper.getFreeDeviceMemoryMb(ctx);
     }
 
     public static int getMaxContinuousAddressSpaceSize() {
-        try {
-            return internalGetMaxContinuousAddressSpaceSize();
-        }catch (Exception e){
-            Log.w("Tools", "Failed to find the largest uninterrupted address space");
-            return -1;
-        }
+        return git.artdeell.mojo.utils.SystemWindowHelper.getMaxContinuousAddressSpaceSizeMb();
     }
 
-    public static int getDisplayFriendlyRes(int displaySideRes, float scaling){
-        displaySideRes = (int)(displaySideRes * scaling);
-        if(displaySideRes % 2 != 0) displaySideRes --;
-        return displaySideRes;
+    public static int getDisplayFriendlyRes(int displaySideRes, float scaling) {
+        return git.artdeell.mojo.utils.SystemWindowHelper.getDisplayFriendlyRes(displaySideRes, scaling);
     }
 
     public static String getFileName(Context ctx, Uri uri) {

@@ -313,314 +313,39 @@ public final class InstanceManager {
                                            @Nullable File controlsDir,
                                            int requiredJavaMajor,
                                            int selectedJavaMajor) {
-        List<String> findings = new ArrayList<>();
-        List<String> repairs = new ArrayList<>();
-        HealthStatus status = HealthStatus.HEALTHY;
-
-        if (!Tools.isValidString(instance.versionId)) {
-            status = HealthStatus.CRITICAL;
-            findings.add("No Minecraft version selected for this instance.");
-            repairs.add("Reset version to Latest Release");
-        } else if (versionsDir != null
-                && !Instance.VERSION_LATEST_RELEASE.equals(instance.versionId)
-                && !Instance.VERSION_LATEST_SNAPSHOT.equals(instance.versionId)) {
-            File verJson = new File(new File(versionsDir, instance.versionId), instance.versionId + ".json");
-            if (!verJson.isFile()) {
-                findings.add("Version files not yet downloaded (" + instance.versionId + ") — will fetch on launch.");
-            }
-        }
-
-        if (requiredJavaMajor > 0 && selectedJavaMajor > 0 && selectedJavaMajor < requiredJavaMajor) {
-            status = escalate(status, HealthStatus.WARNING);
-            findings.add("Java mismatch: requires Java " + requiredJavaMajor
-                    + ", selected runtime is Java " + selectedJavaMajor + " (auto-upgrade will trigger on launch).");
-            repairs.add("Clear incompatible runtime override");
-        }
-
-        if (Tools.isValidString(instance.controlLayout) && controlsDir != null) {
-            File ctrlFile = new File(controlsDir, instance.controlLayout);
-            if (!ctrlFile.isFile()) {
-                status = escalate(status, HealthStatus.WARNING);
-                findings.add("Assigned control layout \"" + instance.controlLayout + "\" is missing.");
-                repairs.add("Reset missing control layout to default");
-            }
-        }
-
-        if (instance.consecutiveStartupFailures >= 2) {
-            status = escalate(status, HealthStatus.WARNING);
-            findings.add("Detected " + instance.consecutiveStartupFailures
-                    + " consecutive incomplete startups. Consider switching renderer to Safe Compatibility"
-                    + (Tools.isValidString(instance.lastKnownGoodRenderer)
-                    ? " or last-known-good (" + instance.lastKnownGoodRenderer + ")." : "."));
-            repairs.add("Revert renderer to last-known-good / reset crash counter");
-        }
-
-        if (instance.installer != null) {
-            status = escalate(status, HealthStatus.WARNING);
-            findings.add("Pending mod loader installer has not finished running yet.");
-        }
-
-        File gameDir = instance.getGameDirectory();
-        int worldCount = 0;
-        int enabledMods = 0;
-        int disabledMods = 0;
-        long bytes = 0L;
-
-        if (gameDir == null || (!gameDir.exists() && !instance.sharedData)) {
-            status = escalate(status, HealthStatus.WARNING);
-            findings.add("Instance game directory does not exist yet.");
-            repairs.add("Recreate standard instance subfolders (saves, mods, config, resourcepacks, shaderpacks)");
-        } else if (gameDir.isDirectory()) {
-            File saves = new File(gameDir, "saves");
-            File[] worldDirs = saves.listFiles(f -> f.isDirectory() && new File(f, "level.dat").isFile());
-            if (worldDirs != null) worldCount = worldDirs.length;
-
-            File mods = new File(gameDir, "mods");
-            File[] modFiles = mods.listFiles(File::isFile);
-            if (modFiles != null) {
-                for (File mf : modFiles) {
-                    String n = mf.getName().toLowerCase(Locale.ROOT);
-                    if (n.endsWith(".jar")) {
-                        enabledMods++;
-                        if (mf.length() == 0L) {
-                            status = escalate(status, HealthStatus.WARNING);
-                            findings.add("Empty/corrupt mod JAR found: " + mf.getName());
-                        }
-                    } else if (n.endsWith(".jar.disabled")) {
-                        disabledMods++;
-                    }
-                }
-            }
-            if (!instance.sharedData) {
-                bytes = computeDirectoryBytes(gameDir, 20_000);
-            }
-        }
-
-        if (instance.mInstanceRoot != null
-                && new File(instance.mInstanceRoot, "mojo_instance.json.corrupt").isFile()) {
-            findings.add("Previously recovered from a damaged metadata file (.corrupt backup preserved).");
-        }
-
-        if (findings.isEmpty()) {
-            findings.add("Instance configuration, storage directories, and runtime settings are healthy.");
-        }
-
-        return new HealthReport(status, findings, repairs, worldCount, enabledMods, disabledMods, bytes);
+        return InstanceHealthInspector.checkHealth(
+                instance, versionsDir, controlsDir, requiredJavaMajor, selectedJavaMajor);
     }
 
-    /**
-     * Performs safe, non-destructive repairs on an instance (never deletes worlds, saves, or mods).
-     *
-     * @return list of repairs performed
-     */
     @NonNull
     public static List<String> repairInstance(@NonNull Instance instance, @Nullable File controlsDir)
             throws IOException {
-        List<String> applied = new ArrayList<>();
-        if (!Tools.isValidString(instance.versionId)) {
-            instance.versionId = Instance.VERSION_LATEST_RELEASE;
-            applied.add("Set missing version to Latest Release");
-        }
-        if (Tools.isValidString(instance.controlLayout) && controlsDir != null) {
-            File ctrl = new File(controlsDir, instance.controlLayout);
-            if (!ctrl.isFile()) {
-                instance.controlLayout = null;
-                applied.add("Cleared missing control profile reference");
-            }
-        }
-        if (instance.consecutiveStartupFailures >= 2) {
-            if (Tools.isValidString(instance.lastKnownGoodRenderer)) {
-                instance.renderer = instance.lastKnownGoodRenderer;
-                applied.add("Reverted renderer to last-known-good (" + instance.lastKnownGoodRenderer + ")");
-            }
-            instance.consecutiveStartupFailures = 0;
-            applied.add("Reset consecutive startup failure counter");
-        }
-        File gameDir = instance.getGameDirectory();
-        if (gameDir != null) {
-            for (String sub : new String[]{"saves", "mods", "config", "resourcepacks", "shaderpacks"}) {
-                File dir = new File(gameDir, sub);
-                if (!dir.isDirectory() && dir.mkdirs()) {
-                    applied.add("Created missing folder: " + sub + "/");
-                }
-            }
-        }
-        instance.sanitize();
-        instance.write();
-        if (applied.isEmpty()) {
-            applied.add("Verified metadata & rewrote clean atomic backup");
-        }
-        return applied;
+        return InstanceHealthInspector.repairInstance(instance, controlsDir);
     }
 
-    /**
-     * Detects duplicate instances sharing the same normalized name and version ID.
-     */
     @NonNull
     public static List<String> findDuplicateSummaries(@NonNull List<? extends DisplayInstance> instances) {
-        Map<String, Integer> counts = new HashMap<>();
-        Map<String, String> labels = new HashMap<>();
-        for (DisplayInstance inst : instances) {
-            String n = inst.name != null ? inst.name.trim().toLowerCase(Locale.ROOT) : "";
-            String v = inst.versionId != null ? inst.versionId.trim().toLowerCase(Locale.ROOT) : "";
-            String key = n + "|" + v;
-            Integer prev = counts.get(key);
-            counts.put(key, prev == null ? 1 : prev + 1);
-            labels.put(key, (inst.name != null && !inst.name.isEmpty() ? inst.name : inst.versionId)
-                    + " [" + inst.versionId + "]");
-        }
-        List<String> dupes = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : counts.entrySet()) {
-            if (e.getValue() > 1) {
-                dupes.add(labels.get(e.getKey()) + " (" + e.getValue() + " profiles)");
-            }
-        }
-        return dupes;
+        return InstanceHealthInspector.findDuplicateSummaries(instances);
     }
 
-    /**
-     * Computes exact files and disk size affected before deleting an instance.
-     */
     @NonNull
     public static DeleteImpact computeDeleteImpact(@NonNull Instance instance) {
-        String label = Tools.isValidString(instance.name)
-                ? instance.name
-                : (Tools.isValidString(instance.versionId) ? instance.versionId : "Unnamed");
-        File root = instance.mInstanceRoot;
-        if (root == null || !root.isDirectory()) {
-            return new DeleteImpact(label, instance.sharedData, 0, 0, 0, 0L);
-        }
-        if (instance.sharedData) {
-            long metaBytes = computeDirectoryBytes(root, 500);
-            return new DeleteImpact(label, true, 0, 0, 0, metaBytes);
-        }
-        int worlds = countChildren(new File(root, "saves"), f -> f.isDirectory() && new File(f, "level.dat").isFile());
-        int mods = countChildren(new File(root, "mods"), f -> f.isFile()
-                && (f.getName().endsWith(".jar") || f.getName().endsWith(".jar.disabled")));
-        int shots = countChildren(new File(root, "screenshots"), File::isFile);
-        long total = computeDirectoryBytes(root, 50_000);
-        return new DeleteImpact(label, false, worlds, mods, shots, total);
+        return InstanceHealthInspector.computeDeleteImpact(instance);
     }
 
-    /**
-     * Creates a verified ZIP backup of an instance (metadata, icon, configs, mods, and optionally worlds)
-     * inside {@code backupsDir}, enforcing free-space check and backup retention only after success.
-     */
     @NonNull
     public static File createInstanceBackup(@NonNull Instance instance,
                                             @NonNull File backupsDir,
                                             boolean includeWorlds,
                                             int maxBackupsToKeep) throws IOException {
-        if (instance.mInstanceRoot == null || !instance.mInstanceRoot.isDirectory()) {
-            throw new IOException("Instance directory does not exist");
-        }
-        FileUtils.ensureDirectory(backupsDir);
-        long estimated = computeDirectoryBytes(instance.mInstanceRoot, 50_000);
-        if (!NetworkPolicyHelper.hasEnoughDiskSpace(backupsDir, Math.max(4L * 1024 * 1024, estimated / 2))) {
-            throw new IOException("Insufficient free disk space to create instance backup");
-        }
-
-        String safeLabel = FileUtils.escapeFileName(
-                Tools.isValidString(instance.name) ? instance.name : instance.versionId);
-        if (safeLabel.isEmpty()) safeLabel = "instance";
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
-        File finalZip = new File(backupsDir, safeLabel + "-" + stamp + ".zip");
-        File tempZip = new File(backupsDir, finalZip.getName() + ".tmp");
-
-        int[] fileCounter = new int[]{0};
-        long[] byteCounter = new long[]{0L};
-        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(tempZip)))) {
-            zipDirectoryFiltered(instance.mInstanceRoot, "", zos, includeWorlds, fileCounter, byteCounter);
-
-            JsonObject meta = new JsonObject();
-            meta.addProperty("format", "zyrox-instance-backup-v2");
-            meta.addProperty("name", instance.name != null ? instance.name : "");
-            meta.addProperty("versionId", instance.versionId != null ? instance.versionId : "");
-            meta.addProperty("includesWorlds", includeWorlds);
-            meta.addProperty("fileCount", fileCounter[0]);
-            meta.addProperty("uncompressedBytes", byteCounter[0]);
-            meta.addProperty("createdAtMs", System.currentTimeMillis());
-            byte[] metaBytes = Tools.GLOBAL_GSON.toJson(meta).getBytes(StandardCharsets.UTF_8);
-            ZipEntry metaEntry = new ZipEntry(BACKUP_META_ENTRY);
-            zos.putNextEntry(metaEntry);
-            zos.write(metaBytes);
-            zos.closeEntry();
-            zos.finish();
-        } catch (IOException e) {
-            //noinspection ResultOfMethodCallIgnored
-            tempZip.delete();
-            throw e;
-        }
-
-        if (!tempZip.renameTo(finalZip)) {
-            //noinspection ResultOfMethodCallIgnored
-            tempZip.delete();
-            throw new IOException("Failed to finalize instance backup archive");
-        }
-
-        // Write companion SHA-256 verification file
-        String sha256 = computeSha256Hex(finalZip);
-        File shaFile = new File(backupsDir, finalZip.getName() + ".sha256");
-        try (FileOutputStream out = new FileOutputStream(shaFile, false)) {
-            out.write((sha256 + "  " + finalZip.getName() + "\n").getBytes(StandardCharsets.UTF_8));
-        }
-
-        // Apply retention policy only AFTER the new backup & checksum are verified on disk
-        pruneOldBackups(backupsDir, safeLabel + "-", Math.max(1, maxBackupsToKeep));
-        return finalZip;
+        return InstanceBackupService.createInstanceBackup(
+                instance, backupsDir, includeWorlds, maxBackupsToKeep);
     }
 
-    /**
-     * Verifies and restores an instance backup ZIP into a brand-new isolated instance directory
-     * (never silently overwrites an existing instance).
-     */
     @NonNull
     public static Instance restoreInstanceBackup(@NonNull File backupZip,
                                                  @NonNull File instancesDir) throws IOException {
-        if (!backupZip.isFile()) {
-            throw new IOException("Backup archive not found");
-        }
-        // Verify companion SHA-256 checksum if present
-        File shaFile = new File(backupZip.getParentFile(), backupZip.getName() + ".sha256");
-        if (shaFile.isFile()) {
-            String expected = readFirstToken(shaFile);
-            String actual = computeSha256Hex(backupZip);
-            if (!expected.isEmpty() && !expected.equalsIgnoreCase(actual)) {
-                throw new IOException("Backup SHA-256 verification failed — archive may be corrupted");
-            }
-        }
-        if (!NetworkPolicyHelper.hasEnoughDiskSpace(instancesDir, backupZip.length() * 2L)) {
-            throw new IOException("Insufficient free disk space to restore backup");
-        }
-
-        FileUtils.ensureDirectory(instancesDir);
-        File newRoot = Instances.findNewInstanceRoot(instancesDir, "restored");
-        FileUtils.ensureDirectory(newRoot);
-        boolean ok = false;
-        try (ZipFile zf = new ZipFile(backupZip)) {
-            if (zf.getEntry("mojo_instance.json") == null) {
-                throw new IOException("Archive is not a valid Zyrox instance backup (missing mojo_instance.json)");
-            }
-            ZipUtils.zipExtract(zf, "", newRoot);
-            //noinspection ResultOfMethodCallIgnored
-            new File(newRoot, BACKUP_META_ENTRY).delete();
-            Instance restored = Instances.readWithRecovery(newRoot, Instance.class);
-            if (restored == null) {
-                throw new IOException("Restored instance metadata could not be parsed");
-            }
-            restored.sharedData = false;
-            restored.sanitize();
-            if (Tools.isValidString(restored.name) && !restored.name.endsWith(" (Restored)")) {
-                restored.name = restored.name + " (Restored)";
-            }
-            restored.write();
-            ok = true;
-            return restored;
-        } finally {
-            if (!ok && newRoot.exists()) {
-                org.apache.commons.io.FileUtils.deleteQuietly(newRoot);
-            }
-        }
+        return InstanceBackupService.restoreInstanceBackup(backupZip, instancesDir);
     }
 
     /**
@@ -674,94 +399,16 @@ public final class InstanceManager {
     }
 
     public static void pruneOldBackups(@NonNull File dir, @NonNull String prefix, int keepCount) {
-        if (keepCount < 1 || !dir.isDirectory()) return;
-        File[] zips = dir.listFiles(f -> f.isFile() && f.getName().startsWith(prefix) && f.getName().endsWith(".zip"));
-        if (zips == null || zips.length <= keepCount) return;
-        Arrays.sort(zips, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-        for (int i = keepCount; i < zips.length; i++) {
-            File old = zips[i];
-            File sha = new File(dir, old.getName() + ".sha256");
-            //noinspection ResultOfMethodCallIgnored
-            old.delete();
-            //noinspection ResultOfMethodCallIgnored
-            sha.delete();
-        }
+        InstanceBackupService.pruneOldBackups(dir, prefix, keepCount);
     }
 
     @NonNull
     public static String computeSha256Hex(@NonNull File file) throws IOException {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] buf = new byte[16 * 1024];
-            try (FileInputStream in = new FileInputStream(file)) {
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    md.update(buf, 0, n);
-                }
-            }
-            return AppTrustVerifier.formatSha256Hex(md.digest());
-        } catch (IOException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IOException("SHA-256 unavailable", e);
-        }
+        return InstanceBackupService.computeSha256Hex(file);
     }
 
     public static long computeDirectoryBytes(@Nullable File dir, int maxFiles) {
-        if (dir == null || !dir.exists()) return 0L;
-        if (dir.isFile()) return Math.max(0L, dir.length());
-        long[] sum = new long[]{0L};
-        int[] visited = new int[]{0};
-        accumulateBytes(dir, sum, visited, Math.max(1, maxFiles));
-        return sum[0];
-    }
-
-    private static void accumulateBytes(@NonNull File node, long[] sum, int[] visited, int maxFiles) {
-        if (visited[0] >= maxFiles) return;
-        File[] children = node.listFiles();
-        if (children == null) return;
-        for (File child : children) {
-            if (visited[0]++ >= maxFiles) return;
-            if (child.isFile()) {
-                sum[0] += Math.max(0L, child.length());
-            } else if (child.isDirectory()) {
-                accumulateBytes(child, sum, visited, maxFiles);
-            }
-        }
-    }
-
-    private static void zipDirectoryFiltered(@NonNull File current,
-                                             @NonNull String relPrefix,
-                                             @NonNull ZipOutputStream zos,
-                                             boolean includeWorlds,
-                                             int[] fileCount,
-                                             long[] byteCount) throws IOException {
-        File[] children = current.listFiles();
-        if (children == null) return;
-        byte[] buf = new byte[16 * 1024];
-        for (File child : children) {
-            String name = child.getName();
-            if (name.endsWith(".tmp") || BACKUP_META_ENTRY.equals(name)) continue;
-            if (!includeWorlds && relPrefix.isEmpty() && "saves".equals(name)) continue;
-            if (relPrefix.isEmpty() && ("logs".equals(name) || "crash-reports".equals(name))) continue;
-            String entryPath = relPrefix.isEmpty() ? name : (relPrefix + "/" + name);
-            if (child.isDirectory()) {
-                zipDirectoryFiltered(child, entryPath, zos, includeWorlds, fileCount, byteCount);
-            } else if (child.isFile()) {
-                ZipEntry entry = new ZipEntry(entryPath);
-                entry.setTime(child.lastModified());
-                zos.putNextEntry(entry);
-                try (FileInputStream in = new FileInputStream(child)) {
-                    int n;
-                    while ((n = in.read(buf)) != -1) {
-                        zos.write(buf, 0, n);
-                        byteCount[0] += n;
-                    }
-                }
-                zos.closeEntry();
-                fileCount[0]++;
-            }
-        }
+        return InstanceBackupService.computeDirectoryBytes(dir, maxFiles);
     }
 
     private static long estimateCloneBytes(@NonNull File gameDir, boolean configsMods, boolean worlds) {

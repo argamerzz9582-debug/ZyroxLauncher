@@ -16,6 +16,7 @@ import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.downloader.Downloader;
 import git.artdeell.mojo.downloader.TaskMetadata;
+import git.artdeell.mojo.metadata.ModPlatformRepository;
 import git.artdeell.mojo.metadata.ModrinthProvider;
 import git.artdeell.mojo.metadata.VersionMetadataRepository;
 import git.artdeell.mojo.modding.fabric.FabriclikeUtils;
@@ -36,20 +37,18 @@ import git.artdeell.mojo.utils.GsonJsonUtils;
 import git.artdeell.mojo.utils.ZipUtils;
 
 public class ModrinthApi implements ModpackApi {
-    private final ApiHandler mApiHandler;
-    private final ModrinthProvider mProvider;
+    private final ModPlatformRepository mRepository;
 
     public ModrinthApi() {
-        mApiHandler = new ApiHandler(ModrinthProvider.OFFICIAL_MODRINTH_API_URL);
-        mProvider = VersionMetadataRepository.getInstance().getModrinthProvider();
+        mRepository = VersionMetadataRepository.getInstance().getModPlatformRepository();
     }
 
     @Override
     public SearchResult searchMod(SearchFilters searchFilters, SearchResult previousPageResult) {
         ModrinthSearchResult modrinthSearchResult = (ModrinthSearchResult) previousPageResult;
 
-        // Avoid redundant queries once offset reaches total_hits
-        if (modrinthSearchResult != null && modrinthSearchResult.previousOffset >= modrinthSearchResult.totalResultCount) {
+        if (modrinthSearchResult != null
+                && modrinthSearchResult.previousOffset >= modrinthSearchResult.totalResultCount) {
             ModrinthSearchResult emptyResult = new ModrinthSearchResult();
             emptyResult.results = new ModItem[0];
             emptyResult.totalResultCount = modrinthSearchResult.totalResultCount;
@@ -57,48 +56,21 @@ public class ModrinthApi implements ModpackApi {
             return emptyResult;
         }
 
-        // Build official Modrinth v2 facet filters
-        HashMap<String, Object> params = new HashMap<>();
-        StringBuilder facetString = new StringBuilder();
-        facetString.append("[");
-        String projectType = (searchFilters.projectTypeOverride != null && !searchFilters.projectTypeOverride.isEmpty())
-                ? searchFilters.projectTypeOverride
-                : (searchFilters.isModpack ? "modpack" : "mod");
-        facetString.append(String.format("[\"project_type:%s\"]", projectType));
-        if (searchFilters.category != null && !searchFilters.category.isEmpty()) {
-            facetString.append(String.format(",[\"categories:%s\"]", searchFilters.category));
-        }
-        if (searchFilters.mcVersion != null && !searchFilters.mcVersion.isEmpty()) {
-            facetString.append(String.format(",[\"versions:%s\"]", searchFilters.mcVersion));
-        }
-        facetString.append("]");
-        params.put("facets", facetString.toString());
-        params.put("query", searchFilters.name != null ? searchFilters.name : "");
-        params.put("limit", 50);
-        params.put("index", "relevance");
-        if (modrinthSearchResult != null) {
-            params.put("offset", modrinthSearchResult.previousOffset);
-        }
+        int offset = modrinthSearchResult != null ? modrinthSearchResult.previousOffset : 0;
+        ModPlatformRepository.SearchPage page = mRepository.searchModrinth(
+                searchFilters, offset, ModPlatformRepository.DEFAULT_PAGE_SIZE);
+        if (page == null) return null;
 
-        JsonObject response = mApiHandler.get("search", params, JsonObject.class);
-        if (response == null) return null;
-        JsonArray responseHits = GsonJsonUtils.getJsonArraySafe(response, "hits");
-        if (responseHits == null) return null;
-
-        ModItem[] items = mProvider.parseSearchHits(responseHits);
         if (modrinthSearchResult == null) modrinthSearchResult = new ModrinthSearchResult();
-        modrinthSearchResult.previousOffset += responseHits.size();
-        modrinthSearchResult.results = items;
-        modrinthSearchResult.totalResultCount = GsonJsonUtils.getIntSafe(
-                response, "total_hits", modrinthSearchResult.previousOffset);
+        modrinthSearchResult.results = page.items;
+        modrinthSearchResult.previousOffset = page.nextOffset;
+        modrinthSearchResult.totalResultCount = page.totalHits;
         return modrinthSearchResult;
     }
 
     @Override
     public ModDetail getModDetails(ModItem item) {
-        if (item == null || item.id == null || item.id.trim().isEmpty()) return null;
-        JsonArray response = mApiHandler.get(String.format("project/%s/version", item.id.trim()), JsonArray.class);
-        return mProvider.parseModDetails(item, response);
+        return mRepository.getModrinthDetails(item);
     }
 
     @Override
@@ -163,7 +135,7 @@ public class ModrinthApi implements ModpackApi {
             ModrinthIndex modrinthIndex = Tools.GLOBAL_GSON.fromJson(
                     Tools.read(indexStream), ModrinthIndex.class);
             // Verify manifest schema & MC/loader compatibility BEFORE downloading hundreds of mods
-            ModrinthProvider.ResolvedMrpackSpec spec = mProvider.verifyAndResolveIndex(modrinthIndex);
+            ModrinthProvider.ResolvedMrpackSpec spec = mRepository.verifyModrinthIndex(modrinthIndex);
 
             if (modrinthIndex.files != null && modrinthIndex.files.length > 0) {
                 try {

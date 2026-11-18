@@ -33,12 +33,17 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
     private SharedPreferences.Editor mEditor;
 
     private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch, mHapticsSwitch, mEdgeGuardSwitch;
+    private SwitchCompat mHudEnabledSwitch, mHudLockSwitch, mHudCompactSwitch;
     private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar, mGyroDeadzoneBar;
+    private CustomSeekbar mHudScaleBar, mHudOpacityBar;
     private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText, mGyroDeadzoneText, mGyroDeadzoneLabel;
+    private TextView mHudScaleLabel, mHudScaleText, mHudOpacityLabel, mHudOpacityText;
+    private View mHudResetButton;
 
     private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled, mOriginalHaptics, mOriginalEdgeGuard;
+    private boolean mOriginalHudEnabled, mOriginalHudLocked, mOriginalHudCompact;
     private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution, mOriginalGyroDeadzone;
-    private int mOriginalGestureDelay;
+    private int mOriginalGestureDelay, mOriginalHudScale, mOriginalHudOpacity;
     private short mOriginalTransparency;
 
     public QuickSettingSideDialog(Context context, ViewGroup parent) {
@@ -87,6 +92,24 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGyroDeadzoneBar = mDialogContent.findViewById(R.id.editGyroDeadzone_seekBar);
         mGyroDeadzoneText = mDialogContent.findViewById(R.id.editGyroDeadzone_percent);
         mGyroDeadzoneLabel = mDialogContent.findViewById(R.id.editGyroDeadzone_textView);
+
+        // Performance HUD controls (50%..150% scale, opacity, lock, mini-pill, reset)
+        mHudEnabledSwitch = mDialogContent.findViewById(R.id.checkboxHudEnabled);
+        mHudScaleLabel = mDialogContent.findViewById(R.id.editHudScale_textView);
+        mHudScaleText = mDialogContent.findViewById(R.id.editHudScale_percent);
+        mHudScaleBar = mDialogContent.findViewById(R.id.editHudScale_seekBar);
+        mHudOpacityLabel = mDialogContent.findViewById(R.id.editHudOpacity_textView);
+        mHudOpacityText = mDialogContent.findViewById(R.id.editHudOpacity_percent);
+        mHudOpacityBar = mDialogContent.findViewById(R.id.editHudOpacity_seekBar);
+        mHudLockSwitch = mDialogContent.findViewById(R.id.checkboxHudLock);
+        mHudCompactSwitch = mDialogContent.findViewById(R.id.checkboxHudCompact);
+        mHudResetButton = mDialogContent.findViewById(R.id.quickBtn_hudReset);
+        if (mHudResetButton != null) {
+            mHudResetButton.setOnClickListener(v -> {
+                LauncherPreferences.resetHudPosition();
+                onHudResetPositionRequested();
+            });
+        }
 
         View shotBtn = mDialogContent.findViewById(R.id.quickBtn_screenshot);
         if (shotBtn != null) {
@@ -223,6 +246,74 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
         updateGyroVisibility(mOriginalGyroEnabled);
         updateGestureVisibility(mOriginalGestureDisabled);
+
+        mOriginalHudEnabled = LauncherPreferences.PREF_ZYROX_PERF_HUD;
+        mOriginalHudScale = LauncherPreferences.clampHudScale(LauncherPreferences.PREF_ZYROX_HUD_SCALE);
+        mOriginalHudOpacity = LauncherPreferences.clampHudOpacity(LauncherPreferences.PREF_ZYROX_HUD_OPACITY);
+        mOriginalHudLocked = LauncherPreferences.PREF_ZYROX_HUD_LOCKED;
+        mOriginalHudCompact = LauncherPreferences.PREF_ZYROX_HUD_COMPACT;
+
+        if (mHudEnabledSwitch != null) {
+            mHudEnabledSwitch.setChecked(mOriginalHudEnabled);
+            mHudEnabledSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_PERF_HUD = checked;
+                mEditor.putBoolean("zyroxPerfHud", checked);
+                updateHudControlsVisibility(checked);
+                onHudPreferencesChanged();
+            });
+        }
+        if (mHudScaleBar != null && mHudScaleText != null) {
+            mHudScaleBar.setProgress(mOriginalHudScale);
+            setSeekTextPercent(mHudScaleText, mOriginalHudScale);
+            mHudScaleBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
+                int clamped = LauncherPreferences.clampHudScale(progress);
+                LauncherPreferences.PREF_ZYROX_HUD_SCALE = clamped;
+                mEditor.putInt(LauncherPreferences.KEY_ZYROX_HUD_SCALE, clamped);
+                setSeekTextPercent(mHudScaleText, clamped);
+                onHudPreferencesChanged();
+            });
+        }
+        if (mHudOpacityBar != null && mHudOpacityText != null) {
+            mHudOpacityBar.setProgress(mOriginalHudOpacity);
+            setSeekTextPercent(mHudOpacityText, mOriginalHudOpacity);
+            mHudOpacityBar.setOnSeekBarChangeListener((SimpleSeekBarListener) (seekBar, progress, fromUser) -> {
+                int clamped = LauncherPreferences.clampHudOpacity(progress);
+                LauncherPreferences.PREF_ZYROX_HUD_OPACITY = clamped;
+                mEditor.putInt(LauncherPreferences.KEY_ZYROX_HUD_OPACITY, clamped);
+                setSeekTextPercent(mHudOpacityText, clamped);
+                onHudPreferencesChanged();
+            });
+        }
+        if (mHudLockSwitch != null) {
+            mHudLockSwitch.setChecked(mOriginalHudLocked);
+            mHudLockSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_HUD_LOCKED = checked;
+                mEditor.putBoolean(LauncherPreferences.KEY_ZYROX_HUD_LOCKED, checked);
+                onHudPreferencesChanged();
+            });
+        }
+        if (mHudCompactSwitch != null) {
+            mHudCompactSwitch.setChecked(mOriginalHudCompact);
+            mHudCompactSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_HUD_COMPACT = checked;
+                mEditor.putBoolean(LauncherPreferences.KEY_ZYROX_HUD_COMPACT, checked);
+                onHudPreferencesChanged();
+            });
+        }
+        updateHudControlsVisibility(mOriginalHudEnabled);
+    }
+
+    private void updateHudControlsVisibility(boolean hudEnabled) {
+        int vis = hudEnabled ? View.VISIBLE : View.GONE;
+        if (mHudScaleLabel != null) mHudScaleLabel.setVisibility(vis);
+        if (mHudScaleText != null) mHudScaleText.setVisibility(vis);
+        if (mHudScaleBar != null) mHudScaleBar.setVisibility(vis);
+        if (mHudOpacityLabel != null) mHudOpacityLabel.setVisibility(vis);
+        if (mHudOpacityText != null) mHudOpacityText.setVisibility(vis);
+        if (mHudOpacityBar != null) mHudOpacityBar.setVisibility(vis);
+        if (mHudLockSwitch != null) mHudLockSwitch.setVisibility(vis);
+        if (mHudCompactSwitch != null) mHudCompactSwitch.setVisibility(vis);
+        if (mHudResetButton != null) mHudResetButton.setVisibility(vis);
     }
 
     private static void setSeekTextMillisecond(TextView target, int value) {
@@ -272,9 +363,14 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mGestureSwitch.setOnCheckedChangeListener(null);
         if (mHapticsSwitch != null) mHapticsSwitch.setOnCheckedChangeListener(null);
         if (mEdgeGuardSwitch != null) mEdgeGuardSwitch.setOnCheckedChangeListener(null);
+        if (mHudEnabledSwitch != null) mHudEnabledSwitch.setOnCheckedChangeListener(null);
+        if (mHudLockSwitch != null) mHudLockSwitch.setOnCheckedChangeListener(null);
+        if (mHudCompactSwitch != null) mHudCompactSwitch.setOnCheckedChangeListener(null);
 
         mGyroSensitivityBar.setOnSeekBarChangeListener(null);
         if (mGyroDeadzoneBar != null) mGyroDeadzoneBar.setOnSeekBarChangeListener(null);
+        if (mHudScaleBar != null) mHudScaleBar.setOnSeekBarChangeListener(null);
+        if (mHudOpacityBar != null) mHudOpacityBar.setOnSeekBarChangeListener(null);
         mMouseSpeedBar.setOnSeekBarChangeListener(null);
         mGestureDelayBar.setOnSeekBarChangeListener(null);
         mResolutionBar.setOnSeekBarChangeListener(null);
@@ -306,10 +402,16 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS = mOriginalHaptics;
             LauncherPreferences.PREF_ZYROX_EDGE_TOUCH_GUARD = mOriginalEdgeGuard;
             LauncherPreferences.PREF_ZYROX_GYRO_DEADZONE = mOriginalGyroDeadzone;
+            LauncherPreferences.PREF_ZYROX_PERF_HUD = mOriginalHudEnabled;
+            LauncherPreferences.PREF_ZYROX_HUD_SCALE = mOriginalHudScale;
+            LauncherPreferences.PREF_ZYROX_HUD_OPACITY = mOriginalHudOpacity;
+            LauncherPreferences.PREF_ZYROX_HUD_LOCKED = mOriginalHudLocked;
+            LauncherPreferences.PREF_ZYROX_HUD_COMPACT = mOriginalHudCompact;
 
             onGyroStateChanged();
             onResolutionChanged();
             onButtonTransparencyChanged();
+            onHudPreferencesChanged();
         }
 
         disappear(true);
@@ -329,5 +431,13 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
      * Called when the button transparency state is changed. Use {@link LauncherPreferences#PREF_BUTTON_TRANSPARENCY}
      */
     public abstract void onButtonTransparencyChanged();
+
+    /** Called when HUD visibility, scale (50–150%), opacity, lock, or compact mode changes. */
+    public void onHudPreferencesChanged() {
+    }
+
+    /** Called when the user clicks Reset HUD Position. */
+    public void onHudResetPositionRequested() {
+    }
 
 }

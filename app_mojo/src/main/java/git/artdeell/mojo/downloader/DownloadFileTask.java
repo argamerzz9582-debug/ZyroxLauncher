@@ -6,6 +6,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 
+import java.net.URL;
+import java.util.List;
+
+import git.artdeell.mojo.tasks.mojson.mirrors.DownloadMirror;
 import git.artdeell.mojo.utils.FileUtils;
 import git.artdeell.mojo.utils.HashUtils;
 import git.artdeell.mojo.utils.NetworkPolicyHelper;
@@ -102,12 +106,27 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
         mPartFile.delete();
     }
 
+    private URL selectCandidateUrl(int attempt) {
+        if (mMetadata.url == null) return null;
+        try {
+            List<String> candidates = DownloadMirror.buildFailoverCandidates(mMetadata.url.toString());
+            if (!candidates.isEmpty()) {
+                String chosen = candidates.get(Math.abs(attempt) % candidates.size());
+                return new URL(chosen);
+            }
+        } catch (Exception ignored) {
+        }
+        return mMetadata.url;
+    }
+
     private void tryDownload(int attempt, boolean rangeAllowed) throws IOException {
+        URL activeUrl = selectCandidateUrl(attempt);
         try {
             mDownloader.checkQueueControl();
             if (!mPartFile.exists() || !rangeAllowed) {
                 mBytesDownloaded = 0L;
-                mDownloader.downloadFile(mPartFile, mMetadata.url, this);
+                mDownloader.downloadFile(mPartFile, activeUrl, this);
+                DownloadMirror.recordEndpointSuccess(activeUrl.toString());
                 return;
             }
 
@@ -117,7 +136,8 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
                 //noinspection ResultOfMethodCallIgnored
                 mPartFile.delete();
                 mBytesDownloaded = 0L;
-                mDownloader.downloadFile(mPartFile, mMetadata.url, this);
+                mDownloader.downloadFile(mPartFile, activeUrl, this);
+                DownloadMirror.recordEndpointSuccess(activeUrl.toString());
                 return;
             }
 
@@ -127,13 +147,18 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
                 return;
             }
 
-            boolean resumed = mDownloader.tryContinueDownload(mPartFile, mMetadata.size, mMetadata.url, this);
+            boolean resumed = mDownloader.tryContinueDownload(mPartFile, mMetadata.size, activeUrl, this);
             if (!resumed) {
                 performRetry(attempt, false);
+            } else {
+                DownloadMirror.recordEndpointSuccess(activeUrl.toString());
             }
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException e) {
+            if (activeUrl != null) {
+                DownloadMirror.recordEndpointFailure(activeUrl.toString());
+            }
             if (attempt >= MAX_RETRIES) {
                 throw e;
             }

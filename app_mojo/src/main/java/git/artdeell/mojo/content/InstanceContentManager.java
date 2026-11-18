@@ -273,29 +273,17 @@ public final class InstanceContentManager {
             throw new IOException("Failed to compute mod SHA-1");
         }
 
-        // 1. Identify current file on Modrinth
-        HttpURLConnection getConn = (HttpURLConnection) new URL(MODRINTH_HASH_API + sha1 + "?algorithm=sha1")
-                .openConnection();
-        getConn.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
-        getConn.setConnectTimeout(10_000);
-        getConn.setReadTimeout(15_000);
-        String currentVersionNum;
-        try {
-            if (getConn.getResponseCode() == 404) {
-                return new ModUpdateInfo(false, false, "", "", null, null, null);
-            }
-            if (getConn.getResponseCode() != 200) {
-                throw new IOException("Modrinth returned HTTP " + getConn.getResponseCode());
-            }
-            String body = new String(ArchiveSecurity.readBytesBounded(getConn.getInputStream(), 512 * 1024),
-                    StandardCharsets.UTF_8);
-            JsonObject curObj = new JsonParser().parse(body).getAsJsonObject();
-            currentVersionNum = curObj.has("version_number") ? curObj.get("version_number").getAsString() : "";
-        } finally {
-            getConn.disconnect();
+        // 1. Identify current file via unified ModPlatformRepository (HTTP/2 pooled + cached)
+        JsonObject curObj = git.artdeell.mojo.metadata.ModPlatformRepository
+                .getInstance()
+                .lookupModrinthVersionBySha1(sha1);
+        if (curObj == null) {
+            return new ModUpdateInfo(false, false, "", "", null, null, null);
         }
+        String currentVersionNum = curObj.has("version_number")
+                ? curObj.get("version_number").getAsString() : "";
 
-        // 2. Query Modrinth /update for the exact MC version and loader
+        // 2. Query Modrinth /update for the exact MC version and loader via HTTP/2 pool
         JsonObject reqBody = new JsonObject();
         JsonArray loaders = new JsonArray();
         String loaderSlug = loader == ModMetadataParser.LoaderFamily.UNKNOWN
@@ -305,52 +293,37 @@ public final class InstanceContentManager {
         gameVers.add(mcVersion);
         reqBody.add("loaders", loaders);
         reqBody.add("game_versions", gameVers);
-        byte[] payload = reqBody.toString().getBytes(StandardCharsets.UTF_8);
 
-        HttpURLConnection updConn = (HttpURLConnection)
-                new URL(MODRINTH_HASH_API + sha1 + "/update?algorithm=sha1").openConnection();
-        updConn.setRequestMethod("POST");
-        updConn.setRequestProperty("User-Agent", DownloadUtils.USER_AGENT);
-        updConn.setRequestProperty("Content-Type", "application/json");
-        updConn.setConnectTimeout(10_000);
-        updConn.setReadTimeout(15_000);
-        updConn.setDoOutput(true);
-        try {
-            updConn.getOutputStream().write(payload);
-            if (updConn.getResponseCode() == 404) {
-                return new ModUpdateInfo(true, false, currentVersionNum, currentVersionNum, null, null, null);
-            }
-            if (updConn.getResponseCode() != 200) {
-                throw new IOException("Modrinth update check HTTP " + updConn.getResponseCode());
-            }
-            String updText = new String(ArchiveSecurity.readBytesBounded(updConn.getInputStream(), 512 * 1024),
-                    StandardCharsets.UTF_8);
-            JsonObject updObj = new JsonParser().parse(updText).getAsJsonObject();
-            String latestVer = updObj.has("version_number") ? updObj.get("version_number").getAsString() : "";
-            String dlUrl = null;
-            String dlName = null;
-            String dlSha1 = null;
-            if (updObj.has("files") && updObj.get("files").isJsonArray()) {
-                JsonArray files = updObj.getAsJsonArray("files");
-                for (int i = 0; i < files.size(); i++) {
-                    JsonObject f = files.get(i).getAsJsonObject();
-                    boolean primary = f.has("primary") && f.get("primary").getAsBoolean();
-                    if (i == 0 || primary) {
-                        dlUrl = f.has("url") ? f.get("url").getAsString() : null;
-                        dlName = f.has("filename") ? f.get("filename").getAsString() : null;
-                        if (f.has("hashes") && f.get("hashes").isJsonObject()
-                                && f.getAsJsonObject("hashes").has("sha1")) {
-                            dlSha1 = f.getAsJsonObject("hashes").get("sha1").getAsString();
-                        }
-                        if (primary) break;
+        String updText = git.artdeell.mojo.utils.ZyroxHttpClient.postJson(
+                MODRINTH_HASH_API + sha1 + "/update?algorithm=sha1",
+                reqBody.toString(),
+                null);
+        if (updText == null || updText.trim().isEmpty()) {
+            return new ModUpdateInfo(true, false, currentVersionNum, currentVersionNum, null, null, null);
+        }
+        JsonObject updObj = JsonParser.parseString(updText).getAsJsonObject();
+        String latestVer = updObj.has("version_number") ? updObj.get("version_number").getAsString() : "";
+        String dlUrl = null;
+        String dlName = null;
+        String dlSha1 = null;
+        if (updObj.has("files") && updObj.get("files").isJsonArray()) {
+            JsonArray files = updObj.getAsJsonArray("files");
+            for (int i = 0; i < files.size(); i++) {
+                JsonObject f = files.get(i).getAsJsonObject();
+                boolean primary = f.has("primary") && f.get("primary").getAsBoolean();
+                if (i == 0 || primary) {
+                    dlUrl = f.has("url") ? f.get("url").getAsString() : null;
+                    dlName = f.has("filename") ? f.get("filename").getAsString() : null;
+                    if (f.has("hashes") && f.get("hashes").isJsonObject()
+                            && f.getAsJsonObject("hashes").has("sha1")) {
+                        dlSha1 = f.getAsJsonObject("hashes").get("sha1").getAsString();
                     }
+                    if (primary) break;
                 }
             }
-            boolean hasNewer = dlSha1 != null && !dlSha1.equalsIgnoreCase(sha1) && dlUrl != null;
-            return new ModUpdateInfo(true, hasNewer, currentVersionNum, latestVer, dlUrl, dlName, dlSha1);
-        } finally {
-            updConn.disconnect();
         }
+        boolean hasNewer = dlSha1 != null && !dlSha1.equalsIgnoreCase(sha1) && dlUrl != null;
+        return new ModUpdateInfo(true, hasNewer, currentVersionNum, latestVer, dlUrl, dlName, dlSha1);
     }
 
     /**

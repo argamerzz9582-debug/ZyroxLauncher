@@ -10,6 +10,10 @@ import git.artdeell.mojo.tasks.SpeedCalculator;
 import git.artdeell.mojo.utils.ArchiveSecurity;
 import git.artdeell.mojo.utils.DownloadUtils;
 import git.artdeell.mojo.utils.FileUtils;
+import git.artdeell.mojo.utils.ZyroxHttpClient;
+
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -309,6 +313,19 @@ public class Downloader {
     }
 
     protected String downloadString(URL url) throws IOException {
+        String urlStr = url.toString();
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlStr)) {
+            try (Response resp = ZyroxHttpClient.openDownloadResponse(urlStr, 0L)) {
+                if (!resp.isSuccessful() || resp.body() == null) {
+                    throw new IOException("HTTP " + resp.code() + " while reading " + LogRedactor.redactUrl(url));
+                }
+                try (InputStream is = resp.body().byteStream()) {
+                    byte[] bytes = ArchiveSecurity.readBytesBounded(is, MAX_STRING_RESPONSE_BYTES);
+                    mInternetUsageCounter.getAndAdd(bytes.length);
+                    return new String(bytes, StandardCharsets.UTF_8);
+                }
+            }
+        }
         HttpURLConnection connection = openConnection(url);
         try {
             int code = connection.getResponseCode();
@@ -328,6 +345,24 @@ public class Downloader {
     protected void downloadFile(File file, URL url, BytesCopiedListener listener) throws IOException {
         checkQueueControl();
         FileUtils.ensureParentDirectory(file);
+        String urlStr = url.toString();
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlStr)) {
+            try (Response resp = ZyroxHttpClient.openDownloadResponse(urlStr, 0L)) {
+                if (!resp.isSuccessful()) {
+                    throw new IOException("HTTP " + resp.code() + " while downloading " + LogRedactor.redactUrl(url));
+                }
+                ResponseBody body = resp.body();
+                if (body == null) {
+                    throw new IOException("Empty response body for " + LogRedactor.redactUrl(url));
+                }
+                try (InputStream inputStream = body.byteStream();
+                     FileOutputStream outputStream = new FileOutputStream(file, false)) {
+                    copy(inputStream, outputStream, listener);
+                    outputStream.flush();
+                }
+                return;
+            }
+        }
         HttpURLConnection connection = openConnection(url);
         try (FileOutputStream outputStream = new FileOutputStream(file, false)) {
             downloadToStream(connection, outputStream, listener);
@@ -343,6 +378,21 @@ public class Downloader {
         long currentLength = file.length();
         if (!DownloadQueueManager.canSafelyResumeRange(currentLength, wantedLength)) {
             return false;
+        }
+        String urlStr = url.toString();
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlStr)) {
+            try (Response resp = ZyroxHttpClient.openRangeResponse(urlStr, currentLength, wantedLength - 1L)) {
+                if (resp.code() != HttpURLConnection.HTTP_PARTIAL || resp.body() == null) {
+                    return false;
+                }
+                checkQueueControl();
+                try (InputStream inputStream = resp.body().byteStream();
+                     FileOutputStream outputStream = new FileOutputStream(file, true)) {
+                    copy(inputStream, outputStream, listener);
+                    outputStream.flush();
+                    return true;
+                }
+            }
         }
         HttpURLConnection connection = openConnection(url);
         String range = String.format(Locale.ENGLISH, "bytes=%d-%d", currentLength, wantedLength - 1L);
@@ -366,6 +416,10 @@ public class Downloader {
     }
 
     protected long getFileContentLength(URL url) throws IOException {
+        String urlStr = url.toString();
+        if (ZyroxHttpClient.isStrictHttpsUrl(urlStr)) {
+            return ZyroxHttpClient.headContentLength(urlStr);
+        }
         HttpURLConnection connection = openConnection(url);
         connection.setConnectTimeout(5000);
         connection.setReadTimeout(5000);
@@ -385,7 +439,7 @@ public class Downloader {
     public static byte[] getBuffer() {
         byte[] buffer = sThreadLocalBuffer.get();
         if (buffer == null) {
-            buffer = new byte[16 * 1024];
+            buffer = new byte[64 * 1024];
             sThreadLocalBuffer.set(buffer);
         }
         return buffer;

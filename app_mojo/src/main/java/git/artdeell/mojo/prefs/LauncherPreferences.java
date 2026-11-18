@@ -93,6 +93,31 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_EDGE_TOUCH_GUARD = false;
     public static boolean PREF_ZYROX_HUD_SNAP_GRID = true;
     public static float PREF_ZYROX_GYRO_DEADZONE = 1.0f;
+    /** GIF scaling filter: {@code "bicubic"} (HD animated scenes) or {@code "nearest"} (pixel art). */
+    public static String PREF_ZYROX_GIF_FILTER = "bicubic";
+    /** Normalized HUD X coordinate in {@code [0, 1]}, or {@code -1f} for automatic safe placement. */
+    public static float PREF_ZYROX_HUD_X = -1f;
+    /** Normalized HUD Y coordinate in {@code [0, 1]}, or {@code -1f} for automatic safe placement. */
+    public static float PREF_ZYROX_HUD_Y = -1f;
+    /** Performance HUD scale percentage in {@code [50, 150]}. */
+    public static int PREF_ZYROX_HUD_SCALE = 100;
+    /** Performance HUD background glass opacity percentage in {@code [10, 100]}. */
+    public static int PREF_ZYROX_HUD_OPACITY = 78;
+    /** When true, locks the Performance HUD position and passes gameplay touches straight through. */
+    public static boolean PREF_ZYROX_HUD_LOCKED = false;
+    /** When true, collapses the Performance HUD into a compact single-row mini-pill. */
+    public static boolean PREF_ZYROX_HUD_COMPACT = false;
+    /** Enables 120Hz/144Hz unbuffered historical touch sampling and sub-frame aim interpolation. */
+    public static boolean PREF_ZYROX_HIGH_RATE_TOUCH = true;
+
+    public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
+    public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
+    public static final String KEY_ZYROX_HUD_Y = "zyroxHudPosY";
+    public static final String KEY_ZYROX_HUD_SCALE = "zyroxHudScale";
+    public static final String KEY_ZYROX_HUD_OPACITY = "zyroxHudOpacity";
+    public static final String KEY_ZYROX_HUD_LOCKED = "zyroxHudLocked";
+    public static final String KEY_ZYROX_HUD_COMPACT = "zyroxHudCompact";
+    public static final String KEY_ZYROX_HIGH_RATE_TOUCH = "zyroxHighRateTouch";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -158,6 +183,15 @@ public class LauncherPreferences {
         PREF_ZYROX_HUD_SNAP_GRID = DEFAULT_PREF.getBoolean("zyroxHudSnapGrid", true);
         PREF_ZYROX_GYRO_DEADZONE = Math.max(0f, Math.min(3f,
                 DEFAULT_PREF.getInt("zyroxGyroDeadzone", 100) / 100f));
+        String rawGifFilter = DEFAULT_PREF.getString(KEY_ZYROX_GIF_FILTER, "bicubic");
+        PREF_ZYROX_GIF_FILTER = "nearest".equalsIgnoreCase(rawGifFilter) ? "nearest" : "bicubic";
+        PREF_ZYROX_HUD_X = sanitizeHudCoord(DEFAULT_PREF.getFloat(KEY_ZYROX_HUD_X, -1f));
+        PREF_ZYROX_HUD_Y = sanitizeHudCoord(DEFAULT_PREF.getFloat(KEY_ZYROX_HUD_Y, -1f));
+        PREF_ZYROX_HUD_SCALE = clampHudScale(DEFAULT_PREF.getInt(KEY_ZYROX_HUD_SCALE, 100));
+        PREF_ZYROX_HUD_OPACITY = clampHudOpacity(DEFAULT_PREF.getInt(KEY_ZYROX_HUD_OPACITY, 78));
+        PREF_ZYROX_HUD_LOCKED = DEFAULT_PREF.getBoolean(KEY_ZYROX_HUD_LOCKED, false);
+        PREF_ZYROX_HUD_COMPACT = DEFAULT_PREF.getBoolean(KEY_ZYROX_HUD_COMPACT, false);
+        PREF_ZYROX_HIGH_RATE_TOUCH = DEFAULT_PREF.getBoolean(KEY_ZYROX_HIGH_RATE_TOUCH, true);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";
@@ -288,5 +322,76 @@ public class LauncherPreferences {
             }
         }
         return false;
+    }
+
+    public static float sanitizeHudCoord(float v) {
+        if (Float.isNaN(v) || Float.isInfinite(v) || v < 0f) return -1f;
+        return Math.max(0f, Math.min(1f, v));
+    }
+
+    public static int clampHudScale(int percent) {
+        return Math.max(50, Math.min(150, percent));
+    }
+
+    public static int clampHudOpacity(int percent) {
+        return Math.max(10, Math.min(100, percent));
+    }
+
+    public static void persistGifFilter(@androidx.annotation.NonNull String filterValue) {
+        String clean = "nearest".equalsIgnoreCase(filterValue) ? "nearest" : "bicubic";
+        PREF_ZYROX_GIF_FILTER = clean;
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit().putString(KEY_ZYROX_GIF_FILTER, clean).apply();
+        }
+    }
+
+    public static void persistHudPosition(float normalizedX, float normalizedY) {
+        PREF_ZYROX_HUD_X = sanitizeHudCoord(normalizedX);
+        PREF_ZYROX_HUD_Y = sanitizeHudCoord(normalizedY);
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit()
+                    .putFloat(KEY_ZYROX_HUD_X, PREF_ZYROX_HUD_X)
+                    .putFloat(KEY_ZYROX_HUD_Y, PREF_ZYROX_HUD_Y)
+                    .apply();
+        }
+    }
+
+    public static void resetHudPosition() {
+        PREF_ZYROX_HUD_X = -1f;
+        PREF_ZYROX_HUD_Y = -1f;
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit()
+                    .putFloat(KEY_ZYROX_HUD_X, -1f)
+                    .putFloat(KEY_ZYROX_HUD_Y, -1f)
+                    .apply();
+        }
+    }
+
+    public static void persistHudScale(int scalePercent) {
+        PREF_ZYROX_HUD_SCALE = clampHudScale(scalePercent);
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit().putInt(KEY_ZYROX_HUD_SCALE, PREF_ZYROX_HUD_SCALE).apply();
+        }
+    }
+
+    public static void persistHudOpacity(int opacityPercent) {
+        PREF_ZYROX_HUD_OPACITY = clampHudOpacity(opacityPercent);
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit().putInt(KEY_ZYROX_HUD_OPACITY, PREF_ZYROX_HUD_OPACITY).apply();
+        }
+    }
+
+    public static void persistHudLocked(boolean locked) {
+        PREF_ZYROX_HUD_LOCKED = locked;
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit().putBoolean(KEY_ZYROX_HUD_LOCKED, locked).apply();
+        }
+    }
+
+    public static void persistHudCompact(boolean compact) {
+        PREF_ZYROX_HUD_COMPACT = compact;
+        if (DEFAULT_PREF != null) {
+            DEFAULT_PREF.edit().putBoolean(KEY_ZYROX_HUD_COMPACT, compact).apply();
+        }
     }
 }

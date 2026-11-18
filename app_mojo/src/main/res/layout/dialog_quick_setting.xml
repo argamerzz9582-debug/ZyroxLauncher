@@ -313,6 +313,141 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/editGyroDeadzone_textView" />
 
+    <!-- Performance HUD Live Customization (Scale 50–150%, Opacity, Lock, Compact Pill, Reset) -->
+    <TextView
+        android:id="@+id/hudSection_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/zyrox_hud_section_title"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11.5sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editGyroDeadzone_seekBar" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxHudEnabled"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="@string/zyrox_pref_perf_hud_title"
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/hudSection_header" />
+
+    <TextView
+        android:id="@+id/editHudScale_textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/zyrox_hud_scale_title"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxHudEnabled" />
+
+    <TextView
+        android:id="@+id/editHudScale_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editHudScale_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editHudScale_textView"
+        tools:text="100%" />
+
+    <com.kdt.CustomSeekbar
+        android:id="@+id/editHudScale_seekBar"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:min="50"
+        android:max="150"
+        app:seekBarIncrement="5"
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editHudScale_textView" />
+
+    <TextView
+        android:id="@+id/editHudOpacity_textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/zyrox_hud_opacity_title"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="12sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editHudScale_seekBar" />
+
+    <TextView
+        android:id="@+id/editHudOpacity_percent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="11sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@id/editHudOpacity_textView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/editHudOpacity_textView"
+        tools:text="78%" />
+
+    <com.kdt.CustomSeekbar
+        android:id="@+id/editHudOpacity_seekBar"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:min="10"
+        android:max="100"
+        app:seekBarIncrement="5"
+        android:progressTint="@color/zyrox_amber"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editHudOpacity_textView" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxHudLock"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="@string/zyrox_hud_lock_title"
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editHudOpacity_seekBar" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxHudCompact"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:text="@string/zyrox_hud_compact_title"
+        android:textColor="@color/zyrox_text_primary"
+        app:track="@drawable/bg_zyrox_switch_track"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxHudLock" />
+
+    <Button
+        android:id="@+id/quickBtn_hudReset"
+        style="@style/MojoLauncher.Button"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="4dp"
+        android:text="@string/zyrox_hud_reset_pos"
+        android:textSize="10.5sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxHudCompact" />
+
     <!-- Instant Quick Screenshot (F2) & Macros Row -->
     <LinearLayout
         android:id="@+id/quickAction_row"
@@ -322,7 +457,7 @@
         android:orientation="horizontal"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/editGyroDeadzone_seekBar">
+        app:layout_constraintTop_toBottomOf="@id/quickBtn_hudReset">
 
         <Button
             android:id="@+id/quickBtn_screenshot"

@@ -1,6 +1,5 @@
 package git.artdeell.mojo.game;
 
-
 import static git.artdeell.mojo.Tools.dialogForceClose;
 import static git.artdeell.mojo.game.platform.Platform.PLATFORM;
 import static git.artdeell.mojo.prefs.LauncherPreferences.PREF_ENABLE_GYRO;
@@ -18,9 +17,11 @@ import android.content.ServiceConnection;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.KeyEvent;
@@ -29,12 +30,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
 import android.view.WindowManager;
-import android.view.animation.DecelerateInterpolator;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.StringRes;
@@ -45,56 +46,67 @@ import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.kdt.LoggerView;
 
-import git.artdeell.mojo.BaseActivity;
-import git.artdeell.mojo.CallbackBridge;
-import git.artdeell.mojo.game.renderer.GameRenderer;
-import git.artdeell.mojo.utils.GpuUtils;
-import git.artdeell.mojo.utils.KeycodeUtils;
-import git.artdeell.mojo.Logger;
-import git.artdeell.mojo.Tools;
-import git.artdeell.mojo.authenticator.accounts.Accounts;
-import git.artdeell.mojo.input.ControlButtonMenuListener;
-import git.artdeell.mojo.input.ControlData;
-import git.artdeell.mojo.input.ControlDrawerData;
-import git.artdeell.mojo.input.ControlJoystickData;
-import git.artdeell.mojo.input.ControlLayout;
-import git.artdeell.mojo.input.CustomControls;
-import git.artdeell.mojo.input.EditorExitable;
-import git.artdeell.mojo.input.keyboard.TouchCharInput;
-import git.artdeell.mojo.input.mouse.GyroControl;
-import git.artdeell.mojo.input.mouse.HotbarView;
-import git.artdeell.mojo.diagnostics.PerformanceHudOverlay;
-import git.artdeell.mojo.instances.Instance;
-import git.artdeell.mojo.instances.InstanceManager;
-import git.artdeell.mojo.instances.Instances;
-import git.artdeell.mojo.utils.lifecycle.ContextExecutor;
-import git.artdeell.mojo.game.platform.Platform;
-import git.artdeell.mojo.game.platform.backend.DummyBackend;
-import git.artdeell.mojo.game.platform.backend.PlatformBackend;
-import git.artdeell.mojo.prefs.LauncherPreferences;
-import git.artdeell.mojo.prefs.QuickSettingSideDialog;
-import git.artdeell.mojo.services.GameService;
-import git.artdeell.mojo.tasks.AsyncAssetManager;
-import git.artdeell.mojo.ui.MinecraftLoadingLandscapeView;
-import git.artdeell.mojo.utils.JREUtils;
-import git.artdeell.mojo.utils.MCOptionUtils;
-import git.artdeell.mojo.authenticator.accounts.Account;
-import git.artdeell.mojo.utils.jre.GameRunner;
-
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
 
+import git.artdeell.mojo.BaseActivity;
+import git.artdeell.mojo.CallbackBridge;
+import git.artdeell.mojo.Logger;
 import git.artdeell.mojo.R;
+import git.artdeell.mojo.Tools;
+import git.artdeell.mojo.authenticator.accounts.Account;
+import git.artdeell.mojo.authenticator.accounts.Accounts;
+import git.artdeell.mojo.contracts.OpenDocumentWithExtension;
+import git.artdeell.mojo.game.platform.Platform;
+import git.artdeell.mojo.game.platform.backend.PlatformBackend;
+import git.artdeell.mojo.game.renderer.GameRenderer;
+import git.artdeell.mojo.input.ControlButtonMenuListener;
+import git.artdeell.mojo.input.ControlData;
+import git.artdeell.mojo.input.ControlDrawerData;
+import git.artdeell.mojo.input.ControlJoystickData;
+import git.artdeell.mojo.input.ControlLayout;
+import git.artdeell.mojo.input.ControlProfileManager;
+import git.artdeell.mojo.input.CustomControls;
+import git.artdeell.mojo.input.EditorExitable;
+import git.artdeell.mojo.input.keyboard.TouchCharInput;
+import git.artdeell.mojo.input.mouse.GyroControl;
+import git.artdeell.mojo.input.mouse.HotbarView;
+import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceManager;
+import git.artdeell.mojo.instances.InstancePlaytimeTracker;
+import git.artdeell.mojo.instances.Instances;
+import git.artdeell.mojo.performance.GameOptimizer;
+import git.artdeell.mojo.prefs.LauncherPreferences;
+import git.artdeell.mojo.prefs.QuickSettingSideDialog;
+import git.artdeell.mojo.services.GameService;
+import git.artdeell.mojo.tasks.AsyncAssetManager;
+import git.artdeell.mojo.utils.JREUtils;
+import git.artdeell.mojo.utils.KeycodeUtils;
+import git.artdeell.mojo.utils.MCOptionUtils;
+import git.artdeell.mojo.utils.jre.GameRunner;
+import git.artdeell.mojo.utils.lifecycle.AppTaskGuard;
+import git.artdeell.mojo.utils.lifecycle.ContextExecutor;
 
-public class GameActivity extends BaseActivity implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
+/**
+ * In-game host activity coordinating the native render surface, custom control overlay, and input
+ * dispatch. Boot overlay lifecycle is delegated to {@link GameLoadingOverlayController} and live
+ * collision-free Performance HUD management is delegated to {@link GameHudCoordinator}.
+ */
+public class GameActivity extends BaseActivity
+        implements ControlButtonMenuListener, EditorExitable, ServiceConnection {
+
     public static final String INTENT_LAUNCH_VERSION = "intent_version";
     public static final String INTENT_LAUNCH_CLASSPATH = "intent_classpath";
 
     public static TouchCharInput touchCharInput;
-    private GameView launcherGLView;
+    public static int mForcedPanningHeight = 0;
+    public static int mImeHeight = 0;
+
     private static WeakReference<GameCursorView> weakCursor;
+
+    private GameView launcherGLView;
     private LoggerView loggerView;
     private DrawerLayout drawerLayout;
     private ListView navDrawer;
@@ -102,33 +114,14 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private GyroControl mGyroControl = null;
     private ControlLayout mControlLayout;
     private HotbarView mHotbarView;
-    private View mLoadingScreen;
-    private MinecraftLoadingLandscapeView mLoadingLandscape;
-    private android.widget.ProgressBar mLoadingProgressBar;
-    private android.widget.TextView mLoadingStageText;
-    private android.widget.TextView mLoadingEtaText;
-    private android.widget.TextView mLoadingPercentText;
-    private android.animation.ObjectAnimator mLoadingBarAnimator;
-    private GameLaunchProgressTracker mLaunchProgressTracker;
-    private Logger.eventLogListener mLaunchLogListener;
-    private long mLastProgressUiPushMs = 0L;
-    private long mSessionResumeRealtimeMs = 0L;
-    private final Runnable mLoadingProgressTickRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (mLoadingScreen == null || mLoadingScreenHiding || mLaunchProgressTracker == null) {
-                return;
-            }
-            applyProgressSnapshotOnUi(
-                    mLaunchProgressTracker.onTick(android.os.SystemClock.elapsedRealtime()));
-            Tools.MAIN_HANDLER.postDelayed(this, 260L);
-        }
-    };
-    private PerformanceHudOverlay mPerfHudOverlay;
-    private boolean mLoadingScreenHiding = false;
-    private static volatile boolean sMojangSplashReached = false;
-    private static volatile int sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
     private GameRenderer mGameRenderer;
+    private GameService.LocalBinder mServiceBinder;
+    private QuickSettingSideDialog mQuickSettingSideDialog;
+
+    private GameLoadingOverlayController mLoadingController;
+    private GameHudCoordinator mHudCoordinator;
+    private long mSessionResumeRealtimeMs = 0L;
+    boolean isInEditor;
 
     Instance instance;
     Account account;
@@ -137,130 +130,146 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     private AdapterView.OnItemClickListener gameActionClickListener;
     public ArrayAdapter<String> ingameControlsEditorArrayAdapter;
     public AdapterView.OnItemClickListener ingameControlsEditorListener;
-    private GameService.LocalBinder mServiceBinder;
 
-    private QuickSettingSideDialog mQuickSettingSideDialog;
-
-    public static int mForcedPanningHeight = 0;
-    public static int mImeHeight = 0;
+    private final ActivityResultLauncher<Object> mOpenControlJsonLauncher =
+            registerForActivityResult(new OpenDocumentWithExtension("json"), this::onControlJsonPicked);
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        git.artdeell.mojo.utils.lifecycle.AppTaskGuard.pruneDuplicateTasks(this);
+        AppTaskGuard.pruneDuplicateTasks(this);
         instance = Instances.loadSelectedInstance();
         account = Accounts.getCurrent();
-        if(instance == null) {
+        if (instance == null) {
             Toast.makeText(this, R.string.instance_dir_missing, Toast.LENGTH_LONG).show();
             finishAndRemoveTask();
             return;
         }
+
+        mLoadingController = new GameLoadingOverlayController(this);
+        mHudCoordinator = new GameHudCoordinator(this);
         mGameRenderer = new GameRenderer(instance.getLaunchRenderer());
 
-        if(!PREF_ZINK_PREFER_SYSTEM_DRIVER) {
-            mGameRenderer.overrideVulkanDriver();
+        if (!PREF_ZINK_PREFER_SYSTEM_DRIVER || instance.hasCustomVulkanDriver()) {
+            mGameRenderer.overrideVulkanDriver(instance);
         }
 
         AsyncAssetManager.extractDefaultSettings(this, instance.getGameDirectory());
         MCOptionUtils.load(instance.getGameDirectory().getAbsolutePath());
 
         Intent gameServiceIntent = new Intent(this, GameService.class);
-        // Start the service a bit early
         ContextCompat.startForegroundService(this, gameServiceIntent);
         initLayout(R.layout.activity_basemain);
 
         Platform.initialize(this, launcherGLView);
-
         mGyroControl = new GyroControl(this);
 
-        // Enabling this on TextureView results in a broken white result
-        if(PREF_USE_ALTERNATE_SURFACE) getWindow().setBackgroundDrawable(null);
-        else getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+        if (PREF_USE_ALTERNATE_SURFACE) {
+            getWindow().setBackgroundDrawable(null);
+        } else {
+            getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+        }
 
-        // Set the sustained performance mode for available APIs
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             getWindow().setSustainedPerformanceMode(PREF_SUSTAINED_PERFORMANCE);
+        }
 
-        // Zyrox Optimizer: reclaim launcher bitmap caches & unlock native 90/120/144 Hz display mode
-        git.artdeell.mojo.performance.GameOptimizer.applyInGameSystemBoost(
-                this, LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE);
-        git.artdeell.mojo.instances.InstancePlaytimeTracker.recordSessionStart(
-                this, instance, System.currentTimeMillis());
+        GameOptimizer.applyInGameSystemBoost(this, LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE);
+        InstancePlaytimeTracker.recordSessionStart(this, instance, System.currentTimeMillis());
 
-        // This is required on Android 10 for the insets listener
-        // https://issuetracker.google.com/issues/266331465
+        setupWindowInsetsAndImePanning();
+        setupInGameControlsEditorMenu();
+
+        MCOptionUtils.addMCOptionListener(MCOptionUtils::getMcScale);
+        mControlLayout.setModifiable(false);
+
+        ContextExecutor.setActivity(this);
+        bindService(gameServiceIntent, this, 0);
+    }
+
+    private void setupWindowInsetsAndImePanning() {
         boolean androidCompat = Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q;
-        if(androidCompat)
+        if (androidCompat) {
             getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        // Make keyboard pan the activity so the user sees what they're typing
+        }
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (view, insets) -> {
-            if(launcherGLView.mSurface == null)
+            if (mHudCoordinator != null) {
+                mHudCoordinator.onWindowInsetsChanged(insets);
+            }
+            if (launcherGLView == null || launcherGLView.mSurface == null) {
                 return insets;
-            ViewPropertyAnimator animSurface = launcherGLView.mSurface.animate()
-                    .setDuration(100);
-            ViewPropertyAnimator animCursor = launcherGLView.mCursorView.animate()
-                    .setDuration(100);
-            if(!insets.isVisible(WindowInsetsCompat.Type.ime())){
+            }
+            ViewPropertyAnimator animSurface = launcherGLView.mSurface.animate().setDuration(100);
+            ViewPropertyAnimator animCursor = launcherGLView.mCursorView.animate().setDuration(100);
+            if (!insets.isVisible(WindowInsetsCompat.Type.ime())) {
                 animSurface.translationY(0).start();
                 animCursor.translationY(0).start();
                 mImeHeight = 0;
-                if(androidCompat) {
-                    // AndroidX keeps SystemUI visible for some reason after IME session
-                    view.postDelayed(() -> {
-                        view.setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN);
-                    }, 150);
+                if (androidCompat) {
+                    view.postDelayed(() -> view.setSystemUiVisibility(
+                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                    | View.SYSTEM_UI_FLAG_FULLSCREEN), 150);
                 }
                 return insets;
             }
-            if(mForcedPanningHeight == 0 && !LauncherPreferences.PREF_KEYBOARD_AUTOPANNING)
+            if (mForcedPanningHeight == 0 && !LauncherPreferences.PREF_KEYBOARD_AUTOPANNING) {
                 return insets;
+            }
             mImeHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
             int translationY;
-            // Autopanning (if keyboardPan wasn't clicked)
-            if(mForcedPanningHeight == 0) {
+            if (mForcedPanningHeight == 0) {
                 translationY = Tools.getTranslationFromCursorY(
-                        (int)(Platform.cursorY * launcherGLView.getCursorRatioY() + 100),
+                        (int) (Platform.cursorY * launcherGLView.getCursorRatioY() + 100),
                         launcherGLView.getHeight(),
                         mImeHeight,
-                        0
-                );
-            } else
-                translationY = mForcedPanningHeight == -1 ? mImeHeight : Math.clamp(mImeHeight - mForcedPanningHeight, 0, mImeHeight);
+                        0);
+            } else {
+                translationY = mForcedPanningHeight == -1
+                        ? mImeHeight
+                        : Math.max(0, Math.min(mImeHeight, mImeHeight - mForcedPanningHeight));
+            }
             animSurface.translationY(-translationY).start();
             animCursor.translationY(-translationY).start();
             return insets;
         });
+    }
 
+    private void setupInGameControlsEditorMenu() {
         ingameControlsEditorArrayAdapter = new ArrayAdapter<>(this,
                 R.layout.item_zyrox_ingame_menu, getResources().getStringArray(R.array.menu_customcontrol));
         ingameControlsEditorListener = (parent, view, position, id) -> {
-            switch(position) {
+            switch (position) {
                 case 0: mControlLayout.addControlButton(new ControlData("New")); break;
                 case 1: mControlLayout.addDrawer(new ControlDrawerData()); break;
                 case 2: mControlLayout.addJoystickButton(new ControlJoystickData()); break;
                 case 3: mControlLayout.openLoadDialog(); break;
                 case 4: mControlLayout.openSaveDialog(this); break;
                 case 5: mControlLayout.openSetDefaultDialog(); break;
-                case 6: mControlLayout.openExitDialog(this);
+                case 6: mControlLayout.openExitDialog(this); break;
+                default: break;
             }
         };
+    }
 
-        // Recompute the gui scale when options are changed
-        MCOptionUtils.MCOptionListener optionListener = MCOptionUtils::getMcScale;
-        MCOptionUtils.addMCOptionListener(optionListener);
-        mControlLayout.setModifiable(false);
-
-        // Set the activity for the executor. Must do this here, or else Tools.showErrorRemote() may not
-        // execute the correct method
-        ContextExecutor.setActivity(this);
-        //Now, attach to the service. The game will only start when this happens, to make sure that we know the right state.
-        bindService(gameServiceIntent, this, 0);
+    private void onControlJsonPicked(Uri uri) {
+        if (uri == null || mControlLayout == null) return;
+        try {
+            File imported = ControlProfileManager.importControlJsonUri(this, uri, null);
+            mControlLayout.loadLayout(imported.getAbsolutePath());
+            if (mHudCoordinator != null) {
+                mHudCoordinator.onControlsLayoutChanged();
+            }
+        } catch (Exception e) {
+            Tools.showError(this, e);
+        }
     }
 
     protected void initLayout(int resId) {
         setContentView(resId);
         bindValues();
         mControlLayout.setMenuListener(this);
+        mControlLayout.setExternalDocumentPicker(() -> mOpenControlJsonLauncher.launch(null));
 
         mDrawerPullButton.setOnClickListener(v -> onClickedMenu());
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
@@ -269,11 +278,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
         try {
             File latestLogFile = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
-            if(!latestLogFile.exists() && !latestLogFile.createNewFile())
+            if (!latestLogFile.exists() && !latestLogFile.createNewFile()) {
                 throw new IOException("Failed to create a new log file");
+            }
             Logger.begin(latestLogFile.getAbsolutePath());
-            if (mLaunchLogListener != null) {
-                Logger.addLogListener(mLaunchLogListener);
+            if (mLoadingController != null) {
+                mLoadingController.attachLogger();
             }
 
             Intent activityIntent = getIntent();
@@ -283,12 +293,9 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             activityIntent.removeExtra(INTENT_LAUNCH_VERSION);
             activityIntent.removeExtra(INTENT_LAUNCH_CLASSPATH);
-
             setIntent(activityIntent);
-
             setTitle("Zyrox Launcher (" + version + ")");
 
-            // In-game menu (preserves existing 5 core actions + Performance HUD + Quick Macros)
             String[] baseActions = getResources().getStringArray(R.array.menu_ingame);
             String[] allActions = new String[baseActions.length + 2];
             System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
@@ -297,25 +304,19 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
             gameActionArrayAdapter = new ArrayAdapter<>(this,
                     R.layout.item_zyrox_ingame_menu, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
-                switch(position) {
-                     case 0: dialogForceClose(GameActivity.this); break;
-                     case 1: openLogOutput(); break;
-                     case 2: dialogSendCustomKey(); break;
-                     case 3: openQuickSettings(); break;
-                     case 4: openCustomControls(); break;
-                     case 5:
-                         if (mPerfHudOverlay != null) {
-                             boolean next = !mPerfHudOverlay.isHudEnabled();
-                             mPerfHudOverlay.setHudEnabled(next);
-                             LauncherPreferences.PREF_ZYROX_PERF_HUD = next;
-                             if (LauncherPreferences.DEFAULT_PREF != null) {
-                                 LauncherPreferences.DEFAULT_PREF.edit().putBoolean("zyroxPerfHud", next).apply();
-                             }
-                         }
-                         break;
-                     case 6:
-                         QuickMacroDialog.show(GameActivity.this);
-                         break;
+                switch (position) {
+                    case 0: dialogForceClose(GameActivity.this); break;
+                    case 1: openLogOutput(); break;
+                    case 2: dialogSendCustomKey(); break;
+                    case 3: openQuickSettings(); break;
+                    case 4: openCustomControls(); break;
+                    case 5:
+                        if (mHudCoordinator != null) mHudCoordinator.toggleEnabled();
+                        break;
+                    case 6:
+                        QuickMacroDialog.show(GameActivity.this);
+                        break;
+                    default: break;
                 }
                 drawerLayout.closeDrawers();
             };
@@ -325,16 +326,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
             launcherGLView.setSurfaceReadyListener(() -> {
                 try {
-                    Tools.runOnUiThread(() -> { if(PREF_VIRTUAL_MOUSE_START) launcherGLView.mCursorView.setVisibility(View.VISIBLE); });
-                    if(version == null || classpath == null) {
-                        Tools.runOnUiThread(()->{
+                    Tools.runOnUiThread(() -> {
+                        if (PREF_VIRTUAL_MOUSE_START) {
+                            launcherGLView.mCursorView.setVisibility(View.VISIBLE);
+                        }
+                    });
+                    if (version == null || classpath == null) {
+                        Tools.runOnUiThread(() -> {
                             Toast.makeText(this, R.string.main_please_restart, Toast.LENGTH_LONG).show();
                             finish();
                         });
                         return;
                     }
                     runCraft(version, classpath);
-                }catch (Throwable e){
+                } catch (Throwable e) {
                     Tools.showErrorRemote(e);
                 }
             });
@@ -345,11 +350,10 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     private void loadControls() {
         try {
-            // Load keys
             mControlLayout.loadLayout(instance.getLaunchControls());
-        } catch(IOException e) {
+        } catch (IOException e) {
             try {
-                Log.w("MainActivity", "Unable to load the control file, loading the default now", e);
+                Log.w("GameActivity", "Unable to load control layout, falling back to default", e);
                 mControlLayout.loadLayout(Tools.CTRLDEF_FILE);
             } catch (IOException ioException) {
                 Tools.showError(this, ioException);
@@ -359,19 +363,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         }
         mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
         mControlLayout.toggleControlVisible();
+        if (mHudCoordinator != null) {
+            mHudCoordinator.onControlsLayoutChanged();
+        }
     }
 
     @Override
     public void onAttachedToWindow() {
-        // Post to get the correct display dimensions after layout.
-        mControlLayout.post(()->{
+        mControlLayout.post(() -> {
             Tools.getDisplayMetrics(this);
             loadControls();
         });
     }
 
-    /** Boilerplate binding */
-    private void bindValues(){
+    private void bindValues() {
         mControlLayout = findViewById(R.id.main_control_layout);
         launcherGLView = findViewById(R.id.main_game_render_view);
         drawerLayout = findViewById(R.id.main_drawer_options);
@@ -383,212 +388,58 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         touchCharInput = findViewById(R.id.mainTouchCharInput);
         mDrawerPullButton = findViewById(R.id.drawer_button);
         mHotbarView = findViewById(R.id.hotbar_view);
-        mLoadingScreen = findViewById(R.id.main_loading_screen);
-        if (mLoadingScreen != null) {
-            mLoadingLandscape = mLoadingScreen.findViewById(R.id.main_loading_landscape);
-            mLoadingProgressBar = mLoadingScreen.findViewById(R.id.main_loading_progress_bar);
-            mLoadingStageText = mLoadingScreen.findViewById(R.id.main_loading_stage_text);
-            mLoadingEtaText = mLoadingScreen.findViewById(R.id.main_loading_eta_text);
-            mLoadingPercentText = mLoadingScreen.findViewById(R.id.main_loading_percent_text);
-            if (sMojangSplashReached && !(PLATFORM instanceof DummyBackend)) {
-                destroyLoadingScreenImmediate();
-            } else {
-                initLaunchProgressTracking();
-                if (launcherGLView != null) {
-                    launcherGLView.setFirstSplashFrameListener(() -> {
-                        sMojangSplashReached = true;
-                        hideLoadingScreen();
-                    });
-                    if (!(PLATFORM instanceof DummyBackend)) {
-                        launcherGLView.notifyNativeWindowBackendReady();
-                    }
-                }
-            }
+
+        View loadingScreen = findViewById(R.id.main_loading_screen);
+        if (mLoadingController != null) {
+            mLoadingController.bind(loadingScreen, launcherGLView, instance, mGameRenderer);
         }
-        // Attach lightweight optional Performance HUD overlay inside content_frame
+
         ViewGroup contentFrame = findViewById(R.id.content_frame);
-        if (contentFrame != null && instance != null) {
-            mPerfHudOverlay = new PerformanceHudOverlay(this);
+        if (contentFrame != null && instance != null && mHudCoordinator != null) {
             String rTag = (mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null)
-                    ? mGameRenderer.getCurrentRenderer().tag() : instance.getLaunchRenderer();
-            mPerfHudOverlay.configureSession(rTag, instance.getEffectiveRamAllocationMb());
-            android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            int m = Math.round(6f * getResources().getDisplayMetrics().density);
-            lp.setMargins(m, m, m, m);
-            contentFrame.addView(mPerfHudOverlay, lp);
-            mPerfHudOverlay.setHudEnabled(LauncherPreferences.PREF_ZYROX_PERF_HUD);
+                    ? mGameRenderer.getCurrentRenderer().tag()
+                    : instance.getLaunchRenderer();
+            mHudCoordinator.attach(contentFrame, mControlLayout, mDrawerPullButton, mHotbarView,
+                    rTag, instance.getEffectiveRamAllocationMb());
         }
     }
 
-    /** Initializes live stdout/stderr log-driven launch progress &amp; smart ETA tracking. */
-    private void initLaunchProgressTracking() {
-        long now = android.os.SystemClock.elapsedRealtime();
-        int modCount = 0;
-        long learnedBootMs = 0L;
-        if (instance != null) {
-            try {
-                modCount = git.artdeell.mojo.performance.GameOptimizer.countInstalledMods(
-                        instance.getGameDirectory());
-            } catch (Throwable ignored) {
-            }
-            learnedBootMs = git.artdeell.mojo.instances.InstancePlaytimeTracker.getLearnedBootMs(
-                    this, instance);
-        }
-        mLaunchProgressTracker = new GameLaunchProgressTracker(now, modCount, learnedBootMs);
-        applyProgressSnapshotOnUi(mLaunchProgressTracker.onTick(now));
-
-        mLaunchLogListener = text -> {
-            GameLaunchProgressTracker tracker = mLaunchProgressTracker;
-            if (tracker == null || mLoadingScreenHiding) return;
-            long ts = android.os.SystemClock.elapsedRealtime();
-            int prevPct = tracker.getPercent();
-            GameLaunchProgressTracker.ProgressSnapshot snap = tracker.onLogOutput(text, ts);
-            // Coalesce rapid log bursts to <= 12 UI updates/sec unless percentage advanced
-            if (snap.percent > prevPct || (ts - mLastProgressUiPushMs) >= 85L) {
-                mLastProgressUiPushMs = ts;
-                Tools.runOnUiThread(() -> applyProgressSnapshotOnUi(snap));
-            }
-        };
-        Tools.MAIN_HANDLER.removeCallbacks(mLoadingProgressTickRunnable);
-        Tools.MAIN_HANDLER.postDelayed(mLoadingProgressTickRunnable, 260L);
-    }
-
-    private void applyProgressSnapshotOnUi(@NonNull GameLaunchProgressTracker.ProgressSnapshot snap) {
-        if (mLoadingScreen == null) return;
-        if (mLoadingStageText != null) {
-            mLoadingStageText.setText(snap.stageText);
-        }
-        if (mLoadingEtaText != null) {
-            mLoadingEtaText.setText(snap.etaText);
-        }
-        if (mLoadingPercentText != null) {
-            mLoadingPercentText.setText(snap.percent + "%");
-        }
-        if (mLoadingProgressBar != null) {
-            int target = Math.max(mLoadingProgressBar.getProgress(), snap.percent * 10);
-            if (LauncherPreferences.isReducedMotionEnabled(this)) {
-                mLoadingProgressBar.setProgress(target);
-            } else if (target > mLoadingProgressBar.getProgress()) {
-                if (mLoadingBarAnimator != null) {
-                    mLoadingBarAnimator.cancel();
-                }
-                mLoadingBarAnimator = android.animation.ObjectAnimator.ofInt(
-                        mLoadingProgressBar, "progress", mLoadingProgressBar.getProgress(), target);
-                mLoadingBarAnimator.setDuration(snap.completed ? 160L : 220L);
-                mLoadingBarAnimator.setInterpolator(new DecelerateInterpolator());
-                mLoadingBarAnimator.start();
-            }
-        }
-    }
-
-    private void stopLaunchProgressTracking(boolean recordSuccessDuration) {
-        Tools.MAIN_HANDLER.removeCallbacks(mLoadingProgressTickRunnable);
-        if (mLaunchLogListener != null) {
-            Logger.removeLogListener(mLaunchLogListener);
-            mLaunchLogListener = null;
-        }
-        if (mLoadingBarAnimator != null) {
-            mLoadingBarAnimator.cancel();
-            mLoadingBarAnimator = null;
-        }
-        if (recordSuccessDuration && mLaunchProgressTracker != null && instance != null) {
-            long elapsed = mLaunchProgressTracker.getElapsedMs(android.os.SystemClock.elapsedRealtime());
-            git.artdeell.mojo.instances.InstancePlaytimeTracker.recordObservedBootMs(
-                    this, instance, elapsed);
-        }
-        mLaunchProgressTracker = null;
-    }
-
-    /**
-     * Thread-safe launch lifecycle hook advancing the live Loading Screen progress bar through
-     * pre-JVM launcher stages before Minecraft's own stdout milestones take over.
-     */
+    /** Thread-safe launch lifecycle hook advancing the live Loading Screen progress bar. */
     public static void reportLoadingStage(@StringRes int stageStringRes) {
-        sCurrentLoadingStatusRes = stageStringRes;
         ContextExecutor.executeActivity(activity -> {
             if (activity instanceof GameActivity) {
                 GameActivity ga = (GameActivity) activity;
-                if (ga.mLoadingLandscape != null && !ga.mLoadingScreenHiding) {
-                    ga.mLoadingLandscape.resumeAnimation();
-                }
-                if (ga.mLaunchProgressTracker != null && !ga.mLoadingScreenHiding) {
-                    int floor = 5;
-                    int ceil = 14;
-                    if (stageStringRes == R.string.zyrox_loading_resources) {
-                        floor = 8;
-                        ceil = 16;
-                    } else if (stageStringRes == R.string.zyrox_loading_runtime) {
-                        floor = 12;
-                        ceil = 20;
-                    } else if (stageStringRes == R.string.zyrox_loading_renderer) {
-                        floor = 15;
-                        ceil = 24;
-                    } else if (stageStringRes == R.string.zyrox_loading_starting) {
-                        floor = 19;
-                        ceil = 32;
-                    }
-                    String label = ga.getString(stageStringRes);
-                    ga.applyProgressSnapshotOnUi(ga.mLaunchProgressTracker.onLauncherStage(
-                            floor, ceil, label, android.os.SystemClock.elapsedRealtime()));
+                if (ga.mLoadingController != null) {
+                    ga.mLoadingController.onLauncherStage(stageStringRes);
                 }
             }
         });
     }
 
-    /**
-     * Called when GLFW/SDL/AWT initializes. Keeps the loading GIF playing continuously until
-     * Mojang's official splash screen draws its first live visible frame on the game surface.
-     */
+    /** Called when GLFW/SDL/AWT initializes; keeps loading GIF live until Mojang's splash draws. */
     public void onNativeWindowBackendReady(PlatformBackend backend) {
         if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
             InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
         }
-        if (mLaunchProgressTracker != null && !mLoadingScreenHiding) {
-            GameLaunchProgressTracker.ProgressSnapshot snap =
-                    mLaunchProgressTracker.onNativeWindowReady(android.os.SystemClock.elapsedRealtime());
-            Tools.runOnUiThread(() -> applyProgressSnapshotOnUi(snap));
-        }
-        if (launcherGLView != null) {
-            launcherGLView.notifyNativeWindowBackendReady();
+        if (mLoadingController != null) {
+            mLoadingController.onNativeWindowReady();
         }
     }
 
-    private void destroyLoadingScreenImmediate() {
-        stopLaunchProgressTracking(false);
-        if (launcherGLView != null) {
-            launcherGLView.releaseSplashProbe();
+    public void hideLoadingScreen() {
+        if (mLoadingController != null) {
+            mLoadingController.hideSmoothly();
         }
-        if (mLoadingLandscape != null) {
-            mLoadingLandscape.release();
-            mLoadingLandscape = null;
-        }
-        mLoadingProgressBar = null;
-        mLoadingStageText = null;
-        mLoadingEtaText = null;
-        mLoadingPercentText = null;
-        if (mLoadingScreen != null) {
-            mLoadingScreen.animate().cancel();
-            if (mLoadingScreen.getParent() instanceof ViewGroup) {
-                ((ViewGroup) mLoadingScreen.getParent()).removeView(mLoadingScreen);
-            }
-            mLoadingScreen = null;
-        }
-        mLoadingScreenHiding = false;
     }
 
     @Override
     public void onResume() {
         super.onResume();
         ContextExecutor.setActivity(this);
-        mSessionResumeRealtimeMs = android.os.SystemClock.elapsedRealtime();
-        if(PREF_ENABLE_GYRO) mGyroControl.enable();
-        if (mLoadingLandscape != null && !mLoadingScreenHiding) {
-            mLoadingLandscape.resumeAnimation();
-        }
-        if (mPerfHudOverlay != null && mPerfHudOverlay.isHudEnabled()) {
-            mPerfHudOverlay.startMonitoring();
-        }
+        mSessionResumeRealtimeMs = SystemClock.elapsedRealtime();
+        if (PREF_ENABLE_GYRO && mGyroControl != null) mGyroControl.enable();
+        if (mLoadingController != null) mLoadingController.resumeAnimation();
+        if (mHudCoordinator != null) mHudCoordinator.onResume();
         PLATFORM.setHovered(true);
     }
 
@@ -596,15 +447,12 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     protected void onPause() {
         flushPlaytimeSession();
         ContextExecutor.clearActivity();
-        mGyroControl.disable();
-        if (mPerfHudOverlay != null) {
-            mPerfHudOverlay.stopMonitoring(false);
-        }
-        // Avoid going through the JNI each time.
-        if (Platform.isGrabbing()){
+        if (mGyroControl != null) mGyroControl.disable();
+        if (mHudCoordinator != null) mHudCoordinator.onPause();
+        if (Platform.isGrabbing()) {
             CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
         }
-        if(mQuickSettingSideDialog != null) {
+        if (mQuickSettingSideDialog != null) {
             mQuickSettingSideDialog.cancel();
         }
         PLATFORM.setHovered(false);
@@ -614,39 +462,36 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     protected void onStart() {
         super.onStart();
-        if (mLoadingLandscape != null && !mLoadingScreenHiding) {
-            mLoadingLandscape.resumeAnimation();
-        }
+        if (mLoadingController != null) mLoadingController.resumeAnimation();
         PLATFORM.setVisible(true);
     }
 
     @Override
     protected void onStop() {
-        if (mLoadingLandscape != null) {
-            mLoadingLandscape.pauseAnimation();
-        }
+        if (mLoadingController != null) mLoadingController.pauseAnimation();
         PLATFORM.setVisible(false);
         super.onStop();
     }
 
     private void flushPlaytimeSession() {
         if (mSessionResumeRealtimeMs > 0L) {
-            long delta = android.os.SystemClock.elapsedRealtime() - mSessionResumeRealtimeMs;
+            long delta = SystemClock.elapsedRealtime() - mSessionResumeRealtimeMs;
             mSessionResumeRealtimeMs = 0L;
-            git.artdeell.mojo.instances.InstancePlaytimeTracker.recordSessionElapsed(
-                    this, instance, delta);
+            InstancePlaytimeTracker.recordSessionElapsed(this, instance, delta);
         }
     }
 
     @Override
     protected void onDestroy() {
         flushPlaytimeSession();
-        if (mPerfHudOverlay != null) {
-            mPerfHudOverlay.stopMonitoring(true);
-            mPerfHudOverlay = null;
+        if (mHudCoordinator != null) {
+            mHudCoordinator.onDestroy();
+            mHudCoordinator = null;
         }
-        destroyLoadingScreenImmediate();
-        sCurrentLoadingStatusRes = R.string.zyrox_loading_preparing;
+        if (mLoadingController != null) {
+            mLoadingController.destroyImmediate();
+            mLoadingController = null;
+        }
         super.onDestroy();
         ContextExecutor.clearActivity();
     }
@@ -654,50 +499,46 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-
-        if(mGyroControl != null) mGyroControl.updateOrientation();
-        // Layout resize is practically guaranteed on a configuration change, and `onConfigurationChanged`
-        // does not implicitly start a layout. So, request a layout and expect the screen dimensions to be valid after the]
-        // post.
-        if(mControlLayout == null) return;
+        if (mGyroControl != null) mGyroControl.updateOrientation();
+        if (mControlLayout == null) return;
         mControlLayout.requestLayout();
-        mControlLayout.post(()->{
-            // Child of mControlLayout, so refreshing size here is correct
+        mControlLayout.post(() -> {
             launcherGLView.refreshSize();
             mControlLayout.refreshControlButtonPositions();
+            if (mHudCoordinator != null) {
+                mHudCoordinator.onControlsLayoutChanged();
+            }
         });
     }
 
     @Override
     protected void onPostResume() {
         super.onPostResume();
-        if (mLoadingScreen != null && sMojangSplashReached && !(PLATFORM instanceof DummyBackend)) {
-            hideLoadingScreen();
+        if (mLoadingController != null) {
+            mLoadingController.hideIfSplashAlreadyReached();
         }
-        if(launcherGLView != null)  // Useful when backing out of the app
+        if (launcherGLView != null) {
             Tools.MAIN_HANDLER.postDelayed(() -> launcherGLView.refreshSize(), 500);
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
-            // Reload PREF_DEFAULTCTRL_PATH
-            // If the storage root got unmounted/unreadable we won't be able to load the file anyway,
-            // and MissingStorageActivity will be started.
-            if(!Tools.checkStorageRoot(this)) return;
+            if (!Tools.checkStorageRoot(this)) return;
             LauncherPreferences.loadPreferences(getApplicationContext());
             try {
                 mControlLayout.loadLayout(LauncherPreferences.PREF_DEFAULTCTRL_PATH);
+                if (mHudCoordinator != null) mHudCoordinator.onControlsLayoutChanged();
             } catch (IOException e) {
-                e.printStackTrace();
+                Log.w("GameActivity", "Failed to reload default control layout", e);
             }
         }
     }
 
     private void runCraft(String versionId, File[] classpath) throws Throwable {
-        sMojangSplashReached = false;
+        GameLoadingOverlayController.resetSplashFlag();
         reportLoadingStage(R.string.zyrox_loading_preparing);
         Logger.appendToLog("--------- Starting game with Launcher Debug!");
         Tools.printLauncherInfo(versionId, instance.getLaunchArgs(), mGameRenderer.getCurrentRenderer(), this);
@@ -705,25 +546,22 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
         try {
             GameRunner.launchGame(this, account, instance, versionId, classpath, mGameRenderer);
         } finally {
-            // Ensure loading animation stops cleanly if launch exits early or fails.
             Tools.runOnUiThread(() -> {
-                if (mLoadingLandscape != null) mLoadingLandscape.pauseAnimation();
+                if (mLoadingController != null) mLoadingController.pauseAnimation();
                 if (mServiceBinder != null) mServiceBinder.isActive = false;
             });
         }
     }
 
     private void dialogSendCustomKey() {
-        AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-        dialog.setTitle(R.string.control_customkey);
-        dialog.setItems(KeycodeUtils.generateKeyName(), (dInterface, position) -> KeycodeUtils.execKeyIndex(position));
-        dialog.show();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.control_customkey)
+                .setItems(KeycodeUtils.generateKeyName(), (d, pos) -> KeycodeUtils.execKeyIndex(pos))
+                .show();
     }
 
-    boolean isInEditor;
     private void openCustomControls() {
-        if(ingameControlsEditorListener == null || ingameControlsEditorArrayAdapter == null) return;
-
+        if (ingameControlsEditorListener == null || ingameControlsEditorArrayAdapter == null) return;
         mControlLayout.setModifiable(true);
         navDrawer.setAdapter(ingameControlsEditorArrayAdapter);
         navDrawer.setOnItemClickListener(ingameControlsEditorListener);
@@ -736,7 +574,7 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     }
 
     private void openQuickSettings() {
-        if(mQuickSettingSideDialog == null) {
+        if (mQuickSettingSideDialog == null) {
             mQuickSettingSideDialog = new QuickSettingSideDialog(this, mControlLayout) {
                 @Override
                 public void onResolutionChanged() {
@@ -758,91 +596,69 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
                 public void onButtonTransparencyChanged() {
                     mControlLayout.updateButtonOpacity();
                 }
+
+                @Override
+                public void onHudPreferencesChanged() {
+                    if (mHudCoordinator != null) {
+                        mHudCoordinator.syncPreferencesLive();
+                    }
+                }
+
+                @Override
+                public void onHudResetPositionRequested() {
+                    if (mHudCoordinator != null) {
+                        mHudCoordinator.resetPosition();
+                    }
+                }
             };
         }
         mQuickSettingSideDialog.appear(true);
     }
 
     public static void toggleMouse(Context ctx) {
-        // Avoid going through the JNI each time.
         if (Platform.isGrabbing()) return;
         GameCursorView cursorView = Tools.getWeakReference(weakCursor);
-        if(cursorView == null) return;
-        int toastString = 0;
-        switch (cursorView.getVisibility()) {
-            case View.GONE:
-            case View.INVISIBLE:
-                toastString = R.string.control_mouseon;
-                cursorView.setVisibility(View.VISIBLE);
-                break;
-            case View.VISIBLE:
-                toastString = R.string.control_mouseoff;
-                cursorView.setVisibility(View.GONE);
-                break;
+        if (cursorView == null) return;
+        int toastString;
+        if (cursorView.getVisibility() == View.VISIBLE) {
+            toastString = R.string.control_mouseoff;
+            cursorView.setVisibility(View.GONE);
+        } else {
+            toastString = R.string.control_mouseon;
+            cursorView.setVisibility(View.VISIBLE);
         }
-
-        if(toastString != 0) Toast.makeText(ctx, toastString, Toast.LENGTH_SHORT).show();
+        Toast.makeText(ctx, toastString, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if(isInEditor) {
-            if(event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-                if(event.getAction() == KeyEvent.ACTION_DOWN) mControlLayout.askToExit(this);
+        if (isInEditor) {
+            if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) mControlLayout.askToExit(this);
                 return true;
             }
             return super.dispatchKeyEvent(event);
         }
-        boolean handleEvent;
-        if(!(handleEvent = launcherGLView.processKeyEvent(event))) {
-            if (event.getKeyCode() == KeyEvent.KEYCODE_BACK && !touchCharInput.isEnabled()) {
-                if(event.getAction() != KeyEvent.ACTION_UP) return true; // We eat it anyway
-                CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
-                return true;
-            }
+        boolean handleEvent = launcherGLView.processKeyEvent(event);
+        if (!handleEvent && event.getKeyCode() == KeyEvent.KEYCODE_BACK && !touchCharInput.isEnabled()) {
+            if (event.getAction() != KeyEvent.ACTION_UP) return true;
+            CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
+            return true;
         }
         return handleEvent;
     }
 
     public static void switchKeyboardState(boolean panning) {
-        if(touchCharInput != null) {
+        if (touchCharInput != null) {
             touchCharInput.switchKeyboardState();
             GameActivity.mForcedPanningHeight = panning ? -1 : 0;
         }
     }
+
     public static void toggleKeyboardState(boolean state, int panningHeight) {
-        if(touchCharInput != null) {
+        if (touchCharInput != null) {
             touchCharInput.setKeyboardState(state);
             GameActivity.mForcedPanningHeight = panningHeight;
-        }
-    }
-
-    public void hideLoadingScreen() {
-        if (mLoadingScreen == null || mLoadingScreenHiding) return;
-        mLoadingScreenHiding = true;
-        sMojangSplashReached = true;
-        if (mLaunchProgressTracker != null) {
-            applyProgressSnapshotOnUi(
-                    mLaunchProgressTracker.markComplete(android.os.SystemClock.elapsedRealtime()));
-        }
-        stopLaunchProgressTracking(true);
-        if (launcherGLView != null) {
-            launcherGLView.releaseSplashProbe();
-        }
-        if (instance != null && mGameRenderer != null && mGameRenderer.getCurrentRenderer() != null) {
-            InstanceManager.recordLaunchWindowReady(instance, mGameRenderer.getCurrentRenderer().tag());
-        }
-        if (LauncherPreferences.isReducedMotionEnabled(this)) {
-            destroyLoadingScreenImmediate();
-        } else {
-            // Keep the animated scene playing smoothly through the cross-fade directly into
-            // Mojang's live official splash screen, then release all GIF memory on completion.
-            mLoadingScreen.animate()
-                    .alpha(0f)
-                    .setDuration(320L)
-                    .setInterpolator(new DecelerateInterpolator())
-                    .withEndAction(this::destroyLoadingScreenImmediate)
-                    .start();
         }
     }
 
@@ -855,15 +671,17 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
     @Override
     public void exitEditor() {
         try {
-            mControlLayout.loadLayout((CustomControls)null);
+            mControlLayout.loadLayout((CustomControls) null);
             mControlLayout.setModifiable(false);
             System.gc();
             mControlLayout.loadLayout(instance.getLaunchControls());
             mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+            if (mHudCoordinator != null) {
+                mHudCoordinator.onControlsLayoutChanged();
+            }
         } catch (Exception e) {
-            Tools.showError(this,e);
+            Tools.showError(this, e);
         }
-
         navDrawer.setAdapter(gameActionArrayAdapter);
         navDrawer.setOnItemClickListener(gameActionClickListener);
         isInEditor = false;
@@ -879,28 +697,20 @@ public class GameActivity extends BaseActivity implements ControlButtonMenuListe
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
-
     }
 
-    /*
-     * Android 14 (or some devices, at least) seems to dispatch the the captured mouse events as trackball events
-     * due to a bug(?) somewhere(????)
-     */
     @RequiresApi(api = Build.VERSION_CODES.O)
     private boolean checkCaptureDispatchConditions(MotionEvent event) {
         int eventSource = event.getSource();
-        // On my device, the mouse sends events as a relative mouse device.
-        // Not comparing with == here because apparently `eventSource` is a mask that can
-        // sometimes indicate multiple sources, like in the case of InputDevice.SOURCE_TOUCHPAD
-        // (which is *also* an InputDevice.SOURCE_MOUSE when controlling a cursor)
-        return (eventSource & InputDevice.SOURCE_MOUSE_RELATIVE) != 0 ||
-                (eventSource & InputDevice.SOURCE_MOUSE) != 0;
+        return (eventSource & InputDevice.SOURCE_MOUSE_RELATIVE) != 0
+                || (eventSource & InputDevice.SOURCE_MOUSE) != 0;
     }
 
     @Override
     public boolean dispatchTrackballEvent(MotionEvent ev) {
-        if(Tools.isAndroid8OrHigher() && checkCaptureDispatchConditions(ev))
+        if (Tools.isAndroid8OrHigher() && checkCaptureDispatchConditions(ev)) {
             return launcherGLView.dispatchCapturedPointerEvent(ev);
-        else return super.dispatchTrackballEvent(ev);
+        }
+        return super.dispatchTrackballEvent(ev);
     }
 }

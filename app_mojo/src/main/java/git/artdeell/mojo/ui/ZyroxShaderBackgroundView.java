@@ -2,6 +2,7 @@ package git.artdeell.mojo.ui;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.RenderEffect;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
@@ -13,6 +14,7 @@ import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import java.io.File;
 
@@ -21,23 +23,24 @@ import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 
 /**
- * Global 100% edge-to-edge Zyrox Launcher Home &amp; sub-page live backdrop:
+ * Blur-isolated, full-resolution edge-to-edge Zyrox Launcher Home &amp; sub-page live backdrop:
  * <ol>
- *   <li>Full-bleed, VSYNC-locked, zero-buffer seamless cherry-blossom lakeside gazebo GIF
- *       ({@code R.raw.zyrox_home_scene}) rendered via {@link ZyroxSeamlessGifView} with zero
- *       procedural particle/Ken-Burns overlay clutter.</li>
- *   <li>Optional muted looping {@link VideoView} override when the user explicitly imports a custom
- *       {@code zyrox_bg.mp4} in Miscellaneous Settings.</li>
- *   <li>Whisper-light optical edge vignette keeping snow-white Liquid Glass labels legible over
- *       sunlit sky while letting the full cherry-blossom scene shine vividly.</li>
+ *   <li>Full-resolution hardware-accelerated {@link ZyroxSeamlessGifView} ({@code ImageDecoder} +
+ *       {@link android.graphics.drawable.AnimatedImageDrawable} on API 28+, lossless 32-bit
+ *       {@code ARGB_8888} on API 21–27) completely decoupled from foreground Liquid Glass blur.</li>
+ *   <li>Supports both {@link ZyroxSeamlessGifView.ScalingFilter#NEAREST_NEIGHBOR} (pixel art) and
+ *       {@link ZyroxSeamlessGifView.ScalingFilter#BICUBIC} (HD animated GIFs).</li>
+ *   <li>Optional muted looping {@link VideoView} override when {@code zyrox_bg.mp4} is imported.</li>
  * </ol>
  */
 public class ZyroxShaderBackgroundView extends FrameLayout {
     public static final String CUSTOM_VIDEO_FILENAME = "zyrox_bg.mp4";
     public static final String CUSTOM_GIF_FILENAME = "zyrox_bg.gif";
+    private static final long MAX_CUSTOM_GIF_BYTES = 32L * 1024L * 1024L;
 
     private ZyroxSeamlessGifView mHomeGifView;
     private VideoView mVideoView;
+    private View mContrastVeilView;
     private boolean mResumed = false;
     private boolean mVideoActive = false;
     private int mVideoWidth = 0;
@@ -59,13 +62,19 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     }
 
     private void init(@NonNull Context context) {
+        setTag(ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP);
+        setLayerType(LAYER_TYPE_NONE, null);
         setBackgroundColor(Color.parseColor("#0A101E"));
         setClipChildren(true);
         setClipToPadding(false);
         setPadding(0, 0, 0, 0);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            clearRenderEffectApi31();
+        }
 
-        // Layer 1: Seamless, zero-buffer full-bleed Starlight Firefly lakeside GIF (default Home scene)
+        // Layer 1: Blur-isolated, full-native-resolution hardware AnimatedImageDrawable GIF
         mHomeGifView = new ZyroxSeamlessGifView(context);
+        mHomeGifView.syncScalingFilterFromPreferences();
         mHomeGifView.setGifResource(R.raw.zyrox_home_scene);
         addView(mHomeGifView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
@@ -79,12 +88,46 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, Gravity.CENTER);
         addView(mVideoView, videoParams);
 
-        // Layer 3: Delicate optical contrast veil so Liquid Glass controls stay crisp on sunlit sky
-        View vignetteView = new View(context);
-        vignetteView.setBackgroundResource(R.drawable.bg_zyrox_vignette);
-        vignetteView.setClickable(false);
-        vignetteView.setFocusable(false);
-        addView(vignetteView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        // Layer 3: Subtle edge-only contrast rim (zero blur, 100% transparent center so GIF stays crisp)
+        mContrastVeilView = new View(context);
+        mContrastVeilView.setLayerType(LAYER_TYPE_NONE, null);
+        mContrastVeilView.setBackgroundResource(R.drawable.bg_zyrox_vignette);
+        mContrastVeilView.setClickable(false);
+        mContrastVeilView.setFocusable(false);
+        addView(mContrastVeilView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private void clearRenderEffectApi31() {
+        super.setRenderEffect(null);
+    }
+
+    /**
+     * Prevents any window/container blur {@link RenderEffect} from being applied to the backdrop
+     * hierarchy — glass blur is strictly restricted to foreground UI cards.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    @Override
+    public void setRenderEffect(@Nullable RenderEffect renderEffect) {
+        super.setRenderEffect(null);
+    }
+
+    /** Returns {@code true}: this background container is permanently isolated from blur passes. */
+    public boolean isBlurIsolated() {
+        return true;
+    }
+
+    /** Returns the underlying blur-isolated {@link ZyroxSeamlessGifView}. */
+    @NonNull
+    public ZyroxSeamlessGifView getGifView() {
+        return mHomeGifView;
+    }
+
+    /** Updates the GIF scaling filter ({@code NEAREST_NEIGHBOR} or {@code BICUBIC}) immediately. */
+    public void setGifScalingFilter(@NonNull ZyroxSeamlessGifView.ScalingFilter filter) {
+        if (mHomeGifView != null) {
+            mHomeGifView.setScalingFilter(filter);
+        }
     }
 
     @Override
@@ -115,7 +158,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
             if (Tools.DIR_GAME_HOME != null) {
                 File customGif = new File(Tools.DIR_GAME_HOME, CUSTOM_GIF_FILENAME);
                 if (customGif.isFile() && customGif.canRead()
-                        && customGif.length() > 16 && customGif.length() <= 24L * 1024L * 1024L) {
+                        && customGif.length() > 16 && customGif.length() <= MAX_CUSTOM_GIF_BYTES) {
                     return customGif;
                 }
             }
@@ -125,6 +168,10 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     }
 
     public void refreshBackgroundState() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            clearRenderEffectApi31();
+        }
+        mHomeGifView.syncScalingFilterFromPreferences();
         boolean animated = LauncherPreferences.PREF_ZYROX_ANIMATED_BG;
         File customGif = resolveCustomGifFile();
         Uri customVideoUri = (animated && customGif == null) ? resolveCustomVideoUri() : null;

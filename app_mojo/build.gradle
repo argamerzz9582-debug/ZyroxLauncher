@@ -17,7 +17,7 @@ static def getDateSeconds() {
 }
 
 def getVersionName = {
-    return "2.2.1"
+    return "2.3.0"
 }
 
 def getCFApiKey = {
@@ -83,9 +83,21 @@ android {
         targetSdkVersion 36
         versionCode getDateSeconds()
         versionName getVersionName()
-        multiDexEnabled false //important
+        // Native ART multidex (minSdk 21) supports modern OkHttp HTTP/2, Gson & Commons Maven artifacts
+        multiDexEnabled true
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         resValue 'string', 'group_id', 'com.zyrox'
+    }
+
+    // ABI split restricting bundled native libraries (including shaderc.aar, spvc.aar, OpenAL,
+    // Mesa/LTW, GLFW, SDL, and libmojoexec.so) to 64-bit arm64-v8a to minimize production APK size.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a'
+            universalApk false
+        }
     }
 
     flavorDimensions  = ["runtime"]
@@ -246,6 +258,8 @@ class AssetTaskRegistrar {
 
         def unzipTask = project.tasks.register("unzip${dependencySuffix}", Copy) {
             from project.zipTree(downloadTarget)
+            // Keep arm64 + universal JRE archives; omit dead 32-bit/x86 payloads for arm64-v8a split APK
+            exclude '**/bin-arm.tar.xz', '**/bin-x86.tar.xz', '**/bin-x86_64.tar.xz'
             into targetExtractionDir
             dependsOn downloadTask
         }
@@ -349,17 +363,26 @@ dependencies {
     // implementation 'com.intuit.ssp:ssp-android:1.0.5'
 
     implementation 'org.tukaani:xz:1.10'
-    // Our version of exp4j can be built from source at
-    // https://github.com/PojavLauncherTeam/exp4j
     implementation 'net.sourceforge.htmlcleaner:htmlcleaner:2.29'
+
+    // Modern official Maven Central replacements for removed legacy local JARs:
+    // (gson-2.8.6.jar, ExagearApacheCommons.jar, exp4j-0.4.9-SNAPSHOT.jar)
+    implementation 'com.google.code.gson:gson:2.11.0'
+    implementation 'commons-io:commons-io:2.11.0'
+    implementation 'org.apache.commons:commons-compress:1.21'
+    implementation 'net.objecthunter:exp4j:0.4.8'
+
+    // HTTP/2 multiplexed connection pooling & QR control profile encoding/decoding
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.zxing:core:3.5.3'
 
     implementation 'com.github.MojoLauncher:alsoft-android-aar:f369161d5f'
 
     implementation project(":glfw:jni_bindings")
     implementation project(":sdl:jni_bindings")
-    // implementation 'net.sourceforge.streamsupport:streamsupport-cfuture:1.7.0'
 
-    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    // Native shader compiler AARs only (shaderc.aar, spvc.aar, plus CI LTW/Mesa AARs), ABI-split to arm64-v8a
+    implementation fileTree(dir: 'libs', include: ['*.aar'])
 
     testImplementation 'junit:junit:4.13.2'
 }

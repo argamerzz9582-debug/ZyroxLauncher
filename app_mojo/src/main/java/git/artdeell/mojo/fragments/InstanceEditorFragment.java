@@ -94,8 +94,25 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     private final ActivityResultLauncher<?> mCropperLauncher = CropperUtils.registerCropper(this, this);
     private final ActivityResultLauncher<String> mExportConfigLauncher =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), this::onExportConfigUri);
-    private final ActivityResultLauncher<String[]> mImportConfigLauncher =
-            registerForActivityResult(new ActivityResultContracts.OpenDocument(), this::onImportConfigUri);
+    private final ActivityResultLauncher<Object> mImportConfigLauncher =
+            registerForActivityResult(new git.artdeell.mojo.contracts.OpenDocumentWithExtension("json"), this::onImportConfigUri);
+    private final ActivityResultLauncher<Object> mOpenControlLayoutLauncher =
+            registerForActivityResult(new git.artdeell.mojo.contracts.OpenDocumentWithExtension("json"), uri -> {
+                if (uri == null || !isAdded()) return;
+                try {
+                    File imported = git.artdeell.mojo.input.ControlProfileManager
+                            .importControlJsonUri(requireContext(), uri, null);
+                    mSelectedControlLayout = imported.getAbsolutePath();
+                    if (mDefaultControl != null) {
+                        mDefaultControl.setText(imported.getName());
+                    }
+                    Toast.makeText(requireContext(),
+                            "Selected control layout: " + imported.getName(),
+                            Toast.LENGTH_SHORT).show();
+                } catch (Exception e) {
+                    Tools.showError(requireContext(), e);
+                }
+            });
 
     public InstanceEditorFragment() {
         super(R.layout.fragment_instance_editor);
@@ -104,10 +121,6 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        String value = (String) ExtraCore.consumeValue(ExtraConstants.FILE_SELECTOR);
-        if (value != null) {
-            mSelectedControlLayout = value;
-        }
         return super.onCreateView(inflater, container, savedInstanceState);
     }
 
@@ -245,12 +258,23 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
             } catch (Throwable ignored) {
             }
         }
+        if (mInstance != null && mInstance.hasCustomVulkanDriver()) {
+            git.artdeell.mojo.vulkan.driver.Driver bound =
+                    git.artdeell.mojo.vulkan.DriverManager.resolveDriverForInstance(mInstance);
+            baseHint = baseHint + "  •  GPU Driver: "
+                    + git.artdeell.mojo.vulkan.DriverManager.formatDriverLabel(bound);
+        }
         mRendererHint.setText(baseHint);
     }
 
     private void showStudioToolsMenu() {
         if (mInstance == null) return;
+        String currentDriverBadge = mInstance.hasCustomVulkanDriver()
+                ? mInstance.vulkanDriver : "Global Default";
         String[] actions = new String[]{
+                "Assign GPU Driver (Turnip / Vulkan) [" + currentDriverBadge + "]",
+                "Auto-Detect GPU & Apply Optimal Renderer Preset",
+                "Open Turnip / Runtime Driver Store",
                 "Clone Instance (Isolated Copy)",
                 "Health Check & Safe Repair",
                 "Create Verified Instance Backup (.zip + SHA-256)",
@@ -264,28 +288,102 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
                 .setTitle("Instance Studio — " + (Tools.isValidString(mInstance.name) ? mInstance.name : mInstance.versionId))
                 .setItems(actions, (d, which) -> {
                     switch (which) {
-                        case 0: promptCloneInstance(); break;
-                        case 1: runHealthCheck(); break;
-                        case 2: createInstanceBackup(); break;
-                        case 3: promptRestoreInstanceBackup(); break;
-                        case 4:
+                        case 0: promptAssignInstanceGpuDriver(); break;
+                        case 1: applyAutoGpuPresetToInstance(); break;
+                        case 2: git.artdeell.mojo.downloader.RuntimeDriverStoreDialog.show(requireContext()); break;
+                        case 3: promptCloneInstance(); break;
+                        case 4: runHealthCheck(); break;
+                        case 5: createInstanceBackup(); break;
+                        case 6: promptRestoreInstanceBackup(); break;
+                        case 7:
                             save();
                             String safe = (Tools.isValidString(mInstance.name) ? mInstance.name : "instance")
                                     .replaceAll("[^A-Za-z0-9._-]", "_");
                             mExportConfigLauncher.launch(safe + "-zyrox-instance.json");
                             break;
-                        case 5:
-                            mImportConfigLauncher.launch(new String[]{"application/json", "*/*"});
+                        case 8:
+                            mImportConfigLauncher.launch(null);
                             break;
-                        case 6:
+                        case 9:
                             Tools.swapFragment(requireActivity(), WorldManagerFragment.class, WorldManagerFragment.TAG, null);
                             break;
-                        case 7:
+                        case 10:
                             Tools.swapFragment(requireActivity(), ContentManagerFragment.class, ContentManagerFragment.TAG, null);
                             break;
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void promptAssignInstanceGpuDriver() {
+        if (mInstance == null || !isAdded()) return;
+        Context ctx = requireContext();
+        List<git.artdeell.mojo.vulkan.driver.Driver> drivers =
+                git.artdeell.mojo.vulkan.DriverManager.getDrivers();
+        git.artdeell.mojo.vulkan.driver.Driver globalDriver =
+                git.artdeell.mojo.vulkan.DriverManager.getPreferredDriver();
+
+        String[] labels = new String[drivers.size() + 1];
+        String[] tokens = new String[drivers.size() + 1];
+        labels[0] = ctx.getString(R.string.global_default)
+                + " (" + git.artdeell.mojo.vulkan.DriverManager.formatDriverLabel(globalDriver) + ")";
+        tokens[0] = null;
+
+        int checked = 0;
+        for (int i = 0; i < drivers.size(); i++) {
+            git.artdeell.mojo.vulkan.driver.Driver d = drivers.get(i);
+            boolean builtin = d instanceof git.artdeell.mojo.vulkan.driver.BuiltinDriver;
+            String tok = builtin
+                    ? git.artdeell.mojo.vulkan.DriverManager.SYSTEM_DRIVER_TOKEN
+                    : d.getHash();
+            tokens[i + 1] = tok;
+            labels[i + 1] = git.artdeell.mojo.vulkan.DriverManager.formatDriverLabel(d);
+            if (mInstance.hasCustomVulkanDriver() && tok != null
+                    && tok.equalsIgnoreCase(mInstance.vulkanDriver)) {
+                checked = i + 1;
+            }
+        }
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Per-Instance Vulkan / Turnip Driver")
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    mInstance.vulkanDriver = tokens[which];
+                    mInstance.maybeWrite();
+                    updateRendererAndRuntimeHint(mDefaultRenderer.getSelectedItemPosition());
+                    Toast.makeText(ctx,
+                            "Assigned GPU driver: " + labels[which],
+                            Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                })
+                .setNeutralButton("Turnip Store", (d, w) ->
+                        git.artdeell.mojo.downloader.RuntimeDriverStoreDialog.showForInstance(
+                                ctx, mInstance, () -> {
+                                    if (isAdded()) {
+                                        updateRendererAndRuntimeHint(mDefaultRenderer.getSelectedItemPosition());
+                                    }
+                                }))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void applyAutoGpuPresetToInstance() {
+        if (mInstance == null || !isAdded()) return;
+        Context ctx = requireContext();
+        git.artdeell.mojo.diagnostics.GraphicsAdvisor.RendererPreset preset =
+                git.artdeell.mojo.diagnostics.GraphicsAdvisor.applyOptimalPreset(
+                        ctx, mInstance, mInstance.versionId);
+        if (preset.rendererId != null && mRenderNames != null) {
+            int idx = mRenderNames.indexOf(preset.rendererId);
+            if (idx >= 0) {
+                mDefaultRenderer.setSelection(idx);
+            }
+        }
+        updateRendererAndRuntimeHint(mDefaultRenderer.getSelectedItemPosition());
+        new AlertDialog.Builder(ctx)
+                .setTitle("GPU Preset Applied — " + preset.presetName)
+                .setMessage(preset.summary)
+                .setPositiveButton(android.R.string.ok, null)
                 .show();
     }
 
@@ -541,10 +639,34 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
     private View.OnClickListener getControlSelectListener() {
         return v -> {
-            Bundle bundle = new Bundle(3);
-            bundle.putBoolean(FileSelectorFragment.BUNDLE_SELECT_FOLDER, false);
-            bundle.putString(FileSelectorFragment.BUNDLE_ROOT_PATH, Tools.CTRLMAP_PATH);
-            Tools.swapFragment(requireActivity(), FileSelectorFragment.class, FileSelectorFragment.TAG, bundle);
+            Context ctx = v.getContext();
+            List<File> saved = git.artdeell.mojo.input.ControlProfileManager.listControlFiles();
+            if (saved.isEmpty()) {
+                mOpenControlLayoutLauncher.launch(null);
+                return;
+            }
+            String[] names = new String[saved.size() + 1];
+            names[0] = ctx.getString(R.string.global_default);
+            for (int i = 0; i < saved.size(); i++) {
+                names[i + 1] = saved.get(i).getName();
+            }
+            new AlertDialog.Builder(ctx)
+                    .setTitle(R.string.mcl_option_customcontrol)
+                    .setItems(names, (dialog, which) -> {
+                        if (which == 0) {
+                            mSelectedControlLayout = null;
+                            if (mInstance != null) mInstance.controlLayout = null;
+                            mDefaultControl.setText("");
+                        } else {
+                            File chosen = saved.get(which - 1);
+                            mSelectedControlLayout = chosen.getAbsolutePath();
+                            mDefaultControl.setText(chosen.getName());
+                        }
+                    })
+                    .setNeutralButton(R.string.zyrox_action_import,
+                            (d, w) -> mOpenControlLayoutLauncher.launch(null))
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
         };
     }
 

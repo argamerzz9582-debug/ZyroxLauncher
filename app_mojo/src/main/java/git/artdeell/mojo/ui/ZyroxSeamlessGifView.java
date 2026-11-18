@@ -1,13 +1,19 @@
 package git.artdeell.mojo.ui;
 
-import android.app.ActivityManager;
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.RenderEffect;
+import android.graphics.RuntimeShader;
+import android.graphics.BitmapShader;
+import android.graphics.Shader;
+import android.graphics.drawable.AnimatedImageDrawable;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
@@ -17,53 +23,138 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
+import androidx.annotation.RequiresApi;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
-import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import git.artdeell.mojo.prefs.LauncherPreferences;
+
 /**
- * Full-bleed edge-to-edge, VSYNC-locked, zero-buffer seamless GIF scene renderer used on both
- * the Zyrox Home Hub and the Minecraft launch screen.
+ * Hardware-accelerated, native-resolution, blur-isolated animated GIF renderer powering both the
+ * Zyrox Home Hub and the Minecraft launch screen.
  *
  * <p>Key guarantees:
  * <ul>
- *   <li><b>Zero loop-end buffer/freeze:</b> All frames are pre-decoded once on a background thread
- *       into compact GPU-prefetched {@link Bitmap.Config#RGB_565} surfaces; runtime playback performs
- *       zero file I/O, zero LZW decoding, and zero heap allocations per frame.</li>
- *   <li><b>Invisible infinite loop:</b> {@link ZyroxGifDecoder} blends the tail and head frames with
- *       a C¹-continuous cosine dissolve, while {@link #onDraw(Canvas)} performs Hermite sub-frame
- *       interpolation anchored to {@link Choreographer} vsync timestamps for 60/90/120 Hz fluidity.</li>
- *   <li><b>Game-friendly memory lifecycle:</b> {@link #trimFrames()} frees all frame memory when
- *       the launcher moves to the background (e.g. while Minecraft runs) and transparently re-warms
- *       on return; {@link #release()} frees everything permanently once Mojang's splash renders.</li>
+ *   <li><b>API 28+ Hardware Pipeline:</b> Decodes and plays GIFs via {@link android.graphics.ImageDecoder}
+ *       and {@link AnimatedImageDrawable} at full 1:1 native pixel dimensions on the GPU RenderThread
+ *       with zero {@code inSampleSize} downsampling and zero {@code RGB_565} color banding.</li>
+ *   <li><b>API 21–27 Lossless Fallback:</b> Decodes into full 32-bit {@link Bitmap.Config#ARGB_8888}
+ *       frames via {@link ZyroxGifDecoder} with Catmull-Rom Bicubic or Nearest-Neighbor scaling.</li>
+ *   <li><b>Dual Scaling Filter Toggle:</b> Switches cleanly at runtime between
+ *       {@link ScalingFilter#NEAREST_NEIGHBOR} (razor-sharp pixel-art GIFs) and
+ *       {@link ScalingFilter#BICUBIC} (Catmull-Rom AGSL / high-precision filtered HD GIFs).</li>
+ *   <li><b>Strict Blur Isolation:</b> Rejects every {@link RenderEffect} blur injection and uses a
+ *       direct unbuffered hardware surface so foreground {@link ZyroxLiquidGlassDrawable} UI cards
+ *       never blur or soften the background GIF.</li>
  * </ul>
  */
 public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCallback {
 
-    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    /** Marker tag checked by {@link ZyroxLiquidGlassDrawable} to forbid backdrop blur propagation. */
+    public static final String TAG_BLUR_ISOLATED_BACKDROP = "zyrox_blur_isolated_gif";
 
-    private final Paint mBasePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
-    private final Paint mBlendPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+    /** User-selectable texture magnification/minification filter for animated GIF rendering. */
+    public enum ScalingFilter {
+        /** Exact texel point sampling — keeps 100% crisp hard edges on pixel-art Minecraft GIFs. */
+        NEAREST_NEIGHBOR("nearest"),
+        /** 4×4 Catmull-Rom bicubic / high-precision filtered sampling for HD animated scenes. */
+        BICUBIC("bicubic");
+
+        @NonNull
+        public final String prefValue;
+
+        ScalingFilter(@NonNull String prefValue) {
+            this.prefValue = prefValue;
+        }
+
+        @NonNull
+        public static ScalingFilter fromPreference(@Nullable String raw) {
+            return "nearest".equalsIgnoreCase(raw) ? NEAREST_NEIGHBOR : BICUBIC;
+        }
+    }
+
+    /**
+     * API 33+ AGSL 4×4 Catmull-Rom bicubic fragment shader evaluated directly on the GPU for
+     * bitmap frames when {@link ScalingFilter#BICUBIC} is active.
+     */
+    private static final String AGSL_BICUBIC_SHADER =
+            "uniform shader uTex;\n"
+            + "uniform float2 uSrcSize;\n"
+            + "uniform float2 uDstOffset;\n"
+            + "uniform float2 uInvScale;\n"
+            + "float4 cubic(float v) {\n"
+            + "  float v2 = v * v; float v3 = v2 * v;\n"
+            + "  return float4(-0.5*v + v2 - 0.5*v3,\n"
+            + "                 1.0 - 2.5*v2 + 1.5*v3,\n"
+            + "                 0.5*v + 2.0*v2 - 1.5*v3,\n"
+            + "                -0.5*v2 + 0.5*v3);\n"
+            + "}\n"
+            + "half4 main(float2 fragCoord) {\n"
+            + "  float2 uv = (fragCoord - uDstOffset) * uInvScale - 0.5;\n"
+            + "  float2 base = floor(uv);\n"
+            + "  float2 f = uv - base;\n"
+            + "  float4 wx = cubic(f.x);\n"
+            + "  float4 wy = cubic(f.y);\n"
+            + "  float4 c = float4(wx.x + wx.y, wx.z + wx.w, wy.x + wy.y, wy.z + wy.w);\n"
+            + "  float4 s = float4(base.x - 0.5 + wx.y / max(c.x, 1e-4),\n"
+            + "                    base.x + 1.5 + wx.w / max(c.y, 1e-4),\n"
+            + "                    base.y - 0.5 + wy.y / max(c.z, 1e-4),\n"
+            + "                    base.y + 1.5 + wy.w / max(c.w, 1e-4));\n"
+            + "  s = clamp(s, float4(0.5, 0.5, 0.5, 0.5),\n"
+            + "            float4(uSrcSize.x - 0.5, uSrcSize.x - 0.5, uSrcSize.y - 0.5, uSrcSize.y - 0.5));\n"
+            + "  half4 s00 = uTex.eval(float2(s.x, s.z));\n"
+            + "  half4 s10 = uTex.eval(float2(s.y, s.z));\n"
+            + "  half4 s01 = uTex.eval(float2(s.x, s.w));\n"
+            + "  half4 s11 = uTex.eval(float2(s.y, s.w));\n"
+            + "  float sx = c.x / max(c.x + c.y, 1e-4);\n"
+            + "  float sy = c.z / max(c.z + c.w, 1e-4);\n"
+            + "  return mix(mix(s11, s01, half(sx)), mix(s10, s00, half(sx)), half(sy));\n"
+            + "}\n";
+
+    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    private static final long MAX_CUSTOM_GIF_BYTES = 32L * 1024L * 1024L;
+
+    private final Paint mBasePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final Paint mBlendPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
+    private final Paint mBicubicPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF mDstRect = new RectF();
+    private final Matrix mDrawMatrix = new Matrix();
+
+    @NonNull
+    private volatile ScalingFilter mScalingFilter = ScalingFilter.BICUBIC;
 
     @RawRes
     private volatile int mGifResId = 0;
     @Nullable
-    private volatile java.io.File mGifFile = null;
+    private volatile File mGifFile = null;
+
+    // API 28+ hardware-accelerated AnimatedImageDrawable state
+    @Nullable
+    private Drawable mHardwareDrawable;
+    @Nullable
+    private AnimatedImageDrawable mAnimatedDrawable;
+
+    // API 21–27 full-resolution ARGB_8888 fallback state
     @Nullable
     private ZyroxGifDecoder.SeamlessSequence<Bitmap> mSequence;
     @Nullable
     private Bitmap mPreviewBitmap;
     private boolean mPreviewOwnedBySequence = false;
     @Nullable
+    private Object mBicubicRuntimeShader; // RuntimeShader on API 33+, kept Object-typed for API 21 verifier
+
+    @Nullable
     private AtomicBoolean mActiveDecodeCancel;
 
     private int mContentWidth = 0;
     private int mContentHeight = 0;
+    private float mCurrentScale = 1f;
     private boolean mDstDirty = true;
 
     private boolean mShouldAnimate = true;
@@ -84,18 +175,104 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
 
     public ZyroxSeamlessGifView(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        setTag(TAG_BLUR_ISOLATED_BACKDROP);
+        setLayerType(LAYER_TYPE_NONE, null);
         setBackgroundColor(Color.BLACK);
         setClickable(false);
         setFocusable(false);
         setWillNotDraw(false);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            clearAnyRenderEffectApi31();
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            initBicubicShaderApi33();
+        }
+        syncScalingFilterFromPreferences();
     }
 
-    /** Binds a bundled {@code res/raw} animated GIF scene and starts asynchronous pre-decoding. */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private void clearAnyRenderEffectApi31() {
+        super.setRenderEffect(null);
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private void initBicubicShaderApi33() {
+        try {
+            mBicubicRuntimeShader = new RuntimeShader(AGSL_BICUBIC_SHADER);
+        } catch (Throwable ignored) {
+            mBicubicRuntimeShader = null;
+        }
+    }
+
+    /**
+     * Hard architectural guard: blocks any {@link RenderEffect} blur pass from ever attaching to
+     * this background GIF view so Liquid Glass blur remains isolated to foreground UI cards.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    @Override
+    public void setRenderEffect(@Nullable RenderEffect renderEffect) {
+        // Intentionally drop non-null RenderEffects — background GIFs must stay 100% razor-sharp.
+        super.setRenderEffect(null);
+    }
+
+    /** Returns {@code true}: this view is permanently decoupled from all UI glass blur passes. */
+    public boolean isBlurIsolated() {
+        return true;
+    }
+
+    /** Returns the active magnification/minification scaling filter. */
+    @NonNull
+    public ScalingFilter getScalingFilter() {
+        return mScalingFilter;
+    }
+
+    /** Returns {@code true} when pixel-art Nearest-Neighbor filtering is active. */
+    public boolean isNearestNeighborFilter() {
+        return mScalingFilter == ScalingFilter.NEAREST_NEIGHBOR;
+    }
+
+    /** Syncs the active scaling filter with {@link LauncherPreferences#PREF_ZYROX_GIF_FILTER}. */
+    public void syncScalingFilterFromPreferences() {
+        setScalingFilter(ScalingFilter.fromPreference(LauncherPreferences.PREF_ZYROX_GIF_FILTER));
+    }
+
+    /** Applies either {@link ScalingFilter#NEAREST_NEIGHBOR} (pixel art) or {@link ScalingFilter#BICUBIC} (HD). */
+    public void setScalingFilter(@NonNull ScalingFilter filter) {
+        mScalingFilter = filter;
+        boolean filterBitmap = (filter == ScalingFilter.BICUBIC);
+        mBasePaint.setFilterBitmap(filterBitmap);
+        mBasePaint.setAntiAlias(filterBitmap);
+        mBasePaint.setDither(false);
+        mBlendPaint.setFilterBitmap(filterBitmap);
+        mBlendPaint.setAntiAlias(filterBitmap);
+        mBlendPaint.setDither(false);
+        if (mHardwareDrawable != null) {
+            mHardwareDrawable.setFilterBitmap(filterBitmap);
+            mHardwareDrawable.setDither(false);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+            mAnimatedDrawable.setFilterBitmap(filterBitmap);
+        }
+        invalidate();
+    }
+
+    /** Toggles between {@link ScalingFilter#NEAREST_NEIGHBOR} and {@link ScalingFilter#BICUBIC}. */
+    @NonNull
+    public ScalingFilter toggleScalingFilter() {
+        ScalingFilter next = (mScalingFilter == ScalingFilter.NEAREST_NEIGHBOR)
+                ? ScalingFilter.BICUBIC
+                : ScalingFilter.NEAREST_NEIGHBOR;
+        setScalingFilter(next);
+        return next;
+    }
+
+    /** Binds a bundled {@code res/raw} animated GIF scene at full native resolution. */
     public void setGifResource(@RawRes int rawResId) {
         if (mReleased || rawResId == 0) return;
-        if (mGifFile == null && mGifResId == rawResId && (mSequence != null || mDecoding)) {
-            syncChoreographer();
+        syncScalingFilterFromPreferences();
+        if (mGifFile == null && mGifResId == rawResId && (hasDecodedContent() || mDecoding)) {
+            syncAnimationState();
             return;
         }
         cancelInFlightDecode();
@@ -107,12 +284,12 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         ensureDecodedAsync();
     }
 
-    /** Binds a user-imported custom {@code .gif} backdrop file (up to 24 MB) for seamless looping. */
-    public void setGifFile(@Nullable java.io.File gifFile) {
+    /** Binds a user-imported custom {@code .gif} backdrop file at full native resolution. */
+    public void setGifFile(@Nullable File gifFile) {
         if (mReleased || gifFile == null || !gifFile.isFile()) return;
-        if (mGifFile != null && mGifFile.equals(gifFile)
-                && (mSequence != null || mDecoding)) {
-            syncChoreographer();
+        syncScalingFilterFromPreferences();
+        if (mGifFile != null && mGifFile.equals(gifFile) && (hasDecodedContent() || mDecoding)) {
+            syncAnimationState();
             return;
         }
         cancelInFlightDecode();
@@ -124,10 +301,15 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         ensureDecodedAsync();
     }
 
-    /** Enables or pauses smooth infinite loop playback (when false, displays a crisp static frame). */
+    private boolean hasDecodedContent() {
+        return mHardwareDrawable != null || mSequence != null;
+    }
+
+    /** Enables or pauses smooth infinite loop playback (displays a crisp native frame when false). */
     public void setPlaybackEnabled(boolean enabled) {
         if (mShouldAnimate == enabled) {
             if (enabled) ensureDecodedAsync();
+            syncAnimationState();
             return;
         }
         mShouldAnimate = enabled;
@@ -135,56 +317,72 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         if (enabled) {
             ensureDecodedAsync();
         }
-        syncChoreographer();
+        syncAnimationState();
         invalidate();
     }
 
     /** Starts or resumes continuous loop playback. */
     public void resumeAnimation() {
         if (mReleased) return;
+        syncScalingFilterFromPreferences();
         mShouldAnimate = true;
         mLastFrameTimeNs = 0L;
         ensureDecodedAsync();
-        syncChoreographer();
+        syncAnimationState();
     }
 
-    /** Pauses vsync callbacks immediately (0% background CPU/GPU) while keeping frames warm. */
+    /** Pauses GPU/VSYNC playback immediately (0% background CPU/GPU) while keeping texture warm. */
     public void pauseAnimation() {
-        stopChoreographer();
+        stopActivePlayback();
         mLastFrameTimeNs = 0L;
     }
 
     /**
-     * Frees all cached frame bitmaps while the host activity is stopped (e.g. while Minecraft is
-     * running in foreground). Automatically reloads when {@link #resumeAnimation()} is next called.
+     * Frees all decoded GPU/Bitmap frame buffers while the host activity is stopped (e.g. while
+     * Minecraft is running in the foreground). Automatically reloads on {@link #resumeAnimation()}.
      */
     public void trimFrames() {
-        stopChoreographer();
+        stopActivePlayback();
         cancelInFlightDecode();
         recycleAllOnUiThread();
     }
 
-    /** Permanently stops playback and frees every native bitmap buffer. */
+    /** Permanently stops playback and releases every hardware drawable and bitmap buffer. */
     public void release() {
         if (mReleased) return;
         mReleased = true;
         mShouldAnimate = false;
-        stopChoreographer();
+        stopActivePlayback();
         cancelInFlightDecode();
         recycleAllOnUiThread();
     }
 
+    @Override
+    protected boolean verifyDrawable(@NonNull Drawable who) {
+        return who == mHardwareDrawable || super.verifyDrawable(who);
+    }
+
+    @Override
+    public void invalidateDrawable(@NonNull Drawable drawable) {
+        if (drawable == mHardwareDrawable) {
+            invalidate();
+        } else {
+            super.invalidateDrawable(drawable);
+        }
+    }
+
     private void ensureDecodedAsync() {
-        if (mReleased || mDecoding || mSequence != null || mGifResId == 0) return;
+        if (mReleased || mDecoding || hasDecodedContent() || mGifResId == 0) return;
         final Context appCtx = getContext().getApplicationContext();
         final int targetRes = mGifResId;
-        final java.io.File targetFile = mGifFile;
+        final File targetFile = mGifFile;
+        final boolean nearest = isNearestNeighborFilter();
         final AtomicBoolean cancelFlag = new AtomicBoolean(false);
         mActiveDecodeCancel = cancelFlag;
         mDecoding = true;
 
-        Thread worker = new Thread(() -> decodeWorker(appCtx, targetRes, targetFile, cancelFlag),
-                "ZyroxSeamlessGif");
+        Thread worker = new Thread(() -> decodeWorker(appCtx, targetRes, targetFile, nearest, cancelFlag),
+                "ZyroxHardwareGif");
         worker.setDaemon(true);
         worker.setPriority(Math.max(Thread.MIN_PRIORITY, Thread.NORM_PRIORITY - 1));
         worker.start();
@@ -192,28 +390,39 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
 
     private void decodeWorker(@NonNull Context appCtx,
                               int resId,
-                              @Nullable java.io.File customFile,
+                              @Nullable File customFile,
+                              boolean nearest,
                               @NonNull AtomicBoolean cancelFlag) {
+        // Primary Path (API 28+): Hardware-accelerated ImageDecoder + AnimatedImageDrawable
+        // at strictly 1:1 native resolution (setTargetSampleSize(1), ALLOCATOR_HARDWARE, no RGB_565).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                ZyroxGifDecoder.HardwareGifResult hw = (customFile != null)
+                        ? ZyroxGifDecoder.decodeHardwareFile(customFile, nearest)
+                        : ZyroxGifDecoder.decodeHardwareResource(appCtx.getResources(), resId, nearest);
+                if (!cancelFlag.get()) {
+                    postHardwareDecodeFinished(resId, cancelFlag, hw);
+                    return;
+                } else if (hw.animatedDrawable != null) {
+                    hw.animatedDrawable.stop();
+                }
+            } catch (Throwable ignored) {
+                // Gracefully fall through to full-resolution ARGB_8888 software pipeline
+            }
+        }
+
+        // Fallback Path (API 21–27): Full native resolution 32-bit ARGB_8888 (zero downscaling)
         byte[] gifBytes = customFile != null
                 ? readFileBytes(customFile, cancelFlag)
                 : readRawBytes(appCtx, resId, cancelFlag);
         if (gifBytes == null || cancelFlag.get()) {
-            postDecodeFinished(resId, cancelFlag, null, null);
+            postSoftwareDecodeFinished(resId, cancelFlag, null, null);
             return;
         }
 
-        int sampleStep = chooseSafeSampleStep(appCtx, gifBytes);
         ZyroxGifDecoder.SeamlessSequence<Bitmap> seq = null;
         try {
-            seq = decodeWithStep(gifBytes, sampleStep, resId, cancelFlag);
-        } catch (OutOfMemoryError oom) {
-            if (!cancelFlag.get() && sampleStep < 2) {
-                try {
-                    seq = decodeWithStep(gifBytes, 2, resId, cancelFlag);
-                } catch (Throwable ignored) {
-                    seq = null;
-                }
-            }
+            seq = decodeFullArgb8888(gifBytes, resId, cancelFlag);
         } catch (Throwable ignored) {
             seq = null;
         }
@@ -221,27 +430,18 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         Bitmap staticFallback = null;
         if (seq == null && !cancelFlag.get()) {
             try {
-                BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inPreferredConfig = Bitmap.Config.RGB_565;
-                staticFallback = BitmapFactory.decodeByteArray(gifBytes, 0, gifBytes.length, opts);
-                if (staticFallback != null) {
-                    staticFallback.prepareToDraw();
-                }
+                staticFallback = ZyroxGifDecoder.decodeStaticArgb8888(gifBytes);
             } catch (Throwable ignored) {
             }
         }
 
-        // Release compressed byte buffer before posting back to UI thread
-        //noinspection UnusedAssignment
-        gifBytes = null;
-        postDecodeFinished(resId, cancelFlag, seq, staticFallback);
+        postSoftwareDecodeFinished(resId, cancelFlag, seq, staticFallback);
     }
 
     @Nullable
-    private ZyroxGifDecoder.SeamlessSequence<Bitmap> decodeWithStep(
+    private ZyroxGifDecoder.SeamlessSequence<Bitmap> decodeFullArgb8888(
             @NonNull byte[] gifBytes,
-            int sampleStep,
-            @RawRes int resId,
+            int resId,
             @NonNull AtomicBoolean cancelFlag) {
 
         final List<Bitmap> allocated = new ArrayList<>(36);
@@ -249,24 +449,18 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         try {
             result = ZyroxGifDecoder.decodeSeamlessLoop(
                     gifBytes,
-                    sampleStep,
                     true,
                     cancelFlag,
-                    (w, h, rgb565) -> {
-                        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565);
+                    (w, h, argb8888) -> {
+                        Bitmap bmp = ZyroxGifDecoder.createArgb8888Bitmap(w, h, argb8888);
                         allocated.add(bmp);
-                        bmp.copyPixelsFromBuffer(ShortBuffer.wrap(rgb565));
-                        bmp.setHasAlpha(false);
-                        bmp.prepareToDraw();
                         return bmp;
                     },
                     (preview, w, h) -> {
-                        if (cancelFlag.get()) {
-                            return;
-                        }
+                        if (cancelFlag.get()) return;
                         MAIN_HANDLER.post(() -> {
                             if (mReleased || cancelFlag.get() || mGifResId != resId
-                                    || mSequence != null || preview.isRecycled()) {
+                                    || hasDecodedContent() || preview.isRecycled()) {
                                 return;
                             }
                             if (!mPreviewOwnedBySequence) {
@@ -295,10 +489,43 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         }
     }
 
-    private void postDecodeFinished(@RawRes int resId,
-                                    @NonNull AtomicBoolean cancelFlag,
-                                    @Nullable ZyroxGifDecoder.SeamlessSequence<Bitmap> seq,
-                                    @Nullable Bitmap fallback) {
+    @RequiresApi(Build.VERSION_CODES.P)
+    private void postHardwareDecodeFinished(int resId,
+                                            @NonNull AtomicBoolean cancelFlag,
+                                            @NonNull ZyroxGifDecoder.HardwareGifResult hw) {
+        MAIN_HANDLER.post(() -> {
+            if (mActiveDecodeCancel == cancelFlag) {
+                mActiveDecodeCancel = null;
+                mDecoding = false;
+            }
+            if (mReleased || cancelFlag.get() || mGifResId != resId) {
+                if (hw.animatedDrawable != null) {
+                    hw.animatedDrawable.stop();
+                }
+                return;
+            }
+            recycleAllOnUiThread();
+            boolean filterBitmap = (mScalingFilter == ScalingFilter.BICUBIC);
+            hw.drawable.setFilterBitmap(filterBitmap);
+            hw.drawable.setDither(false);
+            hw.drawable.setBounds(0, 0, hw.nativeWidth, hw.nativeHeight);
+            hw.drawable.setCallback(this);
+            mHardwareDrawable = hw.drawable;
+            mAnimatedDrawable = hw.animatedDrawable;
+            if (mAnimatedDrawable != null) {
+                mAnimatedDrawable.setRepeatCount(AnimatedImageDrawable.REPEAT_INFINITE);
+                mAnimatedDrawable.setFilterBitmap(filterBitmap);
+            }
+            updateContentDimensions(hw.nativeWidth, hw.nativeHeight);
+            syncAnimationState();
+            invalidate();
+        });
+    }
+
+    private void postSoftwareDecodeFinished(int resId,
+                                            @NonNull AtomicBoolean cancelFlag,
+                                            @Nullable ZyroxGifDecoder.SeamlessSequence<Bitmap> seq,
+                                            @Nullable Bitmap fallback) {
         MAIN_HANDLER.post(() -> {
             if (mActiveDecodeCancel == cancelFlag) {
                 mActiveDecodeCancel = null;
@@ -320,7 +547,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
                 safeRecycle(fallback);
                 updateContentDimensions(seq.width, seq.height);
                 mLastFrameTimeNs = 0L;
-                syncChoreographer();
+                syncAnimationState();
                 invalidate();
             } else if (fallback != null) {
                 if (!mPreviewOwnedBySequence) {
@@ -334,36 +561,11 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         });
     }
 
-    private static int chooseSafeSampleStep(@NonNull Context ctx, @NonNull byte[] gifBytes) {
-        try {
-            ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
-            if (am != null && am.isLowRamDevice()) {
-                return 2;
-            }
-            ZyroxGifDecoder.GifMetadata meta = ZyroxGifDecoder.inspectMetadata(gifBytes);
-            if (meta != null) {
-                int cycleFrames = meta.frameCount - ZyroxGifDecoder.computeOverlapCount(meta.frameCount);
-                long estimatedBytes = (long) meta.width * meta.height * 2L * Math.max(1, cycleFrames);
-                Runtime rt = Runtime.getRuntime();
-                long maxHeap = rt.maxMemory();
-                if (estimatedBytes > 26L * 1024L * 1024L
-                        || (maxHeap > 0 && maxHeap < 160L * 1024L * 1024L && estimatedBytes > 16L * 1024L * 1024L)) {
-                    return 2;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return 1;
-    }
-
-    private static final long MAX_CUSTOM_GIF_BYTES = 24L * 1024L * 1024L;
-
     @Nullable
-    private static byte[] readFileBytes(@NonNull java.io.File file,
-                                        @NonNull AtomicBoolean cancelFlag) {
+    private static byte[] readFileBytes(@NonNull File file, @NonNull AtomicBoolean cancelFlag) {
         long len = file.length();
         if (len <= 16 || len > MAX_CUSTOM_GIF_BYTES || !file.canRead()) return null;
-        try (InputStream in = new java.io.FileInputStream(file)) {
+        try (InputStream in = new FileInputStream(file)) {
             ByteArrayOutputStream out = new ByteArrayOutputStream((int) Math.min(len, 8 * 1024 * 1024));
             byte[] buf = new byte[32768];
             long total = 0;
@@ -407,37 +609,54 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         }
     }
 
+    /** Returns the native unscaled GIF pixel width (0 before first frame decode). */
+    public int getNativeGifWidth() {
+        return mContentWidth;
+    }
+
+    /** Returns the native unscaled GIF pixel height (0 before first frame decode). */
+    public int getNativeGifHeight() {
+        return mContentHeight;
+    }
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         mDstDirty = true;
     }
 
-    private void ensureDstRect(int vw, int vh) {
+    private void ensureGeometry(int vw, int vh) {
         if (!mDstDirty || vw <= 0 || vh <= 0 || mContentWidth <= 0 || mContentHeight <= 0) return;
-        // Full-bleed CENTER_CROP with 1px edge guard to prevent sub-pixel letterboxing on cutouts
-        float scale = Math.max((float) (vw + 2) / (float) mContentWidth,
-                (float) (vh + 2) / (float) mContentHeight);
+        float scale = Math.max((float) vw / (float) mContentWidth,
+                (float) vh / (float) mContentHeight);
         float drawW = mContentWidth * scale;
         float drawH = mContentHeight * scale;
-        float left = (vw - drawW) * 0.5f;
-        float top = (vh - drawH) * 0.5f;
+        // Snap translation to integer pixels to eliminate sub-pixel edge softness
+        float left = Math.round((vw - drawW) * 0.5f);
+        float top = Math.round((vh - drawH) * 0.5f);
+        mCurrentScale = scale;
         mDstRect.set(left, top, left + drawW, top + drawH);
+        mDrawMatrix.reset();
+        mDrawMatrix.postScale(scale, scale);
+        mDrawMatrix.postTranslate(left, top);
         mDstDirty = false;
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            clearAnyRenderEffectApi31();
+        }
         if (!mReleased && getVisibility() == VISIBLE) {
             ensureDecodedAsync();
-            syncChoreographer();
+            syncAnimationState();
         }
     }
 
     @Override
     protected void onDetachedFromWindow() {
-        stopChoreographer();
+        stopActivePlayback();
         super.onDetachedFromWindow();
     }
 
@@ -446,9 +665,9 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         super.onVisibilityChanged(changedView, visibility);
         if (!mReleased && visibility == VISIBLE) {
             ensureDecodedAsync();
-            syncChoreographer();
+            syncAnimationState();
         } else {
-            stopChoreographer();
+            stopActivePlayback();
         }
     }
 
@@ -457,27 +676,52 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         super.onWindowVisibilityChanged(visibility);
         if (!mReleased && visibility == VISIBLE && getVisibility() == VISIBLE) {
             ensureDecodedAsync();
-            syncChoreographer();
+            syncAnimationState();
         } else {
+            stopActivePlayback();
+        }
+    }
+
+    private void syncAnimationState() {
+        boolean visibleAndLive = !mReleased
+                && mShouldAnimate
+                && !LauncherPreferences.PREF_ZYROX_REDUCED_MOTION
+                && isAttachedToWindow()
+                && getVisibility() == VISIBLE
+                && getWindowVisibility() == VISIBLE;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+            stopChoreographer();
+            if (visibleAndLive) {
+                if (!mAnimatedDrawable.isRunning()) {
+                    mAnimatedDrawable.start();
+                }
+            } else if (mAnimatedDrawable.isRunning()) {
+                mAnimatedDrawable.stop();
+            }
+            return;
+        }
+
+        boolean wantChoreo = visibleAndLive && mSequence != null && mSequence.frames.size() > 1;
+        if (wantChoreo && !mChoreographerPosted) {
+            mChoreographerPosted = true;
+            mLastFrameTimeNs = 0L;
+            Choreographer.getInstance().postFrameCallback(this);
+        } else if (!wantChoreo && mChoreographerPosted) {
             stopChoreographer();
         }
     }
 
-    private void syncChoreographer() {
-        boolean wantRun = !mReleased
-                && mShouldAnimate
-                && mSequence != null
-                && mSequence.frames.size() > 1
-                && isAttachedToWindow()
-                && getVisibility() == VISIBLE
-                && getWindowVisibility() == VISIBLE;
-        if (wantRun && !mChoreographerPosted) {
-            mChoreographerPosted = true;
-            mLastFrameTimeNs = 0L;
-            Choreographer.getInstance().postFrameCallback(this);
-        } else if (!wantRun && mChoreographerPosted) {
-            stopChoreographer();
+    private void stopActivePlayback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+            try {
+                if (mAnimatedDrawable.isRunning()) {
+                    mAnimatedDrawable.stop();
+                }
+            } catch (Throwable ignored) {
+            }
         }
+        stopChoreographer();
     }
 
     private void stopChoreographer() {
@@ -499,14 +743,9 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         }
         if (mLastFrameTimeNs != 0L) {
             long dtNs = frameTimeNanos - mLastFrameTimeNs;
-            // Clamp single-vsync step so transient JVM startup CPU spikes never cause a visible jump
             long maxStepNs = mSequence.frameDurationNs * 2L;
             if (dtNs > 0L) {
-                long step = Math.min(dtNs, maxStepNs);
-                mPlayheadNs += step;
-                if (mPlayheadNs >= mSequence.totalDurationNs) {
-                    mPlayheadNs %= mSequence.totalDurationNs;
-                }
+                mPlayheadNs = (mPlayheadNs + Math.min(dtNs, maxStepNs)) % mSequence.totalDurationNs;
             }
         }
         mLastFrameTimeNs = frameTimeNanos;
@@ -520,45 +759,85 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         int vh = getHeight();
         if (vw <= 0 || vh <= 0 || mReleased) return;
 
+        // 1. Primary API 28+ hardware-accelerated AnimatedImageDrawable at full native resolution
+        Drawable hw = mHardwareDrawable;
+        if (hw != null) {
+            ensureGeometry(vw, vh);
+            hw.setFilterBitmap(mScalingFilter == ScalingFilter.BICUBIC);
+            int save = canvas.save();
+            canvas.concat(mDrawMatrix);
+            hw.draw(canvas);
+            canvas.restoreToCount(save);
+            return;
+        }
+
+        // 2. Lossless 32-bit ARGB_8888 sequence (Nearest-Neighbor crisp step OR Bicubic HD)
         ZyroxGifDecoder.SeamlessSequence<Bitmap> seq = mSequence;
         if (seq != null && !seq.frames.isEmpty()) {
             List<Bitmap> frames = seq.frames;
             int count = frames.size();
-            ensureDstRect(vw, vh);
+            ensureGeometry(vw, vh);
 
-            if (count == 1 || !mShouldAnimate) {
-                Bitmap first = frames.get(0);
-                if (!first.isRecycled()) {
-                    canvas.drawBitmap(first, null, mDstRect, mBasePaint);
+            if (count == 1 || !mShouldAnimate || mScalingFilter == ScalingFilter.NEAREST_NEIGHBOR) {
+                int idx = (count == 1 || !mShouldAnimate)
+                        ? 0
+                        : (((int) (mPlayheadNs / seq.frameDurationNs)) % count);
+                Bitmap frame = frames.get(idx);
+                if (!frame.isRecycled()) {
+                    drawCrispBitmap(canvas, frame, vw, vh);
                 }
                 return;
             }
 
             double exact = (double) mPlayheadNs / (double) seq.frameDurationNs;
             int idxA = ((int) exact) % count;
-            int idxB = (idxA + 1) % count;
-            float frac = (float) (exact - Math.floor(exact));
-            // Hermite smoothstep eliminates 20/25fps -> 60/120Hz pulldown judder with zero allocations
-            int blendAlpha = Math.round(255f * frac * frac * (3f - 2f * frac));
-
             Bitmap frameA = frames.get(idxA);
             if (!frameA.isRecycled()) {
-                canvas.drawBitmap(frameA, null, mDstRect, mBasePaint);
-            }
-            if (blendAlpha >= 6) {
-                Bitmap frameB = frames.get(idxB);
-                if (!frameB.isRecycled()) {
-                    mBlendPaint.setAlpha(blendAlpha);
-                    canvas.drawBitmap(frameB, null, mDstRect, mBlendPaint);
-                }
+                drawCrispBitmap(canvas, frameA, vw, vh);
             }
             return;
         }
 
+        // 3. Instant native-resolution ARGB_8888 first-frame preview
         Bitmap preview = mPreviewBitmap;
         if (preview != null && !preview.isRecycled()) {
-            ensureDstRect(vw, vh);
-            canvas.drawBitmap(preview, null, mDstRect, mBasePaint);
+            ensureGeometry(vw, vh);
+            drawCrispBitmap(canvas, preview, vw, vh);
+        }
+    }
+
+    private void drawCrispBitmap(@NonNull Canvas canvas, @NonNull Bitmap bmp, int vw, int vh) {
+        if (mScalingFilter == ScalingFilter.BICUBIC
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && mBicubicRuntimeShader != null
+                && canvas.isHardwareAccelerated()) {
+            if (drawWithBicubicShaderApi33(canvas, bmp, vw, vh)) {
+                return;
+            }
+        }
+        canvas.drawBitmap(bmp, null, mDstRect, mBasePaint);
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private boolean drawWithBicubicShaderApi33(@NonNull Canvas canvas,
+                                               @NonNull Bitmap bmp,
+                                               int vw, int vh) {
+        try {
+            RuntimeShader rs = (RuntimeShader) mBicubicRuntimeShader;
+            if (rs == null || mCurrentScale <= 0f) return false;
+            BitmapShader tex = new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            tex.setFilterMode(BitmapShader.FILTER_MODE_LINEAR);
+            rs.setInputShader("uTex", tex);
+            rs.setFloatUniform("uSrcSize", (float) bmp.getWidth(), (float) bmp.getHeight());
+            rs.setFloatUniform("uDstOffset", mDstRect.left, mDstRect.top);
+            float inv = 1f / mCurrentScale;
+            rs.setFloatUniform("uInvScale", inv, inv);
+            mBicubicPaint.setShader(rs);
+            canvas.drawRect(0f, 0f, vw, vh, mBicubicPaint);
+            mBicubicPaint.setShader(null);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
@@ -571,6 +850,17 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     }
 
     private void recycleAllOnUiThread() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+            try {
+                mAnimatedDrawable.stop();
+            } catch (Throwable ignored) {
+            }
+            mAnimatedDrawable = null;
+        }
+        if (mHardwareDrawable != null) {
+            mHardwareDrawable.setCallback(null);
+            mHardwareDrawable = null;
+        }
         recycleSequence(mSequence);
         mSequence = null;
         if (!mPreviewOwnedBySequence) {

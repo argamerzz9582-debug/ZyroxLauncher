@@ -73,48 +73,8 @@ public class ApiHandler {
     }
 
     public static String getRaw(Map<String, String> headers, String url) {
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            if (Thread.currentThread().isInterrupted()) return null;
-            HttpURLConnection conn = null;
-            try {
-                URL parsed = new URL(url);
-                if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
-                    Log.w(TAG, "Blocked non-HTTPS API request");
-                    return null;
-                }
-                conn = (HttpURLConnection) parsed.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-                conn.setReadTimeout(READ_TIMEOUT_MS);
-                conn.setRequestProperty("User-Agent", API_USER_AGENT);
-                conn.setRequestProperty("Accept", "application/json");
-                addHeaders(conn, headers);
-                conn.connect();
-
-                int code = conn.getResponseCode();
-                if (code == HttpURLConnection.HTTP_OK) {
-                    try (InputStream inputStream = conn.getInputStream()) {
-                        return Tools.read(inputStream);
-                    }
-                }
-                if (isRetryableStatus(code) && attempt < MAX_ATTEMPTS) {
-                    String retryAfter = conn.getHeaderField("Retry-After");
-                    if (!sleepForRetry(attempt, retryAfter)) return null;
-                    continue;
-                }
-                Log.w(TAG, "Provider API returned HTTP " + code + " for " + parsed.getHost());
-                return null;
-            } catch (IOException e) {
-                if (attempt >= MAX_ATTEMPTS) {
-                    Log.w(TAG, "Provider API GET failed after " + attempt + " attempts", e);
-                    return null;
-                }
-                if (!sleepForRetry(attempt, null)) return null;
-            } finally {
-                if (conn != null) conn.disconnect();
-            }
-        }
-        return null;
+        if (url == null) return null;
+        return git.artdeell.mojo.utils.ZyroxHttpClient.getString(url, headers);
     }
 
     public static String postRaw(String url, String body) {

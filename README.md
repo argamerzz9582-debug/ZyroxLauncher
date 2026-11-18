@@ -1,9 +1,10 @@
-# Zyrox Launcher — Sakura Edition
+# Zyrox Launcher
 
-**Zyrox Launcher** (`com.zyrox.launcher`, v`2.2.1` — *Starlight Firefly Edition*) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, 90/120/144 Hz low-pause G1GC mobile optimization, Android 15/16 `16 KB` page alignment, log-driven launch progress, an All-in-One Modrinth/CurseForge Content & Runtime/Driver Store, seamless zero-buffer Starlight Firefly & Dawn animated scenes, and a cohesive **Starlight Firefly × Liquid Glass** user interface and in-game control system.
+**Zyrox Launcher** (`com.zyrox.launcher`, v`2.3.0` — `arm64-v8a`) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, 120/144 Hz unbuffered touch & gyro aiming, AdrenoTools Turnip (`.adpkg`) + Mesa Zink/Freedreno rendering, Android 15/16 `16 KB` page alignment, lossless hardware-decoded animated backdrops, a draggable Pro Telemetry HUD, and a cohesive **Starlight Firefly × Liquid Glass** UI.
 
+> **Direct Signed APK Download (`v2.3.0`, `arm64-v8a`):** [**Zyrox Launcher.apk**](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.3.0/Zyrox.Launcher.apk) ([Always Latest APK](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/Zyrox.Launcher.apk))  
+> **Official Release Page:** <https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/tag/v2.3.0>  
 > **Official Repository:** <https://github.com/argamerzz9582-debug/ZyroxLauncher>  
-> **Official Releases:** <https://github.com/argamerzz9582-debug/ZyroxLauncher/releases>  
 > **License:** LGPL-3.0 (see [`LICENSE`](LICENSE))  
 > **Disclaimer:** Not an official Minecraft product. Not approved by or associated with Mojang AB or Microsoft Corporation.
 
@@ -27,14 +28,14 @@
 
 ## Safe Installation & APK Verification
 
-1. Download APKs **only** from [Official GitHub Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases).
-2. Verify the downloaded APK against the release `SHA256SUMS.txt`:
+1. Download **[Zyrox Launcher.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.3.0/Zyrox.Launcher.apk)** **only** from [Official GitHub Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases).
+2. Verify the downloaded APK SHA-256 against the digest published in the release notes:
    ```bash
-   sha256sum -c SHA256SUMS.txt
+   sha256sum Zyrox.Launcher.apk
    ```
-3. Verify the APK signing signature (v2 + v3):
+3. Verify the APK signing signature (RSA-4096 `v1 + v2 + v3`):
    ```bash
-   apksigner verify --verbose --print-certs ZyroxLauncher-2.0.0-arm64-v8a.apk
+   apksigner verify --verbose --print-certs Zyrox.Launcher.apk
    ```
 4. Inside the app, open **TRUST → Security & Trust** (or **Settings → Security & GPU**) to inspect and copy the live APK signing certificate SHA-256 fingerprint and compare it with the official release notes.
 5. **Google Play Protect Guidance:** Keep Google Play Protect enabled on your device and never install re-signed or modified APKs from third-party mirrors. Sideloaded open-source Java launchers load OpenJDK runtimes, native OpenGL/Vulkan renderers, and user-chosen game/mod JARs, so Android may occasionally offer an app scan on newly published releases. Zyrox Launcher never bypasses, disables, or interferes with Android security checks.
@@ -50,13 +51,13 @@
 ### Commands
 ```bash
 # Run automated JUnit 4 unit test suite
-./gradlew :app_mojo:testRuntimeDebugUnitTest
+./gradlew :app_mojo:testFullReleaseUnitTest
 
 # Run Android Lint static analysis
-./gradlew :app_mojo:lintRuntimeRelease
+./gradlew :app_mojo:lintFullRelease
 
-# Build debug APK (universal + ABI splits)
-./gradlew :app_mojo:assembleRuntimeDebug
+# Build dedicated arm64-v8a release APK
+./gradlew :app_mojo:assembleFullRelease
 
 # Build unsigned release APKs (signed via environment variables when configured)
 ./gradlew :app_mojo:assembleRuntimeRelease

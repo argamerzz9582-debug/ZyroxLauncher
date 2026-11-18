@@ -56,17 +56,45 @@ public final class JavaRuntimeAdvisor {
      */
     public static int resolveRequiredJava(@Nullable JVersionList.Version versionJson,
                                           @Nullable String versionId) {
-        if (versionJson != null) {
+        if (versionJson != null && versionJson.javaVersion != null) {
             return MojangVersionProvider.resolveRequiredJavaVersion(versionJson);
         }
-        if (versionId == null || versionId.trim().isEmpty()) return 8;
-        String id = versionId.trim();
-        if ("latest_release".equalsIgnoreCase(id) || "latest_snapshot".equalsIgnoreCase(id)) {
+        String rawId = (versionId != null && !versionId.trim().isEmpty())
+                ? versionId.trim()
+                : (versionJson != null && versionJson.id != null ? versionJson.id.trim() : "");
+        if (rawId.isEmpty()) return 8;
+        if ("latest_release".equalsIgnoreCase(rawId) || "latest_snapshot".equalsIgnoreCase(rawId)) {
             return 21;
         }
-        JVersionList.Version probe = new JVersionList.Version();
-        probe.id = extractMcVersionToken(id);
-        return MojangVersionProvider.resolveRequiredJavaVersion(probe);
+        return inferRequiredJavaFromVersionToken(extractMcVersionToken(rawId));
+    }
+
+    /**
+     * Infers the minimum Java major version from a normalized Minecraft version token when the
+     * full version JSON has not been downloaded yet (including year-based MC {@code 26.x+} -> JRE 25).
+     */
+    public static int inferRequiredJavaFromVersionToken(@Nullable String mcToken) {
+        if (mcToken == null || mcToken.trim().isEmpty()) return 8;
+        String clean = mcToken.trim();
+        String[] parts = clean.split("[^0-9]+");
+        if (parts.length < 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+            return 8;
+        }
+        try {
+            int major = Integer.parseInt(parts[0]);
+            int minor = Integer.parseInt(parts[1]);
+            int patch = (parts.length >= 3 && !parts[2].isEmpty()) ? Integer.parseInt(parts[2]) : 0;
+            // Mojang year-based releases (26.1+) require Java 25
+            if (major >= 26) return 25;
+            if (major == 1) {
+                if (minor >= 21 || (minor == 20 && patch >= 5)) return 21;
+                if (minor >= 18) return 17;
+                if (minor == 17) return 16;
+                return 8;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return 8;
     }
 
     /**
@@ -191,6 +219,63 @@ public final class JavaRuntimeAdvisor {
             }
         }
         return closest;
+    }
+
+    /**
+     * Computes a safe adjusted JVM heap allocation (MB) in response to an OutOfMemory crash:
+     * increases heap by ~35% (capped leaving OS/GPU headroom) for Java Heap OOM, or lowers heap by
+     * ~20% for native/direct-buffer address-space exhaustion.
+     */
+    public static int computeAutoFixedHeapMb(int currentHeapMb,
+                                             int totalDeviceRamMb,
+                                             boolean nativeOrDirectOom) {
+        int safeTotal = totalDeviceRamMb > 512 ? totalDeviceRamMb : 4096;
+        // Leave at least 1024 MB (or 30% on smaller phones) for Android + GPU/Zink driver
+        int maxSafeHeap = Math.max(512, Math.min(safeTotal - 1024, (int) (safeTotal * 0.68f)));
+        int cur = Math.max(256, currentHeapMb);
+
+        int target;
+        if (nativeOrDirectOom) {
+            target = Math.max(512, Math.min(maxSafeHeap, (int) (cur * 0.80f)));
+            if (target >= cur && cur > 640) {
+                target = cur - 256;
+            }
+        } else {
+            int step = Math.max(256, (int) (cur * 0.35f));
+            target = Math.min(maxSafeHeap, cur + step);
+        }
+        // Snap cleanly to 64 MB increments
+        target = Math.max(384, (target / 64) * 64);
+        return target;
+    }
+
+    /**
+     * Attempts a one-tap switch of {@code instance} (and/or global default) to the closest
+     * installed OpenJDK runtime providing at least {@code requiredJavaMajor}. Returns the selected
+     * {@link Runtime}, or {@code null} if no matching JRE is currently installed on disk.
+     */
+    @Nullable
+    public static Runtime switchToCompatibleRuntime(
+            @Nullable git.artdeell.mojo.instances.Instance instance,
+            int requiredJavaMajor,
+            @Nullable List<Runtime> installedRuntimes,
+            @Nullable String deviceArch) {
+        int targetMajor = Math.max(8, requiredJavaMajor);
+        Runtime best = pickBestInstalledRuntime(targetMajor, installedRuntimes, deviceArch);
+        if (best == null) return null;
+
+        if (instance != null) {
+            instance.selectedRuntime = best.name;
+            instance.maybeWrite();
+        } else {
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULT_RUNTIME = best.name;
+            if (git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF != null) {
+                git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF.edit()
+                        .putString("defaultRuntime", best.name)
+                        .apply();
+            }
+        }
+        return best;
     }
 
     /** Extracts embedded MC version from loader profile IDs like {@code fabric-loader-0.16.9-1.21.4} or {@code neoforge-26.1.0}. */

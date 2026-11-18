@@ -64,7 +64,7 @@
                 tools:text="Game exited with code 1" />
         </LinearLayout>
 
-        <!-- Zyrox Guard Smart Crash Diagnosis Banner (hidden when no diagnosis applies) -->
+        <!-- Zyrox Guard Smart Crash Diagnosis & One-Tap Auto-Fix Banner -->
         <LinearLayout
             android:id="@+id/layout_zyrox_guard"
             android:layout_width="match_parent"
@@ -73,33 +73,47 @@
             android:background="@drawable/bg_zyrox_badge"
             android:paddingHorizontal="10dp"
             android:paddingVertical="7dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
+            android:orientation="vertical"
             android:visibility="gone">
 
             <TextView
                 android:id="@+id/tv_zyrox_guard_summary"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:textColor="@color/zyrox_text_primary"
                 android:textSize="10.5sp"
                 android:lineSpacingExtra="1.5dp"
                 android:maxLines="4"
                 android:ellipsize="end" />
 
-            <Button
-                android:id="@+id/btn_zyrox_guard_fix"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:minHeight="32dp"
-                android:layout_marginStart="8dp"
-                android:paddingHorizontal="10dp"
-                android:background="@drawable/btn_zyrox_secondary"
-                android:text="@string/zyrox_safe_mode_apply"
-                android:textColor="@color/zyrox_lg_text"
-                android:textSize="9.5sp"
-                android:visibility="gone" />
+            <HorizontalScrollView
+                android:id="@+id/sv_zyrox_autofix_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:scrollbars="none"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/layout_zyrox_autofix_actions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Button
+                        android:id="@+id/btn_zyrox_guard_fix"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:minHeight="32dp"
+                        android:paddingHorizontal="10dp"
+                        android:background="@drawable/btn_zyrox_secondary"
+                        android:text="@string/zyrox_safe_mode_apply"
+                        android:textColor="@color/zyrox_lg_text"
+                        android:textSize="9.5sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </HorizontalScrollView>
         </LinearLayout>
 
         <!-- Syntax-Highlighted Monospace Crash Terminal -->
