@@ -86,6 +86,28 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
         mVisibilityUpdater = this::updateVisibility;
         addPreferencesFromResource(R.xml.pref_misc);
 
+        Preference checkUpdatesPref = findPreference("zyroxCheckUpdatesNow");
+        if (checkUpdatesPref != null) {
+            git.artdeell.mojo.updater.AppUpdateChecker.ReleaseInfo avail =
+                    getContext() != null
+                            ? git.artdeell.mojo.updater.AppUpdateChecker.getAvailableUpdate(getContext())
+                            : null;
+            if (avail != null && avail.updateAvailable) {
+                checkUpdatesPref.setSummary("Update " + avail.tagName
+                        + " available! (Installed: v" + git.artdeell.mojo.BuildConfig.VERSION_NAME
+                        + ") — tap to install");
+            } else {
+                checkUpdatesPref.setSummary("Installed: v" + git.artdeell.mojo.BuildConfig.VERSION_NAME
+                        + " — tap to check GitHub Releases now");
+            }
+            checkUpdatesPref.setOnPreferenceClickListener(p -> {
+                if (getActivity() != null) {
+                    git.artdeell.mojo.updater.AppUpdateChecker.checkNowInteractive(getActivity());
+                }
+                return true;
+            });
+        }
+
         Preference gifFilterPref = findPreference(git.artdeell.mojo.prefs.LauncherPreferences.KEY_ZYROX_GIF_FILTER);
         if (gifFilterPref != null) {
             gifFilterPref.setOnPreferenceChangeListener((pref, newVal) -> {

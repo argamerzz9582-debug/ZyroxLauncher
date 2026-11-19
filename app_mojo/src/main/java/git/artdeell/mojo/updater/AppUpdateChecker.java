@@ -79,6 +79,11 @@ public final class AppUpdateChecker {
             "https://api.github.com/repos/argamerzz9582-debug/ZyroxLauncher/releases/latest";
     public static final String RELEASES_PAGE =
             "https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest";
+    private static final String RELEASES_TAG_PREFIX =
+            "https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/tag/";
+    private static final String RELEASES_DOWNLOAD_BASE =
+            "https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/";
+    private static final String DEFAULT_RELEASE_APK_ASSET = "Zyrox.Launcher.apk";
     public static final String APK_MIME_TYPE = "application/vnd.android.package-archive";
     public static final String FILE_PROVIDER_SUFFIX = ".fileprovider";
 
@@ -86,13 +91,26 @@ public final class AppUpdateChecker {
     private static final String KEY_LAST_CHECK_MS = "last_check_ms";
     private static final String KEY_DISMISSED_TAG = "dismissed_tag";
     private static final String KEY_SNOOZE_UNTIL_MS = "snooze_until_ms";
+    private static final String KEY_SNOOZED_TAG = "snoozed_tag";
     private static final String KEY_CACHED_ETAG = "cached_etag";
     private static final String KEY_CACHED_JSON = "cached_release_json";
 
-    private static final long AUTO_CHECK_INTERVAL_MS = 6L * 3600_000L;
-    private static final long LATER_SNOOZE_INTERVAL_MS = 12L * 3600_000L;
+    /**
+     * Warm-resume re-check interval (15 minutes). Cold app launches ALWAYS execute an immediate
+     * conditional {@code If-None-Match} check (HTTP 304 consumes zero GitHub API rate limit) so
+     * newly published updates pop up automatically the moment the user opens the launcher.
+     */
+    public static final long WARM_RESUME_CHECK_INTERVAL_MS = 15L * 60_000L;
+    private static final long LATER_SNOOZE_INTERVAL_MS = 6L * 3600_000L;
+    private static final long COLD_START_RETRY_DELAY_MS = 3_500L;
     private static final long MAX_APK_DOWNLOAD_BYTES = 320L * 1024L * 1024L;
     private static final int MAX_CHECKSUM_TEXT_BYTES = 64 * 1024;
+
+    private static volatile boolean sCompletedColdStartCheck = false;
+    private static volatile boolean sCheckInFlight = false;
+    private static volatile boolean sColdRetryScheduled = false;
+    @Nullable private static volatile ReleaseInfo sAvailableUpdate = null;
+    @Nullable private static volatile String sPromptedTagThisSession = null;
 
     private static final Pattern SHA256_HEX_PATTERN =
             Pattern.compile("(?i)\\b([0-9a-f]{64})\\b");
@@ -230,20 +248,105 @@ public final class AppUpdateChecker {
 
     /** Persists the user's explicit "Skip Version" choice so auto-checks stay silent for {@code tag}. */
     public static void skipVersion(@NonNull Context ctx, @NonNull String tagName) {
+        String clean = tagName.trim();
+        sPromptedTagThisSession = clean;
         ctx.getApplicationContext()
                 .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
-                .putString(KEY_DISMISSED_TAG, tagName.trim())
+                .putString(KEY_DISMISSED_TAG, clean)
                 .apply();
     }
 
-    /** Snoozes automatic update prompts for 12 hours when the user taps "Later". */
+    /** Snoozes automatic update prompts for the current active release when the user taps "Later". */
     public static void snoozeUpdatePrompt(@NonNull Context ctx) {
+        ReleaseInfo cur = sAvailableUpdate;
+        snoozeUpdatePrompt(ctx, cur != null ? cur.tagName : "");
+    }
+
+    /**
+     * Snoozes automatic modal popups for {@code tagName} for 6 hours. If an even newer release
+     * tag is published during the snooze window, its popup still opens immediately on launch.
+     */
+    public static void snoozeUpdatePrompt(@NonNull Context ctx, @NonNull String tagName) {
+        String clean = tagName.trim();
+        if (!clean.isEmpty()) {
+            sPromptedTagThisSession = clean;
+        }
         ctx.getApplicationContext()
                 .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putLong(KEY_SNOOZE_UNTIL_MS, System.currentTimeMillis() + LATER_SNOOZE_INTERVAL_MS)
+                .putString(KEY_SNOOZED_TAG, clean)
                 .apply();
+    }
+
+    /** Returns {@code true} if {@code tagName} is eligible to open the automatic modal popup now. */
+    public static boolean shouldAutoPromptForTag(@NonNull String tagName,
+                                                 @Nullable String skippedTag,
+                                                 @Nullable String snoozedTag,
+                                                 long snoozeUntilMs,
+                                                 @Nullable String alreadyPromptedSessionTag,
+                                                 long nowMs) {
+        String clean = tagName.trim();
+        if (clean.isEmpty()) return false;
+        if (skippedTag != null && clean.equalsIgnoreCase(skippedTag.trim())) {
+            return false;
+        }
+        if (alreadyPromptedSessionTag != null
+                && clean.equalsIgnoreCase(alreadyPromptedSessionTag.trim())) {
+            return false;
+        }
+        if (nowMs < snoozeUntilMs) {
+            // Legacy empty snoozedTag or matching tag stays snoozed; newer tag breaks through!
+            if (snoozedTag == null || snoozedTag.trim().isEmpty()
+                    || clean.equalsIgnoreCase(snoozedTag.trim())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Returns the latest known available update (from this session or cached metadata), if any. */
+    @Nullable
+    public static ReleaseInfo getAvailableUpdate(@NonNull Context ctx) {
+        ReleaseInfo mem = sAvailableUpdate;
+        if (mem != null && mem.updateAvailable) {
+            return mem;
+        }
+        try {
+            SharedPreferences sp = ctx.getApplicationContext()
+                    .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            String cachedJson = sp.getString(KEY_CACHED_JSON, null);
+            if (cachedJson != null && !cachedJson.isEmpty()) {
+                ReleaseInfo parsed = parseReleaseJson(
+                        cachedJson, BuildConfig.VERSION_NAME, getDeviceAbis());
+                if (parsed.updateAvailable) {
+                    sAvailableUpdate = parsed;
+                    return parsed;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** Marks {@code tagName} as auto-shown in the current app session so navigation doesn't re-pop it. */
+    public static void markAutoPromptShown(@NonNull String tagName) {
+        sPromptedTagThisSession = tagName.trim();
+    }
+
+    /** Returns {@code true} if the automatic modal popup should be presented for {@code info} now. */
+    public static boolean shouldShowAutoModalNow(@NonNull Context ctx, @NonNull ReleaseInfo info) {
+        if (!info.updateAvailable) return false;
+        SharedPreferences sp = ctx.getApplicationContext()
+                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        return shouldAutoPromptForTag(
+                info.tagName,
+                sp.getString(KEY_DISMISSED_TAG, ""),
+                sp.getString(KEY_SNOOZED_TAG, ""),
+                sp.getLong(KEY_SNOOZE_UNTIL_MS, 0L),
+                sPromptedTagThisSession,
+                System.currentTimeMillis());
     }
 
     /** Returns {@code true} if {@code tagName} was permanently skipped by the user. */
@@ -254,34 +357,76 @@ public final class AppUpdateChecker {
         return skipped != null && skipped.equalsIgnoreCase(tagName.trim());
     }
 
-    /** Background rate-limit-safe check used on startup (zero toast on offline or up-to-date). */
+    /**
+     * Automatic startup &amp; warm-resume update checker:
+     * <ul>
+     *   <li>Always runs immediately on every cold app launch (conditional {@code ETag} request).</li>
+     *   <li>Re-checks every 15 minutes when returning from background.</li>
+     *   <li>Falls back transparently to zero-quota GitHub 302 release redirect on CGNAT HTTP 403/429.</li>
+     *   <li>Automatically retries once after 3.5s if startup network handshake was still warming up.</li>
+     *   <li>Delivers {@code ReleaseInfo} for both the Home update badge and the automatic modal popup.</li>
+     * </ul>
+     */
     public static void checkSilentlyIfDue(@NonNull Context ctx, @NonNull UpdateCallback cb) {
+        if (!git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_AUTO_UPDATE_CHECK) {
+            return;
+        }
         final Context appCtx = ctx.getApplicationContext();
         final SharedPreferences sp = appCtx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+
+        // Immediately surface any already-cached newer release so UI never waits when returning Home
+        final ReleaseInfo cachedUpdate = getAvailableUpdate(appCtx);
+        if (cachedUpdate != null && cachedUpdate.updateAvailable) {
+            Tools.runOnUiThread(() -> cb.onResult(cachedUpdate, null));
+        }
+
         final long now = System.currentTimeMillis();
-        if (now < sp.getLong(KEY_SNOOZE_UNTIL_MS, 0L)) {
+        final boolean isColdLaunchCheck = !sCompletedColdStartCheck;
+        long lastSuccess = sp.getLong(KEY_LAST_CHECK_MS, 0L);
+        if (!isColdLaunchCheck && (now - lastSuccess) >= 0L
+                && (now - lastSuccess) < WARM_RESUME_CHECK_INTERVAL_MS) {
+            return;
+        }
+        if (sCheckInFlight) {
             return;
         }
         if (!isDeviceOnline(appCtx)) {
+            scheduleOneShotColdRetry(appCtx, cb);
             return;
         }
-        long last = sp.getLong(KEY_LAST_CHECK_MS, 0L);
-        final String skipped = sp.getString(KEY_DISMISSED_TAG, "");
-        if (now - last < AUTO_CHECK_INTERVAL_MS) {
-            return;
-        }
-        sp.edit().putLong(KEY_LAST_CHECK_MS, now).apply();
 
+        sCheckInFlight = true;
         MojoApplication.sExecutorService.execute(() -> {
             try {
                 ReleaseInfo info = fetchLatestReleaseCached(sp, BuildConfig.VERSION_NAME, false);
-                if (info != null && info.updateAvailable
-                        && !info.tagName.equalsIgnoreCase(skipped != null ? skipped : "")) {
+                sCompletedColdStartCheck = true;
+                sp.edit().putLong(KEY_LAST_CHECK_MS, System.currentTimeMillis()).apply();
+                if (info != null && info.updateAvailable) {
+                    sAvailableUpdate = info;
                     Tools.runOnUiThread(() -> cb.onResult(info, null));
+                } else {
+                    sAvailableUpdate = null;
+                    Tools.runOnUiThread(() -> cb.onResult(null, null));
                 }
-            } catch (Throwable ignored) {
+            } catch (Throwable err) {
+                if (!sCompletedColdStartCheck) {
+                    scheduleOneShotColdRetry(appCtx, cb);
+                }
+            } finally {
+                sCheckInFlight = false;
             }
         });
+    }
+
+    private static void scheduleOneShotColdRetry(@NonNull Context appCtx,
+                                                 @NonNull UpdateCallback cb) {
+        if (sColdRetryScheduled || sCompletedColdStartCheck) return;
+        sColdRetryScheduled = true;
+        Tools.MAIN_HANDLER.postDelayed(() -> {
+            if (!sCompletedColdStartCheck && isDeviceOnline(appCtx)) {
+                checkSilentlyIfDue(appCtx, cb);
+            }
+        }, COLD_START_RETRY_DELAY_MS);
     }
 
     /** Explicit user-triggered update check (bypasses snooze/skip so manual checks always work). */
@@ -298,8 +443,12 @@ public final class AppUpdateChecker {
         MojoApplication.sExecutorService.execute(() -> {
             try {
                 ReleaseInfo info = fetchLatestReleaseCached(sp, BuildConfig.VERSION_NAME, true);
+                sCompletedColdStartCheck = true;
+                sp.edit().putLong(KEY_LAST_CHECK_MS, System.currentTimeMillis()).apply();
+                sAvailableUpdate = (info != null && info.updateAvailable) ? info : null;
                 Tools.runOnUiThread(() -> {
                     if (info != null && info.updateAvailable) {
+                        markAutoPromptShown(info.tagName);
                         showUpdateDialog(ctx, info);
                     } else {
                         Toast.makeText(appCtx,
@@ -430,19 +579,24 @@ public final class AppUpdateChecker {
         }
     }
 
-    /** Displays the Liquid Glass {@link AppUpdateDialogFragment} (with safe AlertDialog fallback). */
-    public static void showUpdateDialog(@NonNull Context ctx, @NonNull ReleaseInfo info) {
+    /**
+     * Displays the Liquid Glass {@link AppUpdateDialogFragment}. Returns {@code true} if the modal
+     * is now visible on screen, or {@code false} if lifecycle state was temporarily saved (so
+     * {@code onResume()} can automatically present it the moment the screen becomes active).
+     */
+    public static boolean showUpdateDialog(@NonNull Context ctx, @NonNull ReleaseInfo info) {
         if (ctx instanceof FragmentActivity) {
             FragmentActivity activity = (FragmentActivity) ctx;
-            if (activity.isFinishing() || activity.isDestroyed()) return;
+            if (activity.isFinishing() || activity.isDestroyed()) return false;
             FragmentManager fm = activity.getSupportFragmentManager();
-            if (!fm.isStateSaved()) {
-                if (fm.findFragmentByTag(AppUpdateDialogFragment.TAG) != null) {
-                    return;
-                }
-                AppUpdateDialogFragment.newInstance(info).show(fm, AppUpdateDialogFragment.TAG);
-                return;
+            if (fm.isStateSaved()) {
+                return false;
             }
+            if (fm.findFragmentByTag(AppUpdateDialogFragment.TAG) != null) {
+                return true;
+            }
+            AppUpdateDialogFragment.newInstance(info).show(fm, AppUpdateDialogFragment.TAG);
+            return true;
         }
         // Fallback when invoked with a non-FragmentActivity context
         String targetUrl = isTrustedGitHubDownloadUrl(info.apkDownloadUrl)
@@ -453,8 +607,9 @@ public final class AppUpdateChecker {
                         + formatChangelogPlainText(info.body))
                 .setPositiveButton("Update Now", (d, w) -> openHttpsUrl(ctx, targetUrl))
                 .setNeutralButton("Skip Version", (d, w) -> skipVersion(ctx, info.tagName))
-                .setNegativeButton("Later", (d, w) -> snoozeUpdatePrompt(ctx))
+                .setNegativeButton("Later", (d, w) -> snoozeUpdatePrompt(ctx, info.tagName))
                 .show();
+        return true;
     }
 
     /** Opens an HTTPS release page strictly over TLS. */
@@ -498,6 +653,12 @@ public final class AppUpdateChecker {
             if (code == 403 || code == 429) {
                 String resetHdr = res.header("X-RateLimit-Reset");
                 String retryHdr = res.header("Retry-After");
+                // Zero-quota fallback: resolve github.com/.../releases/latest 302 redirect so users
+                // behind shared mobile carrier NAT (CGNAT) STILL get instant automatic update popups!
+                ReleaseInfo redirectResolved = fetchLatestReleaseViaWebRedirect(currentVersion);
+                if (redirectResolved != null) {
+                    return redirectResolved;
+                }
                 if (!manualForce && cachedJson != null && !cachedJson.isEmpty()) {
                     return parseReleaseJson(cachedJson, currentVersion, getDeviceAbis());
                 }
@@ -526,6 +687,104 @@ public final class AppUpdateChecker {
             }
             ed.apply();
             return parseReleaseJson(bodyText, currentVersion, getDeviceAbis());
+        }
+    }
+
+    /**
+     * Parses the version tag out of a GitHub {@code /releases/tag/<tag>} redirect URL
+     * (strictly pinned to the official ZyroxLauncher HTTPS repository path).
+     */
+    @Nullable
+    public static String extractTagFromReleaseRedirectUrl(@Nullable String redirectUrl) {
+        if (redirectUrl == null || redirectUrl.trim().isEmpty()) return null;
+        String clean = redirectUrl.trim();
+        int q = clean.indexOf('?');
+        if (q >= 0) clean = clean.substring(0, q);
+        int hash = clean.indexOf('#');
+        if (hash >= 0) clean = clean.substring(0, hash);
+        if (!clean.regionMatches(true, 0, RELEASES_TAG_PREFIX, 0, RELEASES_TAG_PREFIX.length())) {
+            return null;
+        }
+        String tag = clean.substring(RELEASES_TAG_PREFIX.length()).trim();
+        if (tag.endsWith("/")) tag = tag.substring(0, tag.length() - 1);
+        if (tag.isEmpty() || tag.length() > 48 || tag.contains("/") || tag.contains("..")) {
+            return null;
+        }
+        if (!tag.matches("^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")) {
+            return null;
+        }
+        return tag;
+    }
+
+    /**
+     * Zero-API-quota fallback that inspects the HTTP {@code 302 Location} header on
+     * {@link #RELEASES_PAGE} when {@code api.github.com} is rate-limited on shared CGNAT networks.
+     */
+    @Nullable
+    private static ReleaseInfo fetchLatestReleaseViaWebRedirect(@NonNull String currentVersion) {
+        try {
+            okhttp3.OkHttpClient noRedirect = ZyroxHttpClient.apiClient()
+                    .newBuilder()
+                    .followRedirects(false)
+                    .followSslRedirects(false)
+                    .build();
+            Request req = new Request.Builder()
+                    .url(RELEASES_PAGE)
+                    .head()
+                    .header("User-Agent", ZyroxHttpClient.USER_AGENT)
+                    .build();
+            String tag;
+            try (okhttp3.Response res = noRedirect.newCall(req).execute()) {
+                tag = extractTagFromReleaseRedirectUrl(res.header("Location"));
+            }
+            if (tag == null) return null;
+            String versionClean = stripVersionPrefix(tag);
+            boolean newer = compareSemVer(tag, currentVersion) > 0;
+            String htmlUrl = RELEASES_TAG_PREFIX + tag;
+            String apkUrl = RELEASES_DOWNLOAD_BASE + tag + "/" + DEFAULT_RELEASE_APK_ASSET;
+            long sizeBytes = 0L;
+            if (newer) {
+                // Probe direct APK asset via HEAD to capture exact file size & confirm availability
+                Request headApk = new Request.Builder()
+                        .url(apkUrl)
+                        .head()
+                        .header("User-Agent", ZyroxHttpClient.USER_AGENT)
+                        .build();
+                try (okhttp3.Response apkRes = ZyroxHttpClient.apiClient().newCall(headApk).execute()) {
+                    if (!apkRes.isSuccessful()) {
+                        apkUrl = null;
+                    } else {
+                        String cl = apkRes.header("Content-Length");
+                        if (cl != null) {
+                            try {
+                                sizeBytes = Long.parseLong(cl.trim());
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            String fallbackBody = "• Zyrox Launcher " + tag
+                    + " is live on official GitHub Releases.\n"
+                    + "• Tap Update Now to download and install directly in-place — all your "
+                    + "instances, worlds, mods, servers, and control profiles stay untouched.\n"
+                    + "• Package signature & integrity are automatically verified before install.";
+            return new ReleaseInfo(
+                    tag,
+                    versionClean,
+                    "Zyrox Launcher " + tag,
+                    fallbackBody,
+                    htmlUrl,
+                    apkUrl,
+                    DEFAULT_RELEASE_APK_ASSET,
+                    "arm64-v8a",
+                    sizeBytes,
+                    null,
+                    null,
+                    newer);
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 
@@ -928,11 +1187,12 @@ public final class AppUpdateChecker {
                 }
 
                 partFile = new File(updatesDir, finalApk.getName() + ".part");
-                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                long resumeOffset = (partFile.isFile() && partFile.length() > 0L
+                        && partFile.length() < MAX_APK_DOWNLOAD_BYTES) ? partFile.length() : 0L;
                 SpeedCalculator speedCalc = new SpeedCalculator(24);
-                long downloaded = 0L;
+                long downloaded = resumeOffset;
                 try (okhttp3.Response res = ZyroxHttpClient.openDownloadResponse(
-                        release.apkDownloadUrl, 0L)) {
+                        release.apkDownloadUrl, resumeOffset)) {
                     okhttp3.ResponseBody body = res.body();
                     int httpCode = res.code();
                     if (httpCode == 403 || httpCode == 429) {
@@ -940,20 +1200,33 @@ public final class AppUpdateChecker {
                                 httpCode, res.header("X-RateLimit-Reset"),
                                 res.header("Retry-After"), System.currentTimeMillis()));
                     }
+                    if (httpCode == 416 && resumeOffset > 0L) {
+                        // Stale .part range — reset cleanly for next attempt
+                        //noinspection ResultOfMethodCallIgnored
+                        partFile.delete();
+                        throw new IOException("Cached partial file expired — tap Retry Update");
+                    }
                     if (!res.isSuccessful() || body == null) {
                         throw new IOException("APK download failed (HTTP " + httpCode + ")");
                     }
+                    boolean appending = (httpCode == HttpURLConnection.HTTP_PARTIAL && resumeOffset > 0L);
+                    if (!appending) {
+                        resumeOffset = 0L;
+                        downloaded = 0L;
+                    }
                     long contentLength = body.contentLength();
-                    final long totalBytes = contentLength > 0 ? contentLength : release.apkSizeBytes;
+                    final long totalBytes = contentLength > 0
+                            ? (resumeOffset + contentLength) : release.apkSizeBytes;
                     if (totalBytes > MAX_APK_DOWNLOAD_BYTES) {
                         throw new IOException("APK exceeds safe size limit");
                     }
 
                     long lastUiUpdateMs = 0L;
-                    try (InputStream in = new BufferedInputStream(body.byteStream(), 32768);
+                    long sessionRead = 0L;
+                    try (InputStream in = new BufferedInputStream(body.byteStream(), 65536);
                          BufferedOutputStream out = new BufferedOutputStream(
-                                 new FileOutputStream(partFile, false), 32768)) {
-                        byte[] buf = new byte[32768];
+                                 new FileOutputStream(partFile, appending), 65536)) {
+                        byte[] buf = new byte[65536];
                         int n;
                         while ((n = in.read(buf)) != -1) {
                             if (cancelSignal.get()) {
@@ -963,23 +1236,28 @@ public final class AppUpdateChecker {
                                 return;
                             }
                             downloaded += n;
+                            sessionRead += n;
                             if (downloaded > MAX_APK_DOWNLOAD_BYTES) {
+                                //noinspection ResultOfMethodCallIgnored
+                                partFile.delete();
                                 throw new IOException("Download exceeded safe size cap");
                             }
                             out.write(buf, 0, n);
-                            sha256.update(buf, 0, n);
 
                             long now = System.currentTimeMillis();
-                            if (now - lastUiUpdateMs >= 110L || downloaded == totalBytes) {
+                            if (now - lastUiUpdateMs >= 100L || downloaded == totalBytes) {
                                 lastUiUpdateMs = now;
                                 final long snapBytes = downloaded;
-                                final double rawSpeed = speedCalc.feed(snapBytes);
+                                final double rawSpeed = speedCalc.feed(sessionRead);
                                 final double safeSpeed = (Double.isNaN(rawSpeed)
                                         || Double.isInfinite(rawSpeed) || rawSpeed < 0d)
                                         ? 0d : rawSpeed;
+                                final String eta = totalBytes > snapBytes
+                                        ? formatEta(totalBytes - snapBytes, safeSpeed) : "";
                                 final String label = totalBytes > 0
                                         ? ("Downloading " + ZyroxStudioUi.formatBytes(snapBytes)
-                                            + " / " + ZyroxStudioUi.formatBytes(totalBytes))
+                                            + " / " + ZyroxStudioUi.formatBytes(totalBytes)
+                                            + (eta.isEmpty() ? "" : "  ·  " + eta))
                                         : ("Downloading " + ZyroxStudioUi.formatBytes(snapBytes));
                                 Tools.runOnUiThread(() ->
                                         listener.onProgress(snapBytes, totalBytes, safeSpeed, label));
@@ -988,16 +1266,18 @@ public final class AppUpdateChecker {
                         out.flush();
                     }
                     if (totalBytes > 0 && downloaded != totalBytes) {
-                        throw new IOException("Incomplete download (" + downloaded + "/" + totalBytes + " B)");
+                        throw new IOException("Connection interrupted at "
+                                + ZyroxStudioUi.formatBytes(downloaded)
+                                + " — tap Retry to resume");
                     }
                 }
 
                 Tools.runOnUiThread(() ->
-                        listener.onProgress(1000L, 1000L, 0d, "Verifying package integrity…"));
+                        listener.onProgress(1000L, 1000L, 0d, "Verifying SHA-256 & signature…"));
 
-                String actualSha256 = toLowerHex(sha256.digest());
                 boolean checksumVerified = false;
                 if (expectedSha256 != null && !expectedSha256.isEmpty()) {
+                    String actualSha256 = computeFileSha256(partFile);
                     if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
                         //noinspection ResultOfMethodCallIgnored
                         partFile.delete();
@@ -1017,16 +1297,13 @@ public final class AppUpdateChecker {
                 if (!verifyDownloadedApkArchive(appCtx, finalApk)) {
                     //noinspection ResultOfMethodCallIgnored
                     finalApk.delete();
-                    throw new IOException("Downloaded file is not a valid Zyrox Launcher package");
+                    throw new IOException("Downloaded APK failed package or signing verification");
                 }
 
                 final boolean verifiedFlag = checksumVerified;
                 Tools.runOnUiThread(() -> listener.onCompleted(finalApk, verifiedFlag));
             } catch (Exception e) {
-                if (partFile != null && partFile.exists()) {
-                    //noinspection ResultOfMethodCallIgnored
-                    partFile.delete();
-                }
+                // Keep valid .part on transient network drop so Retry resumes via HTTP Range!
                 final String msg = e.getMessage() != null ? e.getMessage() : "Download failed";
                 Tools.runOnUiThread(() -> listener.onFailed(msg));
             }
@@ -1079,31 +1356,100 @@ public final class AppUpdateChecker {
         return String.format(Locale.ROOT, "%.0f KB/s", bytesPerSec / 1024d);
     }
 
-    private static boolean verifyDownloadedApkArchive(@NonNull Context context,
-                                                      @NonNull File apkFile) {
-        try {
-            PackageManager pm = context.getPackageManager();
-            PackageInfo pkgInfo = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                    ? pm.getPackageArchiveInfo(apkFile.getAbsolutePath(),
-                        PackageManager.PackageInfoFlags.of(0))
-                    : pm.getPackageArchiveInfo(apkFile.getAbsolutePath(), 0);
-            if (pkgInfo == null || pkgInfo.packageName == null) {
-                return false;
-            }
-            return context.getPackageName().equals(pkgInfo.packageName);
-        } catch (Throwable t) {
-            return false;
+    /** Formats remaining download ETA cleanly (e.g. {@code "~4s left"}, {@code "~1m 12s left"}). */
+    @NonNull
+    public static String formatEta(long remainingBytes, double bytesPerSec) {
+        if (remainingBytes <= 0L || bytesPerSec <= 4096d
+                || Double.isNaN(bytesPerSec) || Double.isInfinite(bytesPerSec)) {
+            return "";
         }
+        long sec = Math.max(1L, Math.round(remainingBytes / bytesPerSec));
+        if (sec > 3600L) return "";
+        if (sec < 60L) return "~" + sec + "s left";
+        long min = sec / 60L;
+        long rem = sec % 60L;
+        return rem > 0L ? ("~" + min + "m " + rem + "s left") : ("~" + min + "m left");
     }
 
     private static void pruneStaleUpdateFiles(@NonNull File updatesDir, @NonNull String keepName) {
         File[] existing = updatesDir.listFiles();
         if (existing == null) return;
+        String keepPart = keepName.isEmpty() ? "" : (keepName + ".part");
         for (File f : existing) {
-            if (f.isFile() && !keepName.equals(f.getName())) {
+            if (f.isFile() && !keepName.equals(f.getName()) && !keepPart.equals(f.getName())) {
                 //noinspection ResultOfMethodCallIgnored
                 f.delete();
             }
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static boolean verifyDownloadedApkArchive(@NonNull Context context,
+                                                      @NonNull File apkFile) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            PackageInfo pkgInfo;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(),
+                        PackageManager.PackageInfoFlags.of(
+                                PackageManager.GET_SIGNING_CERTIFICATES));
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(),
+                        PackageManager.GET_SIGNING_CERTIFICATES);
+            } else {
+                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(), 0);
+            }
+            if (pkgInfo == null || !context.getPackageName().equals(pkgInfo.packageName)) {
+                return false;
+            }
+            // Enforce APK Signature Scheme v2/v3 signing-certificate continuity on Android 9+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                String archiveCert = extractFirstSignerSha256(pkgInfo);
+                String installedCert = extractInstalledSignerSha256(context, pm);
+                if (archiveCert != null && installedCert != null) {
+                    return installedCert.equalsIgnoreCase(archiveCert);
+                }
+            }
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Nullable
+    @SuppressWarnings("deprecation")
+    private static String extractInstalledSignerSha256(@NonNull Context context,
+                                                       @NonNull PackageManager pm) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null;
+        try {
+            PackageInfo self = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ? pm.getPackageInfo(context.getPackageName(),
+                        PackageManager.PackageInfoFlags.of(
+                                PackageManager.GET_SIGNING_CERTIFICATES))
+                    : pm.getPackageInfo(context.getPackageName(),
+                        PackageManager.GET_SIGNING_CERTIFICATES);
+            return extractFirstSignerSha256(self);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static String extractFirstSignerSha256(@Nullable PackageInfo info) {
+        if (info == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P
+                || info.signingInfo == null) {
+            return null;
+        }
+        try {
+            android.content.pm.Signature[] signers = info.signingInfo.hasMultipleSigners()
+                    ? info.signingInfo.getApkContentsSigners()
+                    : info.signingInfo.getSigningCertificateHistory();
+            if (signers == null || signers.length == 0 || signers[0] == null) {
+                return null;
+            }
+            return toLowerHex(MessageDigest.getInstance("SHA-256").digest(signers[0].toByteArray()));
+        } catch (Throwable ignored) {
+            return null;
         }
     }
 

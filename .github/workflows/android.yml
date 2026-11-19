@@ -11,9 +11,9 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag to publish (e.g. v2.6.0)"
+        description: "Release tag to publish (e.g. v2.7.0)"
         required: false
-        default: "v2.6.0"
+        default: "v2.7.0"
         type: string
 
 # Default least-privilege token across all jobs; only publish-release escalates to contents:write.
@@ -244,7 +244,7 @@ jobs:
               fail(f"aapt2 dump badging failed: {badging_proc.stderr[:400]}")
           badging = badging_proc.stdout
           pkg_line = badging.splitlines()[0] if badging else "empty"
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.6.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.7.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
               if expected not in badging:
                   fail(f"Missing {expected} in badging ({pkg_line})")
           if "application-debuggable" in badging:
@@ -282,7 +282,7 @@ jobs:
               for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                   h.update(chunk)
           sha = h.hexdigest()
-          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.6.0 abi=arm64-v8a targetSdk=36 debuggable=false mp4_stored={mp4_stored} size={size_mb:.1f}MB sha256={sha}")
+          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.7.0 abi=arm64-v8a targetSdk=36 debuggable=false mp4_stored={mp4_stored} size={size_mb:.1f}MB sha256={sha}")
           PY
 
       - name: Upload Unsigned Release CI Artifact
@@ -449,7 +449,7 @@ jobs:
               fail(f"Continuity certificate SHA-256 mismatch: expected {expected_continuity}, got {cert_sha256}")
 
           badging = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True, check=True).stdout
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.6.0'", "targetSdkVersion:'36'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.7.0'", "targetSdkVersion:'36'"):
               if expected not in badging:
                   fail(f"Missing {expected} in signed APK badging")
           if "application-debuggable" in badging or "application-testOnly" in badging:
@@ -463,14 +463,14 @@ jobs:
 
           with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
               cf.write("Package: com.zyrox.launcher\n")
-              cf.write("Version: 2.6.0 (arm64-v8a)\n")
+              cf.write("Version: 2.7.0 (arm64-v8a)\n")
               cf.write("Signature Schemes: v1 + v2 + v3 (RSA-4096)\n")
               cf.write(f"Certificate DN: {cert_dn}\n")
               cf.write(f"Certificate SHA-256: {cert_sha256}\n")
               cf.write(f"APK SHA-256: {apk_sha}\n")
 
           size_mb = os.path.getsize(apk) / (1024 * 1024)
-          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.6.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
+          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.7.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
           PY
 
       - name: Upload Verified Signed Release Bundle
@@ -515,7 +515,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${INPUT_TAG:-v2.6.0}"
+            TAG="${INPUT_TAG:-v2.7.0}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
             echo "::error title=InvalidReleaseTag::Refusing invalid tag format: $TAG"
@@ -523,18 +523,17 @@ jobs:
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           {
-            echo "## Zyrox Launcher ${TAG} — Rebuilt 1-Click FPS Boost, Strict Mod Browser Compatibility, Hardened v2.5.0 Ecosystem, Floating Waypoint Pill, Per-Server Controls & 5s Auto-Reconnect"
+            echo "## Zyrox Launcher ${TAG} — Instant Auto-Update Popup, Resumable Updater + ETA, Live Home Telemetry & Quick-Join, In-Game Profile Switcher & UI Polish"
             echo ""
-            echo "### What's New in 2.6.0"
-            echo "- **Rebuilt 1-Click FPS Boost Engine:** Clean Minecraft version + loader resolution across Vanilla, Fabric, Quilt, NeoForge, and Forge (never confuses modloader version numbers with MC version); automatic silent Fabric Loader installation for Vanilla \`1.14+\` instances; properly URL-encoded Modrinth API v2 lookups; automatic required dependency downloading (\`fabric-api\`) with SHA-1 verification + \`.zyrox_pool\` linking; safe \`options.txt\` performance defaults (\`renderDistance:8\`, \`simulationDistance:6\`, \`entityShadows:false\`, \`particles:1\`, \`enableVsync:false\`); and clear installed-vs-skipped completion report."
-            echo "- **Strict Modrinth & CurseForge Version + Loader Filtering:** Mod Browser now locks searches and file listings to the active instance's exact clean Minecraft version and loader with a visible compatibility bar, **Strict Compatibility** toggle, **RECOMMENDED** stable release badge, auto-expanded active MC group, and automatic required dependency downloads."
-            echo "- **Floating Coordinate & Death Waypoint HUD Pill:** Client-mod-free, zero-F3 draggable HUD pill to capture live \`X, Y, Z\` + dimension, auto-pin death markers, share coordinates in multiplayer chat, and copy \`/tp\` commands."
-            echo "- **Per-Server Control Profile Auto-Switch:** Assign dedicated control layouts (e.g. PvP Claw vs. SMP Builder) to individual saved servers and switch automatically when connecting."
-            echo "- **Server Auto-Reconnect (5s Countdown):** Optional Quick Settings toggle that pings and reconnects automatically after a cancellable 5-second countdown on unexpected server timeouts."
-            echo "- **v2.5.0 Reliability & Memory Polish:** Hardened in-app updater (GitHub API rate-limit fallback, conditional \`ETag\`, offline checks, Android 11–16 package/speech visibility), leak-free \`ZYX-XXXX\` room bridge with CGNAT diagnostics and \`:launcher\`→\`:game\` tunnel handoff, resilient push-to-talk Voice Chat fallback, auto-unlatching inventory modifiers, strict off-UI-thread Instance Studio I/O, and deterministic GIF/video/shader release before JVM launch."
+            echo "### What's New in 2.7.0"
+            echo "- **Instant Automatic Startup Update Popup:** Fixed automatic GitHub release detection so new versions pop up immediately on every app launch & network reconnect (zero 6-hour startup lock, lifecycle-safe \`onResume()\` replay, automatic warm-resume checks every 15 min, and tag-scoped *Later* snooze so newer releases always alert immediately)."
+            echo "- **Zero-Quota CGNAT Fallback + Resumable Downloads + Live ETA:** Automatically falls back to official GitHub \`302\` release redirects when mobile ISP IPs hit \`api.github.com\` rate limits, resumes interrupted APK downloads via HTTP \`Range: bytes=<offset>-\` (\`206 Partial Content\`), displays live throughput + remaining ETA, and verifies both SHA-256 and publisher signing-certificate continuity before installation."
+            echo "- **Upgraded Liquid Glass Home Hub:** Added a live off-thread **Active Instance Telemetry Capsule** (loader, MC version, active mod count & RAM — tap for Mods & Packs, hold for Instance Studio), a glowing **1-Tap Update Ready Pill**, a **⚡ Quick-Join Server Capsule** for instant favorite/recent server connection, tappable version watermark, and 120Hz/144Hz tactile spring micro-interactions."
+            echo "- **1-Tap In-Game Control Profile Switcher & Waypoints Menu:** Hot-swap between saved touch control profiles mid-match and manage Waypoints & Death Markers directly from the in-game slide-out drawer without entering full editor mode."
+            echo "- **Smart Modded Launch & Control Center Polish:** Eliminated false mobile-data/low-storage download prompts on already-installed Fabric, Quilt, NeoForge & Forge instances; added Settings → Misc automatic update toggle & 1-tap update check; and synced pre-flight Fabric auto-upgrades seamlessly."
             echo ""
             echo "### Download & Upgrade"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.5.x\` / \`v2.4.x\` / \`v2.3.x\` / \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.6.x\` / \`v2.5.x\` / \`v2.4.x\` / \`v2.3.x\` / \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\` — all instances, worlds, mods, servers & controls remain untouched)."
             echo ""
             echo "### Signing & SHA-256 Verification"
             echo '```'

@@ -3,12 +3,16 @@ package git.artdeell.mojo.fragments;
 import static git.artdeell.mojo.Tools.openPath;
 import static git.artdeell.mojo.Tools.shareLog;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -20,18 +24,25 @@ import com.kdt.mcgui.ProgressLayout;
 import com.kdt.mcgui.mcVersionSpinner;
 
 import java.io.File;
+import java.util.List;
+import java.util.Locale;
 
+import git.artdeell.mojo.BuildConfig;
 import git.artdeell.mojo.CustomControlsActivity;
 import git.artdeell.mojo.LauncherActivity;
+import git.artdeell.mojo.MojoApplication;
 import git.artdeell.mojo.R;
 import git.artdeell.mojo.Tools;
 import git.artdeell.mojo.contracts.OpenDocumentWithExtension;
 import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
+import git.artdeell.mojo.extra.ExtraListener;
 import git.artdeell.mojo.instances.Instance;
 import git.artdeell.mojo.instances.Instances;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.prefs.screens.LauncherPreferenceFragment;
+import git.artdeell.mojo.servers.ServerListManager;
+import git.artdeell.mojo.updater.AppUpdateChecker;
 import git.artdeell.mojo.utils.FileUtils;
 
 /**
@@ -41,6 +52,24 @@ public class MainMenuFragment extends Fragment {
     public static final String TAG = "MainMenuFragment";
 
     private mcVersionSpinner mVersionSpinner;
+    @Nullable private TextView mInstanceCapsule;
+    @Nullable private TextView mUpdatePill;
+    @Nullable private TextView mQuickServerPill;
+    @Nullable private TextView mWatermarkView;
+    private int mTelemetryGeneration = 0;
+
+    private final ExtraListener<String> mVersionRefreshListener = (key, value) -> {
+        refreshHomeTelemetryAsync();
+        return false;
+    };
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener mSelectedInstanceObserver =
+            (prefs, key) -> {
+                if ("selectedInstance".equals(key) || "allocation".equals(key)
+                        || LauncherPreferences.KEY_ZYROX_AUTO_UPDATE_CHECK.equals(key)) {
+                    refreshHomeTelemetryAsync();
+                }
+            };
 
     private final ActivityResultLauncher<Object> mModInstallerLauncher =
             registerForActivityResult(new OpenDocumentWithExtension("jar"), (data) -> {
@@ -73,9 +102,38 @@ public class MainMenuFragment extends Fragment {
         Button mSkinsButton = view.findViewById(R.id.skins_button);
         Button mDownloadsButton = view.findViewById(R.id.downloads_button);
         Button mHomeSettingsButton = view.findViewById(R.id.home_settings_button);
+        mInstanceCapsule = view.findViewById(R.id.tv_home_instance_capsule);
+        mUpdatePill = view.findViewById(R.id.tv_home_update_pill);
+        mQuickServerPill = view.findViewById(R.id.tv_home_quick_server_pill);
+        mWatermarkView = view.findViewById(R.id.tv_zyrox_watermark);
 
         mPlayButton.setOnClickListener(v -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
+        attachLiquidPressSpring(mPlayButton);
+
+        if (mInstanceCapsule != null) {
+            attachLiquidPressSpring(mInstanceCapsule);
+            mInstanceCapsule.setOnClickListener(v ->
+                    Tools.swapFragment(requireActivity(), ContentManagerFragment.class,
+                            ContentManagerFragment.TAG, null));
+            mInstanceCapsule.setOnLongClickListener(v -> {
+                mVersionSpinner.openProfileEditor(requireActivity());
+                return true;
+            });
+        }
+        if (mWatermarkView != null) {
+            mWatermarkView.setOnClickListener(v -> {
+                if (isAdded() && getActivity() != null) {
+                    AppUpdateChecker.checkNowInteractive(requireActivity());
+                }
+            });
+        }
+
+        ExtraCore.addExtraListener(ExtraConstants.REFRESH_VERSION_SPINNER, mVersionRefreshListener);
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.DEFAULT_PREF.registerOnSharedPreferenceChangeListener(
+                    mSelectedInstanceObserver);
+        }
 
         // Single unified first-time setup: wait until initial dependency extraction finishes,
         // then present OnboardingWizardFragment once (never overlapping with SelectAuthFragment).
@@ -169,18 +227,217 @@ public class MainMenuFragment extends Fragment {
                 Tools.openURL(requireActivity(), getString(R.string.social_media_invite)));
 
         setupFullScreenGlassPolish(view);
+        refreshHomeTelemetryAsync();
+        bindAvailableUpdateUi(AppUpdateChecker.getAvailableUpdate(requireContext()), false);
+    }
 
-        // Throttled GitHub Releases in-app auto-updater check (runs once onboarding is complete)
-        if (LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE) {
-            git.artdeell.mojo.updater.AppUpdateChecker.checkSilentlyIfDue(
-                    requireContext(), (info, err) -> {
-                        if (isAdded() && isResumed() && getActivity() != null
-                                && info != null && info.updateAvailable) {
-                            git.artdeell.mojo.updater.AppUpdateChecker.showUpdateDialog(
-                                    requireActivity(), info);
-                        }
-                    });
+    /**
+     * Formats the concise Home Hero instance status capsule text (e.g.
+     * {@code "Fabric 1.21.4  ·  6 Mods  ·  4096 MB"}).
+     */
+    @NonNull
+    public static String formatHomeInstanceCapsule(@Nullable String loader,
+                                                   @Nullable String mcVersion,
+                                                   int enabledModCount,
+                                                   int ramMb) {
+        String loaderName = Instance.formatLoaderDisplayName(loader);
+        String ver = (mcVersion != null && !mcVersion.trim().isEmpty()) ? mcVersion.trim() : "";
+        StringBuilder sb = new StringBuilder();
+        sb.append(loaderName);
+        if (!ver.isEmpty()) {
+            sb.append(' ').append(ver);
         }
+        if (enabledModCount > 0) {
+            sb.append("  ·  ").append(enabledModCount)
+                    .append(enabledModCount == 1 ? " Mod" : " Mods");
+        }
+        if (ramMb > 0) {
+            sb.append("  ·  ").append(ramMb).append(" MB");
+        }
+        return sb.toString();
+    }
+
+    private void refreshHomeTelemetryAsync() {
+        if (!isAdded()) return;
+        final int gen = ++mTelemetryGeneration;
+        MojoApplication.sExecutorService.execute(() -> {
+            Instance inst = Instances.loadSelectedInstance();
+            if (inst == null) {
+                Tools.runOnUiThread(() -> {
+                    if (!isAdded() || gen != mTelemetryGeneration) return;
+                    if (mInstanceCapsule != null) mInstanceCapsule.setVisibility(View.GONE);
+                    if (mQuickServerPill != null) mQuickServerPill.setVisibility(View.GONE);
+                });
+                return;
+            }
+            String rawVersion = inst.versionId;
+            String loader = Instance.detectModLoader(rawVersion);
+            String mcVer = Instance.resolveCleanMinecraftVersion(rawVersion);
+            if (mcVer.isEmpty() && Instance.isLatestFabricId(rawVersion)) {
+                mcVer = "Latest";
+            } else if (mcVer.isEmpty() && Instance.isLatestReleaseId(rawVersion)) {
+                mcVer = "Latest";
+            } else if (mcVer.isEmpty() && Instance.isLatestSnapshotId(rawVersion)) {
+                mcVer = "Snapshot";
+            }
+            int activeMods = countEnabledMods(inst.getGameDirectory());
+            int ramMb = inst.ramAllocationMb > 0 ? inst.ramAllocationMb : LauncherPreferences.PREF_RAM_ALLOCATION;
+            final String capsuleText = formatHomeInstanceCapsule(loader, mcVer, activeMods, ramMb);
+
+            // Resolve favorite or most-recent saved server for 1-tap Home Quick Join
+            String quickName = null;
+            String quickAddr = null;
+            String quickProfile = null;
+            try {
+                File gameDir = inst.getGameDirectory();
+                List<ServerListManager.ServerEntry> servers = ServerListManager.loadServers(gameDir);
+                ServerListManager.ServerEntry chosen = null;
+                for (ServerListManager.ServerEntry s : servers) {
+                    if (s != null && !s.hidden && s.favorite && Tools.isValidString(s.address)) {
+                        chosen = s;
+                        break;
+                    }
+                }
+                if (chosen == null) {
+                    for (ServerListManager.ServerEntry s : servers) {
+                        if (s != null && !s.hidden && Tools.isValidString(s.address)) {
+                            chosen = s;
+                            break;
+                        }
+                    }
+                }
+                if (chosen != null) {
+                    quickName = Tools.isValidString(chosen.name) ? chosen.name.trim() : chosen.address.trim();
+                    quickAddr = chosen.address.trim();
+                    quickProfile = chosen.controlProfile;
+                }
+            } catch (Throwable ignored) {
+            }
+
+            final String fQuickName = quickName;
+            final String fQuickAddr = quickAddr;
+            final String fQuickProfile = quickProfile;
+            Tools.runOnUiThread(() -> {
+                if (!isAdded() || gen != mTelemetryGeneration) return;
+                if (mInstanceCapsule != null) {
+                    mInstanceCapsule.setText(capsuleText);
+                    mInstanceCapsule.setVisibility(View.VISIBLE);
+                }
+                if (mQuickServerPill != null) {
+                    if (fQuickAddr != null && !fQuickAddr.isEmpty()) {
+                        mQuickServerPill.setText("⚡ QUICK JOIN  ·  " + fQuickName);
+                        mQuickServerPill.setVisibility(View.VISIBLE);
+                        attachLiquidPressSpring(mQuickServerPill);
+                        mQuickServerPill.setOnClickListener(v -> {
+                            ServerListManager.setPendingQuickConnect(fQuickAddr, fQuickProfile);
+                            Toast.makeText(requireContext(),
+                                    "Joining " + fQuickName + "…", Toast.LENGTH_SHORT).show();
+                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                        });
+                        mQuickServerPill.setOnLongClickListener(v -> {
+                            Tools.swapFragment(requireActivity(), ServerManagerFragment.class,
+                                    ServerManagerFragment.TAG, null);
+                            return true;
+                        });
+                    } else {
+                        mQuickServerPill.setVisibility(View.GONE);
+                    }
+                }
+            });
+        });
+    }
+
+    private static int countEnabledMods(@Nullable File gameDir) {
+        if (gameDir == null) return 0;
+        File modsDir = new File(gameDir, "mods");
+        File[] files = modsDir.listFiles();
+        if (files == null) return 0;
+        int count = 0;
+        for (File f : files) {
+            if (f != null && f.isFile()
+                    && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar")) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** Triggered by {@link LauncherActivity} when internet connectivity comes online mid-session. */
+    public void onConnectivityRestored() {
+        triggerAutomaticUpdateCheck();
+    }
+
+    private void triggerAutomaticUpdateCheck() {
+        if (!isAdded() || getContext() == null) return;
+        // Run automatic update popup once first-time onboarding isn't actively taking over screen
+        if (OnboardingWizardFragment.shouldLaunchOnboarding()) return;
+
+        AppUpdateChecker.checkSilentlyIfDue(requireContext(), (info, err) -> {
+            if (!isAdded()) return;
+            bindAvailableUpdateUi(info, true);
+        });
+    }
+
+    private void bindAvailableUpdateUi(@Nullable AppUpdateChecker.ReleaseInfo info,
+                                       boolean allowAutoModal) {
+        if (!isAdded() || getContext() == null) return;
+        boolean hasUpdate = (info != null && info.updateAvailable);
+
+        if (mUpdatePill != null) {
+            if (hasUpdate) {
+                String tag = info.tagName.startsWith("v") || info.tagName.startsWith("V")
+                        ? info.tagName : ("v" + info.versionClean);
+                mUpdatePill.setText("⬆ UPDATE " + tag.toUpperCase(Locale.ROOT)
+                        + " READY  ·  TAP TO INSTALL");
+                mUpdatePill.setVisibility(View.VISIBLE);
+                attachLiquidPressSpring(mUpdatePill);
+                mUpdatePill.setOnClickListener(v -> {
+                    if (isAdded() && getActivity() != null) {
+                        AppUpdateChecker.markAutoPromptShown(info.tagName);
+                        AppUpdateChecker.showUpdateDialog(requireActivity(), info);
+                    }
+                });
+            } else {
+                mUpdatePill.setVisibility(View.GONE);
+            }
+        }
+
+        if (mWatermarkView != null) {
+            if (hasUpdate) {
+                String tag = info.tagName.startsWith("v") || info.tagName.startsWith("V")
+                        ? info.tagName : ("v" + info.versionClean);
+                mWatermarkView.setText("ZYROX v" + BuildConfig.VERSION_NAME
+                        + "  •  ⬆ " + tag.toUpperCase(Locale.ROOT));
+            } else {
+                mWatermarkView.setText(R.string.zyrox_engine_watermark);
+            }
+        }
+
+        if (allowAutoModal && hasUpdate && isResumed() && getActivity() != null) {
+            Fragment current = getActivity().getSupportFragmentManager()
+                    .findFragmentById(R.id.container_fragment);
+            if (current == this && AppUpdateChecker.shouldShowAutoModalNow(requireContext(), info)) {
+                if (AppUpdateChecker.showUpdateDialog(requireActivity(), info)) {
+                    AppUpdateChecker.markAutoPromptShown(info.tagName);
+                }
+            }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private void attachLiquidPressSpring(@NonNull View target) {
+        target.setOnTouchListener((v, ev) -> {
+            if (getContext() == null || LauncherPreferences.isReducedMotionEnabled(getContext())) {
+                return false;
+            }
+            int action = ev.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                v.animate().scaleX(0.965f).scaleY(0.965f).setDuration(85L).start();
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                v.animate().scaleX(1f).scaleY(1f).setDuration(130L).start();
+            }
+            return false;
+        });
     }
 
     private void setupFullScreenGlassPolish(@NonNull View root) {
@@ -252,6 +509,25 @@ public class MainMenuFragment extends Fragment {
     public void onResume() {
         super.onResume();
         ExtraCore.setValue(ExtraConstants.REFRESH_ACCOUNT_SPINNER, true);
+        refreshHomeTelemetryAsync();
+        // Present any pending update popup that arrived while paused/in-dialog & check GitHub live!
+        bindAvailableUpdateUi(AppUpdateChecker.getAvailableUpdate(requireContext()), true);
+        triggerAutomaticUpdateCheck();
+    }
+
+    @Override
+    public void onDestroyView() {
+        ExtraCore.removeExtraListenerFromValue(
+                ExtraConstants.REFRESH_VERSION_SPINNER, mVersionRefreshListener);
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.DEFAULT_PREF.unregisterOnSharedPreferenceChangeListener(
+                    mSelectedInstanceObserver);
+        }
+        mInstanceCapsule = null;
+        mUpdatePill = null;
+        mQuickServerPill = null;
+        mWatermarkView = null;
+        super.onDestroyView();
     }
 
     private void runInstallerWithConfirmation() {
