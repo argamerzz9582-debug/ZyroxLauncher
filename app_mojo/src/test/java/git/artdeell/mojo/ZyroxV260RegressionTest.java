@@ -218,9 +218,11 @@ public class ZyroxV260RegressionTest {
         assertTrue(rpFacets.contains("[\"versions:1.21.4\"]"));
         assertFalse(rpFacets.contains("categories:quilt"));
 
-        // Disabling Strict Compatibility removes version & loader locks while keeping type/category
+        // Disabling Strict Compatibility clears instance version/loader locks while keeping type/category
         f.projectTypeOverride = "mod";
         f.strictCompatibility = false;
+        f.mcVersion = null;
+        f.loader = null;
         String looseFacets = ModrinthProvider.buildSearchFacets(f);
         assertTrue(looseFacets.contains("[\"project_type:mod\"]"));
         assertTrue(looseFacets.contains("[\"categories:optimization\"]"));

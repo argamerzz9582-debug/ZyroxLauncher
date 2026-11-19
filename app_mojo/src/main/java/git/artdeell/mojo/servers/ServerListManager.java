@@ -245,7 +245,7 @@ public final class ServerListManager {
     @Nullable
     public static String normalizeServerEndpoint(@Nullable String address) {
         if (address == null || address.trim().isEmpty()) return null;
-        String cleaned = address.trim();
+        String cleaned = address.trim().replace(".:", ":");
         if (cleaned.endsWith(".")) {
             cleaned = cleaned.substring(0, cleaned.length() - 1);
         }
