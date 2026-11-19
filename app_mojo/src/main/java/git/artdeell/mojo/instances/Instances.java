@@ -222,19 +222,142 @@ public class Instances {
         org.apache.commons.io.FileUtils.deleteDirectory(instanceDirectory);
     }
 
+    private static final java.util.concurrent.atomic.AtomicBoolean sDefaultFabricSyncInFlight =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    public static final String DEFAULT_FABRIC_PLACEHOLDER_NAME = "Fabric (Latest)";
+
     private static void createFirstTimeInstance() throws IOException {
-        internalCreateInstance(instance -> {
+        Instance created = internalCreateInstance(instance -> {
             instance.sharedData = true;
-            instance.versionId = Instance.VERSION_LATEST_RELEASE;
-            instance.name = "Latest Release";
-        }, "latest");
+            instance.versionId = Instance.VERSION_LATEST_FABRIC;
+            instance.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
+            instance.icon = "fabric";
+        }, "fabric-latest");
+        setSelectedInstance(created);
+        markDefaultFabricInitialized();
     }
 
     public static Instance createDefaultInstance() throws IOException {
         return createInstance(instance -> {
             instance.sharedData = false;
-            instance.versionId = Instance.VERSION_LATEST_RELEASE;
+            instance.versionId = Instance.VERSION_LATEST_FABRIC;
+            instance.icon = "fabric";
         }, null);
+    }
+
+    private static void markDefaultFabricInitialized() {
+        LauncherPreferences.PREF_ZYROX_DEFAULT_FABRIC_READY = true;
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putBoolean(LauncherPreferences.KEY_ZYROX_DEFAULT_FABRIC_READY, true)
+                    .apply();
+        }
+    }
+
+    /**
+     * Ensures the launcher's default selected profile targets the latest stable Fabric release
+     * and materializes any symbolic {@link Instance#VERSION_LATEST_FABRIC} profile into an
+     * installed {@code fabric-loader-<loader>-<mc>} profile JSON asynchronously without blocking UI.
+     */
+    public static void ensureDefaultLatestFabricAsync() {
+        if (!sDefaultFabricSyncInFlight.compareAndSet(false, true)) {
+            return;
+        }
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            try {
+                boolean spinnerNeedsRefresh = false;
+                List<Instance> all = loadAllInstances();
+                if (all.isEmpty()) {
+                    createFirstTimeInstance();
+                    all = loadAllInstances();
+                    spinnerNeedsRefresh = true;
+                }
+
+                // One-time default Fabric selection for fresh & upgrading installs
+                if (!LauncherPreferences.PREF_ZYROX_DEFAULT_FABRIC_READY) {
+                    Instance existingFabric = null;
+                    for (Instance inst : all) {
+                        if (inst != null && (Instance.isLatestFabricId(inst.versionId)
+                                || (inst.versionId != null && inst.versionId.startsWith("fabric-loader-")))) {
+                            existingFabric = inst;
+                            break;
+                        }
+                    }
+                    if (existingFabric != null) {
+                        setSelectedInstance(existingFabric);
+                    } else {
+                        Instance selected = loadSelectedInstance();
+                        if (selected != null && Instance.isLatestReleaseId(selected.versionId)
+                                && selected.launchCount == 0) {
+                            selected.versionId = Instance.VERSION_LATEST_FABRIC;
+                            selected.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
+                            selected.icon = "fabric";
+                            selected.sanitize();
+                            selected.write();
+                            all = loadAllInstances();
+                        } else {
+                            Instance fabricDefault = internalCreateInstance(inst -> {
+                                inst.sharedData = true;
+                                inst.versionId = Instance.VERSION_LATEST_FABRIC;
+                                inst.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
+                                inst.icon = "fabric";
+                            }, "fabric-latest");
+                            setSelectedInstance(fabricDefault);
+                            all = loadAllInstances();
+                        }
+                    }
+                    markDefaultFabricInitialized();
+                    spinnerNeedsRefresh = true;
+                }
+
+                // Resolve any symbolic "latest_fabric" profile into the newest stable Fabric release
+                boolean hasSymbolicFabric = false;
+                for (Instance inst : all) {
+                    if (inst != null && Instance.isLatestFabricId(inst.versionId)) {
+                        hasSymbolicFabric = true;
+                        break;
+                    }
+                }
+                if (hasSymbolicFabric) {
+                    try {
+                        git.artdeell.mojo.modding.fabric.FabriclikeUtils.ResolvedFabricRelease latest =
+                                git.artdeell.mojo.modding.fabric.FabriclikeUtils.FABRIC_UTILS
+                                        .resolveAndInstallLatestStable();
+                        // Re-read current instances so any profile edits made mid-fetch stay intact
+                        for (Instance inst : loadAllInstances()) {
+                            if (inst != null && Instance.isLatestFabricId(inst.versionId)) {
+                                inst.versionId = latest.versionId;
+                                if (inst.name == null || inst.name.trim().isEmpty()
+                                        || DEFAULT_FABRIC_PLACEHOLDER_NAME.equalsIgnoreCase(inst.name.trim())
+                                        || "Latest Release".equalsIgnoreCase(inst.name.trim())) {
+                                    inst.name = "Fabric " + latest.minecraftVersion;
+                                }
+                                if (inst.icon == null || InstanceIconProvider.FALLBACK_ICON_NAME.equals(inst.icon)) {
+                                    inst.icon = "fabric";
+                                }
+                                inst.sanitize();
+                                inst.write();
+                                spinnerNeedsRefresh = true;
+                            }
+                        }
+                    } catch (IOException e) {
+                        Log.w("Instances", "Deferred latest Fabric resolution until network is ready: "
+                                + e.getMessage());
+                    }
+                }
+
+                if (spinnerNeedsRefresh) {
+                    git.artdeell.mojo.Tools.runOnUiThread(() ->
+                            git.artdeell.mojo.extra.ExtraCore.setValue(
+                                    git.artdeell.mojo.extra.ExtraConstants.REFRESH_VERSION_SPINNER, null));
+                }
+            } catch (Throwable t) {
+                Log.w("Instances", "ensureDefaultLatestFabricAsync failed", t);
+            } finally {
+                sDefaultFabricSyncInFlight.set(false);
+            }
+        });
     }
 
     private static Instance internalCreateInstance(InstanceSetter instanceSetter, String namePrefix) throws IOException {

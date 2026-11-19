@@ -92,6 +92,10 @@ public class OnboardingWizardFragment extends Fragment {
     private TextView mCalHeadline, mCalGpu, mCalRam, mCalJava, mCalDetail;
     private View mCardVanilla, mCardFps, mCardPvp;
     private TextView mStep3Status;
+    public static final String ARG_INITIAL_STEP = "initial_step";
+    private static volatile boolean sAwaitingOAuthReturn = false;
+    private static volatile boolean sWizardCurrentlyActive = false;
+
     private Button mBackBtn, mNextBtn;
     private ProgressBar mBusyBar;
 
@@ -99,13 +103,41 @@ public class OnboardingWizardFragment extends Fragment {
         super(R.layout.fragment_onboarding_wizard);
     }
 
+    /** Consumes and clears the OAuth-from-onboarding return flag so OAuth resumes on Step 2. */
+    public static boolean consumePendingOAuthReturn() {
+        boolean pending = sAwaitingOAuthReturn;
+        sAwaitingOAuthReturn = false;
+        return pending;
+    }
+
+    /** Clears pending OAuth-from-onboarding state if the user cancels the browser sign-in. */
+    public static void cancelPendingOAuthReturn() {
+        sAwaitingOAuthReturn = false;
+    }
+
+    /**
+     * Notified whenever an account finishes signing in. If the login occurred outside the
+     * Onboarding Wizard (e.g. via {@link SelectAuthFragment}), immediately marks onboarding
+     * complete and initializes the default Latest Fabric instance so a second login screen never appears.
+     */
+    public static void onAccountAuthenticated() {
+        if (!sWizardCurrentlyActive && !sAwaitingOAuthReturn
+                && !LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE) {
+            markOnboardingCompleted();
+            Instances.ensureDefaultLatestFabricAsync();
+        }
+    }
+
     /**
      * Checks whether first-time onboarding should be shown. Preserves strict backward
-     * compatibility: existing users who already have at least one saved account automatically
-     * keep their setup undisturbed and are marked onboarded.
+     * compatibility: existing users who already have at least one saved account (or an active
+     * in-flight sign-in) keep their setup undisturbed and never see duplicate login screens.
      */
     public static boolean shouldLaunchOnboarding() {
-        if (LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE) {
+        if (LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE
+                || sWizardCurrentlyActive
+                || sAwaitingOAuthReturn
+                || com.kdt.mcgui.AccountSpinner.isLoginInFlight()) {
             return false;
         }
         try {
@@ -161,18 +193,28 @@ public class OnboardingWizardFragment extends Fragment {
         mNextBtn = view.findViewById(R.id.btn_onboarding_next);
         mBusyBar = view.findViewById(R.id.pb_onboarding_busy);
 
+        sWizardCurrentlyActive = true;
         if (savedInstanceState != null) {
             mCurrentStep = savedInstanceState.getInt("step", 1);
             mSelectedPreset = savedInstanceState.getInt("preset", PRESET_FPS_BOOSTED);
+        } else if (getArguments() != null && getArguments().containsKey(ARG_INITIAL_STEP)) {
+            mCurrentStep = Math.max(1, Math.min(3, getArguments().getInt(ARG_INITIAL_STEP, 1)));
+            if (mCurrentStep >= 2) {
+                mHasSavedAccount = true;
+            }
         }
 
-        // Step 1 listeners
-        view.findViewById(R.id.btn_onboard_microsoft).setOnClickListener(v ->
-                Tools.swapFragment(requireActivity(),
-                        MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null));
-        view.findViewById(R.id.btn_onboard_elyby).setOnClickListener(v ->
-                Tools.swapFragment(requireActivity(),
-                        ElyByLoginFragment.class, ElyByLoginFragment.TAG, null));
+        // Step 1 listeners (single login flow — OAuth returns directly to Step 2)
+        view.findViewById(R.id.btn_onboard_microsoft).setOnClickListener(v -> {
+            sAwaitingOAuthReturn = true;
+            Tools.swapFragment(requireActivity(),
+                    MicrosoftLoginFragment.class, MicrosoftLoginFragment.TAG, null);
+        });
+        view.findViewById(R.id.btn_onboard_elyby).setOnClickListener(v -> {
+            sAwaitingOAuthReturn = true;
+            Tools.swapFragment(requireActivity(),
+                    ElyByLoginFragment.class, ElyByLoginFragment.TAG, null);
+        });
 
         mOfflineEdit.addTextChangedListener(new TextWatcher() {
             @Override
@@ -201,7 +243,9 @@ public class OnboardingWizardFragment extends Fragment {
 
         // Navigation controls
         view.findViewById(R.id.btn_onboarding_skip).setOnClickListener(v -> {
+            sAwaitingOAuthReturn = false;
             markOnboardingCompleted();
+            Instances.ensureDefaultLatestFabricAsync();
             Tools.backToMainMenu(requireActivity());
         });
         mBackBtn.setOnClickListener(v -> {
@@ -232,6 +276,7 @@ public class OnboardingWizardFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        sWizardCurrentlyActive = false;
         if (mSkinPreview != null) {
             mSkinPreview.setImageResource(R.drawable.ic_default_steve_head);
         }
@@ -516,17 +561,20 @@ public class OnboardingWizardFragment extends Fragment {
         }
 
         MojoApplication.sExecutorService.execute(() -> {
-            String mcVersion = ModrinthContentInstaller.resolveModernGameVersion(null);
-            String resolvedVersionId = mcVersion;
+            String resolvedVersionId;
+            String resolvedMcLabel = null;
             boolean fabricInstalled = false;
 
             if (chosenPreset == PRESET_FPS_BOOSTED || chosenPreset == PRESET_PVP_READY) {
                 try {
-                    resolvedVersionId = FabriclikeUtils.FABRIC_UTILS
-                            .installLatestForGameVersion(mcVersion);
+                    FabriclikeUtils.ResolvedFabricRelease latestFabric =
+                            FabriclikeUtils.FABRIC_UTILS.resolveAndInstallLatestStable();
+                    resolvedVersionId = latestFabric.versionId;
+                    resolvedMcLabel = latestFabric.minecraftVersion;
                     fabricInstalled = true;
                 } catch (Exception ignored) {
-                    resolvedVersionId = Instance.VERSION_LATEST_RELEASE;
+                    // Stay on latest Fabric symbolically so first Play click installs Fabric automatically
+                    resolvedVersionId = Instance.VERSION_LATEST_FABRIC;
                 }
             } else {
                 resolvedVersionId = Instance.VERSION_LATEST_RELEASE;
@@ -534,16 +582,19 @@ public class OnboardingWizardFragment extends Fragment {
 
             final String finalVersionId = resolvedVersionId;
             final boolean finalFabric = fabricInstalled;
+            final boolean isFabricPreset = (chosenPreset != PRESET_VANILLA_SMOOTH);
             final String profileTitle;
             final String perfPreset;
             if (chosenPreset == PRESET_VANILLA_SMOOTH) {
                 profileTitle = "Vanilla Smooth";
                 perfPreset = Instance.PRESET_BALANCED;
             } else if (chosenPreset == PRESET_PVP_READY) {
-                profileTitle = "PvP Ready";
+                profileTitle = resolvedMcLabel != null
+                        ? "Fabric " + resolvedMcLabel + " (PvP)" : "Fabric (PvP Ready)";
                 perfPreset = Instance.PRESET_MAX_FPS;
             } else {
-                profileTitle = "FPS Boosted (Sodium)";
+                profileTitle = resolvedMcLabel != null
+                        ? "Fabric " + resolvedMcLabel : "Fabric (Latest)";
                 perfPreset = Instance.PRESET_MAX_FPS;
             }
 
@@ -552,6 +603,7 @@ public class OnboardingWizardFragment extends Fragment {
                 Instance created = Instances.createInstance(inst -> {
                     inst.name = profileTitle;
                     inst.versionId = finalVersionId;
+                    inst.icon = isFabricPreset ? "fabric" : "default";
                     inst.performancePreset = perfPreset;
                     inst.resolutionScalePercent = 100;
                     inst.ramAllocationMb = heapMb;
@@ -578,24 +630,46 @@ public class OnboardingWizardFragment extends Fragment {
                             ModrinthContentInstaller.InstallSummary modRes =
                                     ModrinthContentInstaller.installZeroLagFpsPack(
                                             created, false, null);
-                            toastSummary = "Ready! Created \"" + created.name + "\" ("
+                            toastSummary = "Ready! Selected \"" + created.name + "\" ("
                                     + modRes.installedCount + " FPS mods installed).";
                         } catch (Exception netErr) {
                             created.pendingAutoFpsPack = true;
                             created.maybeWrite();
-                            toastSummary = "Created \"" + created.name
-                                    + "\" — FPS mods will finish downloading automatically on launch.";
+                            toastSummary = "Selected \"" + created.name
+                                    + "\" — FPS mods will finish downloading on launch.";
                         }
                     } else {
-                        toastSummary = "Created \"" + created.name
-                                + "\" with zero-lag video tuning applied!";
+                        created.pendingAutoFpsPack = true;
+                        created.maybeWrite();
+                        toastSummary = "Selected \"" + created.name
+                                + "\" — latest Fabric will sync automatically on launch!";
                     }
                 } else {
                     GameOptionsUtils.applyVanillaSmoothOptions(gameDir);
-                    toastSummary = "Ready! Created calibrated \"" + created.name + "\" instance.";
+                    toastSummary = "Ready! Selected calibrated \"" + created.name + "\" instance.";
                 }
 
                 Instances.setSelectedInstance(created);
+                // Remove any untouched auto-bootstrap placeholder so the spinner stays clutter-free
+                try {
+                    for (Instance existing : Instances.loadAllInstances()) {
+                        if (existing != null && existing != created
+                                && existing.sharedData
+                                && existing.launchCount == 0
+                                && !created.getGameDirectory().equals(existing.getGameDirectory())
+                                && (Instances.DEFAULT_FABRIC_PLACEHOLDER_NAME.equals(existing.name)
+                                    || Instance.isLatestFabricId(existing.versionId))) {
+                            Instances.removeInstance(existing);
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+                LauncherPreferences.PREF_ZYROX_DEFAULT_FABRIC_READY = true;
+                if (LauncherPreferences.DEFAULT_PREF != null) {
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putBoolean(LauncherPreferences.KEY_ZYROX_DEFAULT_FABRIC_READY, true)
+                            .apply();
+                }
                 markOnboardingCompleted();
             } catch (Exception e) {
                 markOnboardingCompleted();
@@ -604,6 +678,7 @@ public class OnboardingWizardFragment extends Fragment {
 
             final String finalToast = toastSummary;
             Tools.runOnUiThread(() -> {
+                ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
                 Toast.makeText(appCtx, finalToast, Toast.LENGTH_LONG).show();
                 if (!isAdded()) return;
                 if (mBusyBar != null) mBusyBar.setVisibility(View.GONE);

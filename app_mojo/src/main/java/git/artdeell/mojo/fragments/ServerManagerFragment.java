@@ -284,7 +284,8 @@ public class ServerManagerFragment extends Fragment {
             final Instance matchingOther = findMatchingInstance(reqMc);
             final boolean currentMatches = reqMc == null
                     || ServerPinger.doesInstanceMatchVersion(mInstance.versionId, reqMc)
-                    || Instance.VERSION_LATEST_RELEASE.equals(mInstance.versionId);
+                    || Instance.isLatestReleaseId(mInstance.versionId)
+                    || Instance.isLatestFabricId(mInstance.versionId);
 
             if (reqMc != null && !currentMatches && matchingOther == null) {
                 Button btnCreateJoin = ZyroxStudioUi.createPrimaryButton(

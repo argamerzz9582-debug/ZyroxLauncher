@@ -494,7 +494,7 @@
                             android:background="@drawable/bg_zyrox_badge_info"
                             android:paddingHorizontal="7dp"
                             android:paddingVertical="2dp"
-                            android:text="RECOMMENDED"
+                            android:text="DEFAULT · FABRIC"
                             android:textColor="@color/zyrox_firefly_gold"
                             android:textSize="9sp"
                             android:textStyle="bold" />
@@ -503,7 +503,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:text="FPS Boosted (Sodium)"
+                            android:text="Fabric Latest (FPS Boost)"
                             android:textColor="@color/zyrox_text_primary"
                             android:textSize="12.5sp"
                             android:textStyle="bold" />
@@ -512,7 +512,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="3dp"
-                            android:text="Fabric + Sodium, Lithium, FerriteCore &amp; ImmediatelyFast + auto-tuned zero-lag options.txt."
+                            android:text="Latest stable Fabric Loader + Sodium, Lithium, FerriteCore &amp; zero-lag options.txt."
                             android:textColor="@color/zyrox_text_secondary"
                             android:textSize="10.5sp" />
                     </LinearLayout>

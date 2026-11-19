@@ -55,7 +55,9 @@ public final class ModrinthContentInstaller {
     private static final long MAX_ARTIFACT_BYTES = 256L * 1024L * 1024L;
     private static final int MAX_AUTO_DEPS = 8;
 
-    private static final Pattern MC_VERSION_PATTERN = Pattern.compile("(1\\.\\d{1,2}(?:\\.\\d{1,2})?)");
+    /** Matches both classic {@code 1.x(.y)} and year-based {@code 26.x(.y)} Minecraft releases. */
+    private static final Pattern MC_VERSION_PATTERN =
+            Pattern.compile("(?:^|[^0-9])((?:1\\.\\d{1,2}|[2-9]\\d\\.\\d{1,2})(?:\\.\\d{1,2})?)(?=$|[^0-9])");
 
     public interface ProgressCallback {
         void onProgress(@NonNull String status);
@@ -111,11 +113,25 @@ public final class ModrinthContentInstaller {
         return detected != null ? detected : "fabric";
     }
 
-    /** Resolves a modern Modrinth-compatible Minecraft release (defaults to {@code 1.21.4}). */
+    /**
+     * Resolves a modern Modrinth-compatible Minecraft release dynamically from {@code versionId}
+     * or the synced official Mojang / Fabric release catalogs.
+     */
     @NonNull
     public static String resolveModernGameVersion(@Nullable String versionId) {
         String mc = extractMinecraftVersion(versionId);
-        return mc != null ? mc : "1.21.4";
+        if (mc != null) return mc;
+        try {
+            git.artdeell.mojo.JVersionList catalog =
+                    git.artdeell.mojo.metadata.VersionMetadataRepository.getInstance().getCurrentCatalog();
+            String latestRelease = git.artdeell.mojo.metadata.MojangVersionProvider.findLatestByType(
+                    catalog, git.artdeell.mojo.metadata.MojangVersionProvider.TYPE_RELEASE);
+            if (latestRelease != null && !latestRelease.trim().isEmpty()) {
+                return latestRelease.trim();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "1.21.4";
     }
 
     /**

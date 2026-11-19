@@ -44,10 +44,9 @@ public final class InstanceHealthInspector {
         if (!Tools.isValidString(instance.versionId)) {
             status = HealthStatus.CRITICAL;
             findings.add("No Minecraft version selected for this instance.");
-            repairs.add("Reset version to Latest Release");
+            repairs.add("Reset version to Latest Fabric Release");
         } else if (versionsDir != null
-                && !Instance.VERSION_LATEST_RELEASE.equals(instance.versionId)
-                && !Instance.VERSION_LATEST_SNAPSHOT.equals(instance.versionId)) {
+                && !Instance.isSymbolicVersionId(instance.versionId)) {
             File verJson = new File(
                     new File(versionsDir, instance.versionId), instance.versionId + ".json");
             if (!verJson.isFile()) {
@@ -142,8 +141,8 @@ public final class InstanceHealthInspector {
                                               @Nullable File controlsDir) throws IOException {
         List<String> applied = new ArrayList<>();
         if (!Tools.isValidString(instance.versionId)) {
-            instance.versionId = Instance.VERSION_LATEST_RELEASE;
-            applied.add("Set missing version to Latest Release");
+            instance.versionId = Instance.VERSION_LATEST_FABRIC;
+            applied.add("Set missing version to Latest Fabric Release");
         }
         if (Tools.isValidString(instance.controlLayout) && controlsDir != null) {
             File ctrl = new File(controlsDir, instance.controlLayout);

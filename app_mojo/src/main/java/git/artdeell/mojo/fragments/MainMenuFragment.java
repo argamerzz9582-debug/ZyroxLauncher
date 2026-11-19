@@ -77,17 +77,28 @@ public class MainMenuFragment extends Fragment {
         mPlayButton.setOnClickListener(v -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
 
-        // First-time beginner guided setup: trigger 3-Step Onboarding Wizard when no account exists
-        view.post(() -> {
-            if (!isAdded() || getActivity() == null) return;
-            if (OnboardingWizardFragment.shouldLaunchOnboarding()) {
-                Tools.swapFragment(
-                        requireActivity(),
-                        OnboardingWizardFragment.class,
-                        OnboardingWizardFragment.TAG,
-                        null);
-            }
-        });
+        // Single unified first-time setup: wait until initial dependency extraction finishes,
+        // then present OnboardingWizardFragment once (never overlapping with SelectAuthFragment).
+        if (!git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE) {
+            git.artdeell.mojo.progresskeeper.ProgressKeeper.waitUntilDone(() -> Tools.runOnUiThread(() -> {
+                if (!isAdded() || !isResumed()) return;
+                androidx.fragment.app.FragmentActivity host = getActivity();
+                if (host == null || host.isFinishing()
+                        || host.getSupportFragmentManager().isStateSaved()) {
+                    return;
+                }
+                Fragment current = host.getSupportFragmentManager()
+                        .findFragmentById(R.id.container_fragment);
+                if (current != MainMenuFragment.this) return;
+                if (OnboardingWizardFragment.shouldLaunchOnboarding()) {
+                    Tools.swapFragment(
+                            host,
+                            OnboardingWizardFragment.class,
+                            OnboardingWizardFragment.TAG,
+                            null);
+                }
+            }));
+        }
 
         if (mModpacksButton != null) {
             mModpacksButton.setOnClickListener(v ->

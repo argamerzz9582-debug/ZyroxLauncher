@@ -92,18 +92,26 @@ public class MoJsonDownloader extends Downloader {
                       @NonNull String realVersion, // this was there for a reason
                       @NonNull MoJsonExtras.DoneListener listener) {
         sExecutorService.execute(() -> {
+            File[] resolvedClassPath = null;
+            Throwable failure = null;
             try {
                 downloadGame(assetManager, version, realVersion);
-                listener.onDownloadDone(mClassPath.toArray(new File[0]));
-            } catch(JsonParseException e) {
-                listener.onDownloadFailed(e); // Handled separately from the general case because it subclasses RuntimeException. Ugh.
-            } catch(RuntimeException e) {
-                throw e; // log fatal errors to Google Play
+                resolvedClassPath = mClassPath != null
+                        ? mClassPath.toArray(new File[0]) : new File[0];
             } catch (InterruptedException ignored) {
-            } catch (Exception e) {
-                listener.onDownloadFailed(e);
+            } catch (Throwable e) {
+                Log.e("MoJsonDownloader", "Failed while preparing game launch for " + realVersion, e);
+                failure = e;
+            } finally {
+                // Always clear DOWNLOAD_GAME before signaling completion/failure so ProgressKeeper
+                // never stalls ContextAwareDoneListener or blocks subsequent Play attempts.
+                ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
             }
-            ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+            if (resolvedClassPath != null) {
+                listener.onDownloadDone(resolvedClassPath);
+            } else if (failure != null) {
+                listener.onDownloadFailed(failure);
+            }
         });
     }
 
@@ -322,7 +330,10 @@ public class MoJsonDownloader extends Downloader {
 
         if(Tools.isValidString(verInfo.inheritsFrom)) {
             JVersionList.Version inheritedVersion = MoJsonExtras.getListedVersion(verInfo.inheritsFrom);
-            // Infinite inheritance !?! :noway:
+            if (inheritedVersion == null && !createGameJsonPath(verInfo.inheritsFrom).canRead()) {
+                MoJsonExtras.ensureActiveManifestSynced();
+                inheritedVersion = MoJsonExtras.getListedVersion(verInfo.inheritsFrom);
+            }
             downloadAndProcessMetadata(assetManager, inheritedVersion, verInfo.inheritsFrom);
         }
     }

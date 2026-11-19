@@ -63,7 +63,9 @@ public final class JavaRuntimeAdvisor {
                 ? versionId.trim()
                 : (versionJson != null && versionJson.id != null ? versionJson.id.trim() : "");
         if (rawId.isEmpty()) return 8;
-        if ("latest_release".equalsIgnoreCase(rawId) || "latest_snapshot".equalsIgnoreCase(rawId)) {
+        if ("latest_release".equalsIgnoreCase(rawId) || "latest-release".equalsIgnoreCase(rawId)
+                || "latest_snapshot".equalsIgnoreCase(rawId) || "latest-snapshot".equalsIgnoreCase(rawId)
+                || "latest_fabric".equalsIgnoreCase(rawId) || "latest-fabric".equalsIgnoreCase(rawId)) {
             return 21;
         }
         return inferRequiredJavaFromVersionToken(extractMcVersionToken(rawId));

@@ -28,20 +28,30 @@ import java.lang.ref.WeakReference;
 public class GameService extends Service {
     private static volatile WeakReference<GameService> sGameService = new WeakReference<>(null);
     private final LocalBinder mLocalBinder = new LocalBinder();
+    /**
+     * Tracks foreground service lifetime independently of {@link LocalBinder#isActive}.
+     * IMPORTANT: {@code mLocalBinder.isActive} MUST remain {@code false} until
+     * {@link GameActivity#onServiceConnected} passes it into {@code GameView.start(isActive)},
+     * otherwise {@code GameView} treats a fresh launch as a surface-only refresh and never boots the JVM.
+     */
+    private volatile boolean mServiceRunning = false;
 
     /** Returns {@code true} while the foreground Minecraft runtime service is running. */
     public static boolean isGameServiceActive() {
         GameService svc = sGameService.get();
-        return svc != null && svc.mLocalBinder.isActive;
+        return svc != null && (svc.mServiceRunning || svc.mLocalBinder.isActive);
     }
 
-    /** Purges every background launcher GIF/video/shader media allocation to prevent LMK kills. */
-    private static void reclaimLauncherMediaMemory() {
+    /** Purges launcher-shell GIF/video/shader backdrops without disrupting GameActivity's loading view. */
+    private static void reclaimLauncherMediaMemory(boolean emergencyLowMemory) {
         try {
             ZyroxGifDecoder.cancelAllActiveDecodes();
-            ZyroxSeamlessGifView.purgeAllActiveInstances(false);
-            ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+            ZyroxLoopingVideoView.suspendLauncherBackdrops();
             ZyroxShaderBackgroundView.releaseAllForGameStart();
+            if (emergencyLowMemory) {
+                ZyroxSeamlessGifView.purgeAllActiveInstances(false);
+                ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+            }
         } catch (Throwable ignored) {
         }
     }
@@ -49,22 +59,23 @@ public class GameService extends Service {
     @Override
     public void onCreate() {
         sGameService = new WeakReference<>(this);
-        reclaimLauncherMediaMemory();
+        reclaimLauncherMediaMemory(false);
         Tools.buildNotificationChannel(getApplicationContext());
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if(intent != null && intent.getBooleanExtra("kill", false)) {
+            mServiceRunning = false;
             mLocalBinder.isActive = false;
             stopSelf();
             Process.killProcess(Process.myPid());
             return START_NOT_STICKY;
         }
-        // Immediately stop, recycle, and release any launcher background GIF/video/shader decoders
-        // so 4 GB–6 GB RAM devices keep maximum free headroom for the JVM & GPU driver.
-        reclaimLauncherMediaMemory();
-        mLocalBinder.isActive = true;
+        // Release any leftover launcher-shell background media so JVM & GPU keep full headroom.
+        // Do NOT set mLocalBinder.isActive here — GameActivity.onServiceConnected owns that handshake!
+        reclaimLauncherMediaMemory(false);
+        mServiceRunning = true;
         Intent killIntent = new Intent(getApplicationContext(), GameService.class);
         killIntent.putExtra("kill", true);
         PendingIntent pendingKillIntent = PendingIntent.getService(this, NotificationUtils.PENDINGINTENT_CODE_KILL_GAME_SERVICE
@@ -94,17 +105,21 @@ public class GameService extends Service {
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        reclaimLauncherMediaMemory();
+        boolean critical = level == TRIM_MEMORY_RUNNING_LOW
+                || level == TRIM_MEMORY_RUNNING_CRITICAL
+                || level >= TRIM_MEMORY_BACKGROUND;
+        reclaimLauncherMediaMemory(critical);
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        reclaimLauncherMediaMemory();
+        reclaimLauncherMediaMemory(true);
     }
 
     @Override
     public void onDestroy() {
+        mServiceRunning = false;
         mLocalBinder.isActive = false;
         sGameService = new WeakReference<>(null);
         super.onDestroy();

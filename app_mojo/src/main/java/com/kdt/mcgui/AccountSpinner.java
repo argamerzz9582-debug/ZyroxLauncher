@@ -47,7 +47,15 @@ import fr.spse.extended_view.ExtendedTextView;
 import git.artdeell.mojo.R;
 
 public class AccountSpinner extends AppCompatSpinner implements LoginListener, AdapterView.OnItemSelectedListener, ValueAnimator.AnimatorUpdateListener {
+    private static volatile boolean sLoginInFlight = false;
+
+    /** Returns {@code true} while an account creation or OAuth token exchange is running. */
+    public static boolean isLoginInFlight() {
+        return sLoginInFlight;
+    }
+
     private Adapter mAdapter;
+    private boolean mSuppressSelectionCallback = false;
     /* Login progress bar stuff */
     private int mMaxSteps = 5;
     private final ValueAnimator mLoginStepAnimator = ValueAnimator.ofFloat(mMaxSteps);
@@ -63,6 +71,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
         @Override
         public boolean onValueSet(String key, @NonNull String value) {
+            sLoginInFlight = true;
             mLoginBarPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.zyrox_amber_bright));
             BackgroundLogin backgroundLogin = mAuthType.createAuth();
             backgroundLogin.createAccount(AccountSpinner.this, value);
@@ -74,6 +83,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
     private final ExtraListener<String> mMicrosoftLoginListener = new LoginExtraListener(AuthType.MICROSOFT);
     private final ExtraListener<String> mElyByLoginListener = new LoginExtraListener(AuthType.ELY_BY);
     private final ExtraListener<String[]> mMojangLoginListener = (key, value) -> {
+        sLoginInFlight = true;
         try {
             Account account = Accounts.create(acc-> acc.username = value[0]);
             onLoginDone(account);
@@ -172,15 +182,23 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         mAdapter.setNotifyOnChange(true);
         mAdapter.addAll(accounts.accounts);
 
-        if(accounts.accounts.isEmpty()) {
-            setSelection(0);
-        } else {
-            int clampedIndex = Math.max(0, Math.min(accounts.selectionIndex, accounts.accounts.size() - 1));
-            setSelection(clampedIndex + 1);
-            Object selected = getSelectedItem();
-            if (selected instanceof Account) {
-                refreshAccount((Account) selected);
+        mSuppressSelectionCallback = true;
+        try {
+            if(accounts.accounts.isEmpty()) {
+                // Never auto-open SelectAuthFragment during programmatic empty reload;
+                // OnboardingWizardFragment handles first-time login in a single unified flow,
+                // and tapping "+ Add account" explicitly opens auth on demand.
+                setSelection(0, false);
+            } else {
+                int clampedIndex = Math.max(0, Math.min(accounts.selectionIndex, accounts.accounts.size() - 1));
+                setSelection(clampedIndex + 1, false);
+                Object selected = getSelectedItem();
+                if (selected instanceof Account) {
+                    refreshAccount((Account) selected);
+                }
             }
+        } finally {
+            post(() -> mSuppressSelectionCallback = false);
         }
     }
 
@@ -225,17 +243,20 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
     @Override
     public void onLoginDone(Account account) {
+        sLoginInFlight = false;
         mLoginStep = mMaxSteps;
         invalidate();
 
         Toast.makeText(getContext(), R.string.main_login_done, Toast.LENGTH_SHORT).show();
         Accounts.setCurrent(account);
+        git.artdeell.mojo.fragments.OnboardingWizardFragment.onAccountAuthenticated();
         reload();
     }
 
 
     @Override
     public void onLoginError(Throwable errorMessage) {
+        sLoginInFlight = false;
         mLoginBarPaint.setColor(Color.RED);
         invalidate();
 
@@ -264,10 +285,18 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
 
     @Override
     public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
+        if (mSuppressSelectionCallback) {
+            return;
+        }
         Account account = mAdapter.getItem(i);
         if(account == null) {
             if(i == 0) {
-                createAccount();
+                // Only trigger createAccount when explicitly picked from a populated dropdown;
+                // when empty (count == 1), populateView's click listener handles direct user taps
+                // without spuriously opening a second login screen on Activity/layout start.
+                if (mAdapter.getCount() > 1) {
+                    createAccount();
+                }
             }else {
                 Tools.showError(adapterView.getContext(), new NullPointerException());
             }

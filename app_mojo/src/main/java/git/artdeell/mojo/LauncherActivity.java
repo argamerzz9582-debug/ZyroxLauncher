@@ -104,6 +104,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     private void updateGlobalShellForFragment(@NonNull Fragment f) {
         boolean isHome = f instanceof MainMenuFragment;
+        boolean isOnboarding = f instanceof OnboardingWizardFragment;
         mSettingsButton.setImageDrawable(ContextCompat.getDrawable(getBaseContext(),
                 isHome ? R.drawable.ic_px_sliders : R.drawable.ic_px_home));
 
@@ -111,11 +112,11 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             mAccountDockCard.setVisibility(isHome ? View.VISIBLE : View.GONE);
         }
         if (mGlobalHeader != null) {
-            mGlobalHeader.setVisibility(isHome ? View.GONE : View.VISIBLE);
+            mGlobalHeader.setVisibility((isHome || isOnboarding) ? View.GONE : View.VISIBLE);
         }
         updateHeaderTaskIndicators();
 
-        if (isHome || mPageTitleView == null || mTopActionButton == null) return;
+        if (isHome || isOnboarding || mPageTitleView == null || mTopActionButton == null) return;
 
         // Default: hide contextual top action unless screen provides one
         mTopActionButton.setVisibility(View.GONE);
@@ -198,8 +199,18 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         FragmentManager manager = getSupportFragmentManager();
         if (!value || manager.isStateSaved()) return false;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        if (fragment instanceof SelectAuthFragment) return false;
+        if (fragment instanceof SelectAuthFragment
+                || fragment instanceof OnboardingWizardFragment) {
+            return false;
+        }
         if (!(fragment instanceof MainMenuFragment)) return false;
+
+        // Guarantee a single unified first-time login flow (never stack SelectAuth + Onboarding)
+        if (OnboardingWizardFragment.shouldLaunchOnboarding()) {
+            Tools.swapFragment(this,
+                    OnboardingWizardFragment.class, OnboardingWizardFragment.TAG, null);
+            return false;
+        }
 
         Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;
@@ -242,36 +253,83 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             ExtraCore.setValue(ExtraConstants.SELECT_AUTH_METHOD, true);
             return false;
         }
-        String normalizedVersionId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
-        JVersionList.Version mcVersion = MoJsonExtras.getListedVersion(normalizedVersionId);
+        String initialNormalizedId = MoJsonExtras.normalizeVersionId(selectedInstance.versionId);
+        final String displayVersionLabel = Instance.isLatestFabricId(initialNormalizedId)
+                ? getString(R.string.profiles_latest_fabric) : initialNormalizedId;
         final Context appCtx = getApplicationContext();
         Runnable startLaunch = () -> {
-            // Run silent pre-launch advisors (InstanceHealthInspector, JavaRuntimeAdvisor,
-            // GraphicsAdvisor, GameOptimizer) off the UI thread, then verify/download & boot game.
+            // Immediately post visible launch progress, resolve latest Fabric / Mojang metadata,
+            // run non-blocking pre-flight advisors, then download/verify & launch Minecraft.
+            ProgressLayout.setProgress(ProgressLayout.DOWNLOAD_GAME, 0, R.string.newdl_starting);
             MojoApplication.sExecutorService.execute(() -> {
+                String resolvedVersionId = selectedInstance.versionId;
+                JVersionList.Version resolvedMcVersion = null;
+                try {
+                    // 1. Ensure Mojang manifest is available for symbolic IDs & Fabric inheritsFrom
+                    MoJsonExtras.ensureActiveManifestSynced();
+
+                    // 2. Materialize symbolic latest_fabric or self-heal missing Fabric profile JSON
+                    boolean wasSymbolicFabric = Instance.isLatestFabricId(resolvedVersionId);
+                    String fabricCheckedId = git.artdeell.mojo.modding.fabric.FabriclikeUtils
+                            .ensureProfileReadyForLaunch(resolvedVersionId);
+                    if (!fabricCheckedId.equals(resolvedVersionId)) {
+                        resolvedVersionId = fabricCheckedId;
+                        selectedInstance.versionId = fabricCheckedId;
+                        if (wasSymbolicFabric) {
+                            String mcPart = git.artdeell.mojo.content.ModrinthContentInstaller
+                                    .extractMinecraftVersion(fabricCheckedId);
+                            if (mcPart != null && (selectedInstance.name == null
+                                    || selectedInstance.name.trim().isEmpty()
+                                    || Instances.DEFAULT_FABRIC_PLACEHOLDER_NAME
+                                        .equalsIgnoreCase(selectedInstance.name.trim()))) {
+                                selectedInstance.name = "Fabric " + mcPart;
+                            }
+                            selectedInstance.icon = "fabric";
+                        }
+                        selectedInstance.sanitize();
+                        selectedInstance.maybeWrite();
+                        Tools.runOnUiThread(() ->
+                                ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null));
+                    }
+
+                    // 3. Resolve symbolic vanilla channels (latest_release / latest_snapshot)
+                    resolvedVersionId = MoJsonExtras.normalizeVersionId(resolvedVersionId);
+                    resolvedMcVersion = MoJsonExtras.getListedVersion(resolvedVersionId);
+                } catch (Throwable metaErr) {
+                    ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+                    Tools.showErrorRemote(metaErr);
+                    return;
+                }
+
                 try {
                     git.artdeell.mojo.utils.jre.GameRunner.runPreFlightAdvisors(
-                            appCtx, selectedInstance, normalizedVersionId);
+                            appCtx, selectedInstance, resolvedVersionId);
                 } catch (Throwable t) {
                     android.util.Log.w("LauncherActivity",
                             "Pre-flight advisor warning: " + t.getMessage());
                 }
+
+                final String finalVersionId = resolvedVersionId;
+                final JVersionList.Version finalMcVersion = resolvedMcVersion;
                 Tools.runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) return;
+                    if (isFinishing() || isDestroyed()) {
+                        ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+                        return;
+                    }
                     if (mShaderBackground != null) {
                         mShaderBackground.onPause();
                     }
                     new MoJsonDownloader().start(
                             LauncherActivity.this.getAssets(),
-                            mcVersion,
-                            normalizedVersionId,
-                            new ContextAwareDoneListener(LauncherActivity.this, normalizedVersionId)
+                            finalMcVersion,
+                            finalVersionId,
+                            new ContextAwareDoneListener(LauncherActivity.this, finalVersionId)
                     );
                 });
             });
         };
         java.io.File versionJar = new java.io.File(Tools.DIR_HOME_VERSION,
-                normalizedVersionId + "/" + normalizedVersionId + ".jar");
+                initialNormalizedId + "/" + initialNormalizedId + ".jar");
         long freeBytes = git.artdeell.mojo.utils.NetworkPolicyHelper.queryFreeDiskBytes(
                 new java.io.File(Tools.DIR_GAME_HOME));
         if (!versionJar.isFile() && freeBytes > 0L
@@ -279,7 +337,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Low Storage Warning")
                     .setMessage("Only " + git.artdeell.mojo.utils.NetworkPolicyHelper.formatBytes(freeBytes)
-                            + " of free storage remains. Downloading Minecraft " + normalizedVersionId
+                            + " of free storage remains. Downloading Minecraft " + displayVersionLabel
                             + " may fail unless you free up space first.")
                     .setPositiveButton("Continue Anyway", (d, w) -> startLaunch.run())
                     .setNegativeButton(android.R.string.cancel, null)
@@ -292,7 +350,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_WARN_MOBILE_DATA)) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Mobile Data Download")
-                    .setMessage("Minecraft " + normalizedVersionId
+                    .setMessage("Minecraft " + displayVersionLabel
                             + " needs to download game files and you are currently on a metered mobile network. Continue downloading?")
                     .setPositiveButton("Download & Launch", (d, w) -> startLaunch.run())
                     .setNegativeButton(android.R.string.cancel, null)
@@ -400,7 +458,13 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         ExtraCore.addExtraListener(ExtraConstants.REFRESH_BG_VIDEO, mRefreshBgListener);
         ExtraCore.addExtraListener(ExtraConstants.LAUNCH_GAME, mLaunchGameListener);
 
-        new AsyncVersionList().getVersionList(versions -> ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, versions));
+        new AsyncVersionList().getVersionList(versions -> {
+            ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, versions);
+            if (versions != null) {
+                Instances.ensureDefaultLatestFabricAsync();
+            }
+        });
+        Instances.ensureDefaultLatestFabricAsync();
 
         mProgressLayout.observe(ProgressLayout.DOWNLOAD_GAME);
         mProgressLayout.observe(ProgressLayout.UNPACK_RUNTIME);

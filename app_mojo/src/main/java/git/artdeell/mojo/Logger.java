@@ -38,6 +38,23 @@ public class Logger {
     /** Print the text to the log file if not censored */
     public static native void appendToLog(String text);
 
+    /**
+     * Process-safe wrapper around {@link #appendToLog(String)} that never throws
+     * {@link UnsatisfiedLinkError} when called from the {@code :launcher} process (where
+     * {@code libmojort.so} is not loaded) or from host JVM unit tests.
+     */
+    public static void appendToLogSafe(@Nullable String text) {
+        if (text == null) return;
+        try {
+            appendToLog(text);
+        } catch (UnsatisfiedLinkError ignored) {
+            try {
+                android.util.Log.i("ZyroxLog", text);
+            } catch (Throwable ignoredToo) {
+            }
+        }
+    }
+
     /** Reset the log file, effectively erasing any previous logs */
     public static native void begin(String logFilePath);
 
