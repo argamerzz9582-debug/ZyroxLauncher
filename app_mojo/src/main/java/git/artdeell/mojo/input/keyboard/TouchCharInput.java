@@ -182,7 +182,17 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
         boolean prevSpace = true;
         for (int i = 0; i < rawText.length() && sb.length() < 256; i++) {
             char c = rawText.charAt(i);
-            if (c < 0x20 || c == 0x7F || c == '\u00A7') {
+            if (c == '\u00A7') {
+                if (i + 1 < rawText.length()) {
+                    char fmt = Character.toLowerCase(rawText.charAt(i + 1));
+                    if ((fmt >= '0' && fmt <= '9') || (fmt >= 'a' && fmt <= 'f')
+                            || (fmt >= 'k' && fmt <= 'o') || fmt == 'r' || fmt == 'x') {
+                        i++;
+                    }
+                }
+                continue;
+            }
+            if (c < 0x20 || c == 0x7F) {
                 c = ' ';
             }
             if (Character.isWhitespace(c)) {
