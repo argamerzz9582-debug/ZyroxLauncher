@@ -43,6 +43,7 @@ import git.artdeell.mojo.fragments.InstanceEditorFragment;
 import git.artdeell.mojo.fragments.LocalLoginFragment;
 import git.artdeell.mojo.fragments.LogInspectorFragment;
 import git.artdeell.mojo.fragments.MainMenuFragment;
+import git.artdeell.mojo.fragments.OnboardingWizardFragment;
 import git.artdeell.mojo.fragments.MicrosoftLoginFragment;
 import git.artdeell.mojo.fragments.ModVersionListFragment;
 import git.artdeell.mojo.fragments.ProfileTypeSelectFragment;
@@ -286,7 +287,6 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                             }
                             selectedInstance.icon = "fabric";
                         }
-                        selectedInstance.sanitize();
                         selectedInstance.maybeWrite();
                         Tools.runOnUiThread(() ->
                                 ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null));
