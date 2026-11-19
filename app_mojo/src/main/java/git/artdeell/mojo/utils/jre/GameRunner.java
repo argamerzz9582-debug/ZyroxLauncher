@@ -294,16 +294,16 @@ public class GameRunner {
             try {
                 ModrinthContentInstaller.InstallSummary fpsSum =
                         ModrinthContentInstaller.installZeroLagFpsPack(instance, wantIris, null);
-                Logger.appendToLog("Zyrox Pre-Flight: " + fpsSum.message);
+                Logger.appendToLogSafe("Zyrox Pre-Flight: " + fpsSum.message);
             } catch (Throwable t) {
-                Logger.appendToLog("Zyrox Pre-Flight: deferred FPS pack skipped (" + t.getMessage() + ")");
+                Logger.appendToLogSafe("Zyrox Pre-Flight: deferred FPS pack skipped (" + t.getMessage() + ")");
             }
         }
 
         String summary = "Java " + requiredJava + " (" + (chosenRtName.isEmpty() ? "auto" : chosenRtName)
                 + "), renderer=" + chosenRenderer + ", mode=" + optMode
                 + ", scale=" + scalePercent + "%, repairs=" + repairedCount;
-        Logger.appendToLog("Zyrox Pre-Flight Advisor: " + summary);
+        Logger.appendToLogSafe("Zyrox Pre-Flight Advisor: " + summary);
         return new PreFlightReport(
                 requiredJava, chosenRtName, chosenRenderer, optMode, scalePercent, repairedCount, summary);
     }

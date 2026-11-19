@@ -24,6 +24,29 @@ public class MoJsonExtras {
         return cached;
     }
 
+    /**
+     * Ensures the official Mojang release manifest is populated on a worker thread so cold-start
+     * Play taps, symbolic channels, and Fabric {@code inheritsFrom} lookups always succeed.
+     */
+    @Nullable
+    public static JVersionList ensureActiveManifestSynced() {
+        JVersionList current = getActiveManifest();
+        if (current != null && current.versions != null && current.versions.length > 0) {
+            return current;
+        }
+        try {
+            git.artdeell.mojo.metadata.LocalMetadataCache.SyncResult<JVersionList> synced =
+                    VersionMetadataRepository.getInstance().getMojangProvider().syncManifest(false);
+            if (synced != null && synced.data != null) {
+                ExtraCore.setValue(ExtraConstants.RELEASE_TABLE, synced.data);
+                return synced.data;
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("MoJsonExtras", "Manifest sync before launch failed: " + t.getMessage());
+        }
+        return current;
+    }
+
     public static String normalizeVersionId(String versionString) {
         if (versionString == null) return null;
         return MojangVersionProvider.resolveSymbolicVersionId(versionString, getActiveManifest());

@@ -40,6 +40,7 @@ public class OAuthFragment extends WebViewCompletionFragment {
         String error = uri.getQueryParameter(QUERY_ERROR_NAME);
         String code = uri.getQueryParameter(QUERY_OAUTH_CODE);
         if(code == null) {
+            OnboardingWizardFragment.cancelPendingOAuthReturn();
             activity.onBackPressed();
             // Access denied - means the user exited out of the oauth dialog. Just leave the fragment
             if(ERROR_ACCESS_DENIED.equals(error)) return;
@@ -47,9 +48,16 @@ public class OAuthFragment extends WebViewCompletionFragment {
             displayError(activity, uri);
             return;
         }
+        boolean resumeOnboarding = OnboardingWizardFragment.consumePendingOAuthReturn();
         // Captured by the listener in the mcAccountSpinner
         ExtraCore.setValue(mExtraCoreConstant, code);
         Toast.makeText(activity, R.string.oauth_web_complete, Toast.LENGTH_SHORT).show();
         Tools.backToMainMenu(activity);
+        if (resumeOnboarding && !activity.getSupportFragmentManager().isStateSaved()) {
+            android.os.Bundle args = new android.os.Bundle(1);
+            args.putInt(OnboardingWizardFragment.ARG_INITIAL_STEP, 2);
+            Tools.swapFragment(activity,
+                    OnboardingWizardFragment.class, OnboardingWizardFragment.TAG, args);
+        }
     }
 }

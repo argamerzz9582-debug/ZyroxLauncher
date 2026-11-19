@@ -91,6 +91,9 @@ public final class GameOptionsUtils {
         overrides.put("biomeBlendRadius", "1");
         overrides.put("mipmapLevels", "2");
         overrides.put("entityDistanceScaling", "0.75");
+        overrides.put("fullscreen", "false");
+        overrides.put("narrator", "0");
+        overrides.put("onboardAccessibility", "false");
         if (pvpMode) {
             overrides.put("bobView", "false");
             overrides.put("autoJump", "false");
@@ -117,6 +120,9 @@ public final class GameOptionsUtils {
         overrides.put("maxFps", "120");
         overrides.put("biomeBlendRadius", "2");
         overrides.put("autoJump", "false");
+        overrides.put("fullscreen", "false");
+        overrides.put("narrator", "0");
+        overrides.put("onboardAccessibility", "false");
         return applyOptionOverrides(gameDir, overrides);
     }
 

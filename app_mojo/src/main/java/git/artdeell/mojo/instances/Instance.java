@@ -25,6 +25,38 @@ public class Instance extends DisplayInstance {
 
     public static final String VERSION_LATEST_RELEASE = "latest_release";
     public static final String VERSION_LATEST_SNAPSHOT = "latest_snapshot";
+    public static final String VERSION_LATEST_FABRIC = "latest_fabric";
+
+    /** Matches both {@code "latest_fabric"} and {@code "latest-fabric"} (case-insensitive). */
+    public static boolean isLatestFabricId(@Nullable String versionId) {
+        if (versionId == null) return false;
+        String trimmed = versionId.trim();
+        return VERSION_LATEST_FABRIC.equalsIgnoreCase(trimmed)
+                || "latest-fabric".equalsIgnoreCase(trimmed);
+    }
+
+    /** Matches both {@code "latest_release"} and {@code "latest-release"} (case-insensitive). */
+    public static boolean isLatestReleaseId(@Nullable String versionId) {
+        if (versionId == null) return false;
+        String trimmed = versionId.trim();
+        return VERSION_LATEST_RELEASE.equalsIgnoreCase(trimmed)
+                || "latest-release".equalsIgnoreCase(trimmed);
+    }
+
+    /** Matches both {@code "latest_snapshot"} and {@code "latest-snapshot"} (case-insensitive). */
+    public static boolean isLatestSnapshotId(@Nullable String versionId) {
+        if (versionId == null) return false;
+        String trimmed = versionId.trim();
+        return VERSION_LATEST_SNAPSHOT.equalsIgnoreCase(trimmed)
+                || "latest-snapshot".equalsIgnoreCase(trimmed);
+    }
+
+    /** Returns {@code true} if {@code versionId} is a dynamic symbolic channel alias. */
+    public static boolean isSymbolicVersionId(@Nullable String versionId) {
+        return isLatestFabricId(versionId)
+                || isLatestReleaseId(versionId)
+                || isLatestSnapshotId(versionId);
+    }
 
     public static final String PRESET_BATTERY = "battery";
     public static final String PRESET_BALANCED = "balanced";

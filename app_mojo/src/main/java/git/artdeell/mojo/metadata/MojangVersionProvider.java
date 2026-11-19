@@ -197,22 +197,27 @@ public class MojangVersionProvider {
     }
 
     /**
-     * Resolves symbolic instance version IDs ({@code latest-release}, {@code latest-snapshot})
-     * dynamically against the synced Mojang manifest with zero hardcoded version names.
+     * Resolves symbolic instance version IDs ({@code latest_release}/{@code latest-release},
+     * {@code latest_snapshot}/{@code latest-snapshot}) dynamically against the synced Mojang
+     * manifest with zero hardcoded version names.
      */
     @NonNull
-    public static String resolveSymbolicVersionId(@NonNull String versionId,
+    public static String resolveSymbolicVersionId(@Nullable String versionId,
                                                   @Nullable JVersionList manifest) {
-        if (manifest == null) return versionId;
-        if ("latest-release".equals(versionId)) {
+        if (versionId == null) return "";
+        String trimmed = versionId.trim();
+        if (manifest == null || trimmed.isEmpty()) return trimmed;
+        if ("latest-release".equalsIgnoreCase(trimmed)
+                || "latest_release".equalsIgnoreCase(trimmed)) {
             String resolved = findLatestByType(manifest, TYPE_RELEASE);
-            return resolved != null ? resolved : versionId;
+            return resolved != null ? resolved : trimmed;
         }
-        if ("latest-snapshot".equals(versionId)) {
+        if ("latest-snapshot".equalsIgnoreCase(trimmed)
+                || "latest_snapshot".equalsIgnoreCase(trimmed)) {
             String resolved = findLatestByType(manifest, TYPE_SNAPSHOT);
-            return resolved != null ? resolved : versionId;
+            return resolved != null ? resolved : trimmed;
         }
-        return versionId;
+        return trimmed;
     }
 
     @Nullable

@@ -115,6 +115,8 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_CONTEXT_CONTROLS = true;
     /** Remembers whether the user expanded Advanced / Pro Mode inside InstanceEditorFragment. */
     public static boolean PREF_ZYROX_INSTANCE_PRO_MODE = false;
+    /** True once the default selected launcher profile has been initialized to Latest Stable Fabric. */
+    public static boolean PREF_ZYROX_DEFAULT_FABRIC_READY = false;
 
     public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
     public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
@@ -127,6 +129,7 @@ public class LauncherPreferences {
     public static final String KEY_ZYROX_ONBOARDING_DONE = "zyroxOnboardingDone";
     public static final String KEY_ZYROX_CONTEXT_CONTROLS = "zyroxContextControls";
     public static final String KEY_ZYROX_INSTANCE_PRO_MODE = "zyroxInstanceProMode";
+    public static final String KEY_ZYROX_DEFAULT_FABRIC_READY = "zyroxDefaultFabricReady";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -204,6 +207,7 @@ public class LauncherPreferences {
         PREF_ZYROX_ONBOARDING_DONE = DEFAULT_PREF.getBoolean(KEY_ZYROX_ONBOARDING_DONE, false);
         PREF_ZYROX_CONTEXT_CONTROLS = DEFAULT_PREF.getBoolean(KEY_ZYROX_CONTEXT_CONTROLS, true);
         PREF_ZYROX_INSTANCE_PRO_MODE = DEFAULT_PREF.getBoolean(KEY_ZYROX_INSTANCE_PRO_MODE, false);
+        PREF_ZYROX_DEFAULT_FABRIC_READY = DEFAULT_PREF.getBoolean(KEY_ZYROX_DEFAULT_FABRIC_READY, false);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

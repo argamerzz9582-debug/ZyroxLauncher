@@ -81,9 +81,11 @@ public class InstanceAdapter extends BaseAdapter {
         String profileName = Tools.validOrNullString(i.name);
         String versionName = Tools.validOrNullString(i.versionId);
 
-        if (Instance.VERSION_LATEST_RELEASE.equalsIgnoreCase(versionName))
+        if (Instance.isLatestFabricId(versionName))
+            versionName = v.getContext().getString(R.string.profiles_latest_fabric);
+        else if (Instance.isLatestReleaseId(versionName))
             versionName = v.getContext().getString(R.string.profiles_latest_release);
-        else if (Instance.VERSION_LATEST_SNAPSHOT.equalsIgnoreCase(versionName))
+        else if (Instance.isLatestSnapshotId(versionName))
             versionName = v.getContext().getString(R.string.profiles_latest_snapshot);
 
         String baseTitle;

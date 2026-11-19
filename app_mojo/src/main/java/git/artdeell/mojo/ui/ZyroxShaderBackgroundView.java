@@ -47,8 +47,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
      */
     public static void releaseAllForGameStart() {
         ZyroxGifDecoder.cancelAllActiveDecodes();
-        ZyroxSeamlessGifView.purgeAllActiveInstances(false);
-        ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+        ZyroxLoopingVideoView.suspendLauncherBackdrops();
         Runnable task = () -> {
             java.util.List<ZyroxShaderBackgroundView> snapshot = new java.util.ArrayList<>();
             synchronized (ACTIVE_BACKDROPS) {

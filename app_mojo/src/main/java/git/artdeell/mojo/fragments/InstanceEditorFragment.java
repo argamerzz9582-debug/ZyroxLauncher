@@ -1269,9 +1269,11 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
             String name = Tools.validOrNullString(item.name);
             String ver = Tools.validOrNullString(item.versionId);
-            if (Instance.VERSION_LATEST_RELEASE.equalsIgnoreCase(ver)) {
+            if (Instance.isLatestFabricId(ver)) {
+                ver = holder.itemView.getContext().getString(R.string.profiles_latest_fabric);
+            } else if (Instance.isLatestReleaseId(ver)) {
                 ver = holder.itemView.getContext().getString(R.string.profiles_latest_release);
-            } else if (Instance.VERSION_LATEST_SNAPSHOT.equalsIgnoreCase(ver)) {
+            } else if (Instance.isLatestSnapshotId(ver)) {
                 ver = holder.itemView.getContext().getString(R.string.profiles_latest_snapshot);
             }
             holder.title.setText(name != null ? name : (ver != null ? ver : getString(R.string.unnamed)));

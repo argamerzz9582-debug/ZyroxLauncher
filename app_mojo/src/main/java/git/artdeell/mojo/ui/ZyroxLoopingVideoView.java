@@ -85,9 +85,36 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
     }
 
     /**
+     * Suspends strictly launcher-shell video backdrops ({@link #mLauncherBackdropRole}) without
+     * interfering with {@code GameActivity}'s live loading screen view before its first layout pass.
+     */
+    public static void suspendLauncherBackdrops() {
+        Runnable task = () -> {
+            java.util.List<ZyroxLoopingVideoView> targets = new java.util.ArrayList<>();
+            synchronized (ACTIVE_VIDEO_VIEWS) {
+                for (int i = ACTIVE_VIDEO_VIEWS.size() - 1; i >= 0; i--) {
+                    ZyroxLoopingVideoView cur = ACTIVE_VIDEO_VIEWS.get(i).get();
+                    if (cur == null || cur.mReleased) {
+                        ACTIVE_VIDEO_VIEWS.remove(i);
+                    } else if (cur.mLauncherBackdropRole) {
+                        targets.add(cur);
+                    }
+                }
+            }
+            for (ZyroxLoopingVideoView v : targets) {
+                v.suspendForBackground(true);
+            }
+        };
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            task.run();
+        } else {
+            MAIN_HANDLER.post(task);
+        }
+    }
+
+    /**
      * Immediately pauses and releases hardware {@link MediaPlayer} decoders, {@link Surface}s,
-     * and background poster bitmaps across all inactive (or launcher-scoped) video views to prevent
-     * Android LMK / OOM kills on 4 GB – 6 GB RAM devices when {@code GameService} starts.
+     * and background poster bitmaps across all detached/hidden (or launcher-scoped) video views.
      */
     public static void suspendInactiveDecoders(final boolean includeLauncherBackdrops) {
         Runnable task = () -> {
@@ -97,7 +124,7 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
                     ZyroxLoopingVideoView cur = ACTIVE_VIDEO_VIEWS.get(i).get();
                     if (cur == null || cur.mReleased) {
                         ACTIVE_VIDEO_VIEWS.remove(i);
-                    } else if (!cur.isShown()
+                    } else if ((cur.getVisibility() != View.VISIBLE)
                             || (includeLauncherBackdrops && cur.mLauncherBackdropRole)) {
                         targets.add(cur);
                     }
