@@ -217,14 +217,23 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
         setupFourTabAndSimpleProUi(view, controlSelectListener);
 
-        Instance selectedInstance = Instances.loadSelectedInstance();
-        if (selectedInstance == null) {
-            Toast.makeText(context, R.string.no_instance, Toast.LENGTH_LONG).show();
-            getParentFragmentManager().popBackStack();
-        } else {
-            loadValues(selectedInstance, context);
-            reloadInstanceRail();
-        }
+        // Load selected instance JSON strictly off the UI thread
+        final Context appCtx = context.getApplicationContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            final Instance selectedInstance = Instances.loadSelectedInstance();
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (selectedInstance == null) {
+                    Toast.makeText(appCtx, R.string.no_instance, Toast.LENGTH_LONG).show();
+                    if (!getParentFragmentManager().isStateSaved()) {
+                        getParentFragmentManager().popBackStack();
+                    }
+                } else {
+                    loadValues(selectedInstance, requireContext());
+                    reloadInstanceRail();
+                }
+            });
+        });
     }
 
     private void setupRamSlider(@NonNull Context context) {
@@ -271,28 +280,48 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
             }
         }
 
-        // Append non-hardcoded Java runtime compatibility guidance when local version JSON is installed
-        if (mInstance != null && Tools.isValidString(mInstance.versionId)) {
-            try {
-                JVersionList.Version vInfo = Tools.getVersionInfo(mInstance.versionId);
-                if (vInfo != null) {
-                    int reqJava = JavaRuntimeAdvisor.resolveRequiredJava(vInfo, mInstance.versionId);
-                    Runtime selectedRt = mInstance.selectedRuntime != null
-                            ? MultiRTUtils.read(mInstance.selectedRuntime) : null;
-                    JavaRuntimeAdvisor.Advice jre = JavaRuntimeAdvisor.evaluate(
-                            reqJava, mInstance.versionId, selectedRt, MultiRTUtils.getRuntimes(), null);
-                    baseHint = baseHint + "  •  " + jre.badgeText;
+        final String initialHint = baseHint;
+        mRendererHint.setText(initialHint);
+
+        // Inspect installed version JSON, JRE metadata, and Vulkan driver info off the UI thread
+        final Instance snap = mInstance;
+        if (snap != null && (Tools.isValidString(snap.versionId) || snap.hasCustomVulkanDriver())) {
+            final String snapVer = snap.versionId;
+            final String snapRt = snap.selectedRuntime;
+            MojoApplication.sExecutorService.execute(() -> {
+                StringBuilder extra = new StringBuilder();
+                if (Tools.isValidString(snapVer)) {
+                    try {
+                        JVersionList.Version vInfo = Tools.getVersionInfo(snapVer);
+                        if (vInfo != null) {
+                            int reqJava = JavaRuntimeAdvisor.resolveRequiredJava(vInfo, snapVer);
+                            Runtime selectedRt = snapRt != null ? MultiRTUtils.read(snapRt) : null;
+                            JavaRuntimeAdvisor.Advice jre = JavaRuntimeAdvisor.evaluate(
+                                    reqJava, snapVer, selectedRt, MultiRTUtils.getRuntimes(), null);
+                            extra.append("  •  ").append(jre.badgeText);
+                        }
+                    } catch (Throwable ignored) {
+                    }
                 }
-            } catch (Throwable ignored) {
-            }
+                if (snap.hasCustomVulkanDriver()) {
+                    try {
+                        git.artdeell.mojo.vulkan.driver.Driver bound =
+                                git.artdeell.mojo.vulkan.DriverManager.resolveDriverForInstance(snap);
+                        extra.append("  •  GPU Driver: ")
+                                .append(git.artdeell.mojo.vulkan.DriverManager.formatDriverLabel(bound));
+                    } catch (Throwable ignored) {
+                    }
+                }
+                if (extra.length() > 0) {
+                    final String combined = initialHint + extra;
+                    Tools.runOnUiThread(() -> {
+                        if (isAdded() && mRendererHint != null && mInstance == snap) {
+                            mRendererHint.setText(combined);
+                        }
+                    });
+                }
+            });
         }
-        if (mInstance != null && mInstance.hasCustomVulkanDriver()) {
-            git.artdeell.mojo.vulkan.driver.Driver bound =
-                    git.artdeell.mojo.vulkan.DriverManager.resolveDriverForInstance(mInstance);
-            baseHint = baseHint + "  •  GPU Driver: "
-                    + git.artdeell.mojo.vulkan.DriverManager.formatDriverLabel(bound);
-        }
-        mRendererHint.setText(baseHint);
     }
 
     private void showStudioToolsMenu() {
@@ -548,26 +577,32 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     }
 
     private void promptRestoreInstanceBackup() {
-        File backupRoot = getInstanceBackupDirectory();
-        File[] zips = backupRoot.listFiles(f -> f.isFile() && f.getName().endsWith(".zip"));
-        if (zips == null || zips.length == 0) {
-            Toast.makeText(requireContext(), "No instance backup archives found yet.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Arrays.sort(zips, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-        String[] labels = new String[zips.length];
-        for (int i = 0; i < zips.length; i++) {
-            labels[i] = zips[i].getName() + " (" + ZyroxStudioUi.formatBytes(zips[i].length()) + ")";
-        }
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Restore Instance Backup (Creates New Isolated Copy)")
-                .setItems(labels, (d, which) -> {
-                    final File chosen = zips[which];
-                    MojoApplication.sExecutorService.execute(() -> {
-                        try {
-                            Instance restored = InstanceManager.restoreInstanceBackup(
-                                    chosen, Instances.getInstancesDirectory());
-                            Instances.setSelectedInstance(restored);
+        final File backupRoot = getInstanceBackupDirectory();
+        final Context appCtx = requireContext().getApplicationContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            final File[] zips = backupRoot.listFiles(
+                    f -> f.isFile() && f.getName().toLowerCase(Locale.ROOT).endsWith(".zip"));
+            if (zips == null || zips.length == 0) {
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "No instance backup archives found yet.", Toast.LENGTH_SHORT).show());
+                return;
+            }
+            Arrays.sort(zips, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+            final String[] labels = new String[zips.length];
+            for (int i = 0; i < zips.length; i++) {
+                labels[i] = zips[i].getName() + " (" + ZyroxStudioUi.formatBytes(zips[i].length()) + ")";
+            }
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Restore Instance Backup (Creates New Isolated Copy)")
+                        .setItems(labels, (d, which) -> {
+                            final File chosen = zips[which];
+                            MojoApplication.sExecutorService.execute(() -> {
+                                try {
+                                    Instance restored = InstanceManager.restoreInstanceBackup(
+                                            chosen, Instances.getInstancesDirectory());
+                                    Instances.setSelectedInstance(restored);
                             Tools.runOnUiThread(() -> {
                                 if (!isAdded()) return;
                                 loadValues(restored, requireContext());
@@ -586,6 +621,8 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+            });
+        });
     }
 
     private void showImpactAwareDeleteDialog() {
@@ -666,38 +703,41 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     }
 
     private View.OnClickListener getControlSelectListener() {
-        return v -> {
-            Context ctx = v.getContext();
-            List<File> saved = git.artdeell.mojo.input.ControlProfileManager.listControlFiles();
-            if (saved.isEmpty()) {
-                mOpenControlLayoutLauncher.launch(null);
-                return;
-            }
-            String[] names = new String[saved.size() + 1];
-            names[0] = ctx.getString(R.string.global_default);
-            for (int i = 0; i < saved.size(); i++) {
-                names[i + 1] = saved.get(i).getName();
-            }
-            new AlertDialog.Builder(ctx)
-                    .setTitle(R.string.mcl_option_customcontrol)
-                    .setItems(names, (dialog, which) -> {
-                        if (which == 0) {
-                            mSelectedControlLayout = null;
-                            if (mInstance != null) mInstance.controlLayout = null;
-                            mDefaultControl.setText("");
-                            syncOverviewControlQuickLabel("");
-                        } else {
-                            File chosen = saved.get(which - 1);
-                            mSelectedControlLayout = chosen.getAbsolutePath();
-                            mDefaultControl.setText(chosen.getName());
-                            syncOverviewControlQuickLabel(chosen.getName());
-                        }
-                    })
-                    .setNeutralButton(R.string.zyrox_action_import,
-                            (d, w) -> mOpenControlLayoutLauncher.launch(null))
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show();
-        };
+        return v -> MojoApplication.sExecutorService.execute(() -> {
+            final List<File> saved = git.artdeell.mojo.input.ControlProfileManager.listControlFiles();
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                Context ctx = requireContext();
+                if (saved.isEmpty()) {
+                    mOpenControlLayoutLauncher.launch(null);
+                    return;
+                }
+                String[] names = new String[saved.size() + 1];
+                names[0] = ctx.getString(R.string.global_default);
+                for (int i = 0; i < saved.size(); i++) {
+                    names[i + 1] = saved.get(i).getName();
+                }
+                new AlertDialog.Builder(ctx)
+                        .setTitle(R.string.mcl_option_customcontrol)
+                        .setItems(names, (dialog, which) -> {
+                            if (which == 0) {
+                                mSelectedControlLayout = null;
+                                if (mInstance != null) mInstance.controlLayout = null;
+                                mDefaultControl.setText("");
+                                syncOverviewControlQuickLabel("");
+                            } else {
+                                File chosen = saved.get(which - 1);
+                                mSelectedControlLayout = chosen.getAbsolutePath();
+                                mDefaultControl.setText(chosen.getName());
+                                syncOverviewControlQuickLabel(chosen.getName());
+                            }
+                        })
+                        .setNeutralButton(R.string.zyrox_action_import,
+                                (d, w) -> mOpenControlLayoutLauncher.launch(null))
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
     }
 
     private View.OnClickListener getVersionSelectListener() {
@@ -922,26 +962,30 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     private void runOneTapZeroLagFpsPack() {
         if (mInstance == null || !isAdded()) return;
         final Instance target = mInstance;
-        final Context appCtx = requireContext().getApplicationContext();
-        Toast.makeText(appCtx,
-                "Installing Zero-Lag FPS Pack (Sodium, Lithium, FerriteCore, ImmediatelyFast) + tuning options.txt…",
-                Toast.LENGTH_SHORT).show();
-        MojoApplication.sExecutorService.execute(() -> {
-            try {
-                git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
-                        target, "before-fps-pack");
-                git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary res =
-                        git.artdeell.mojo.content.ModrinthContentInstaller.installZeroLagFpsPack(
-                                target, false, null);
-                Tools.runOnUiThread(() -> {
-                    Toast.makeText(appCtx, res.message, Toast.LENGTH_LONG).show();
-                    if (isAdded()) refreshContentAndSnapshotSummary();
-                });
-            } catch (Exception e) {
-                Tools.runOnUiThread(() -> Toast.makeText(
-                        appCtx, "FPS Pack: " + e.getMessage(), Toast.LENGTH_LONG).show());
-            }
-        });
+        git.artdeell.mojo.content.ContentStudioActions.UiHost uiHost =
+                new git.artdeell.mojo.content.ContentStudioActions.UiHost() {
+                    @Nullable
+                    @Override
+                    public Context getHostContext() {
+                        return isAdded() ? getContext() : null;
+                    }
+
+                    @Override
+                    public boolean isHostActive() {
+                        return isAdded() && getContext() != null;
+                    }
+
+                    @Override
+                    public void onContentMutated() {
+                        if (!isAdded()) return;
+                        if (mInstance == target && mDefaultVersion != null) {
+                            mDefaultVersion.setText(target.versionId);
+                        }
+                        refreshContentAndSnapshotSummary();
+                        reloadInstanceRail();
+                    }
+                };
+        git.artdeell.mojo.content.ContentStudioActions.promptFpsBoostInstall(uiHost, target, false);
     }
 
     private void showPreModSnapshotRollbackDialog() {
@@ -1068,16 +1112,23 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
     private void loadValues(@NonNull Instance instance, @NonNull Context context) {
         mInstance = instance;
-        mInstanceIcon.setImageDrawable(InstanceIconProvider.fetchIcon(getResources(), instance));
-
-        List<Runtime> runtimes = MultiRTUtils.getRuntimes();
-        int jvmIndex = -1;
-        if (instance.selectedRuntime != null) {
-            jvmIndex = runtimes.indexOf(new Runtime(instance.selectedRuntime));
-        }
-        mDefaultRuntime.setAdapter(new RTSpinnerAdapter(context, runtimes));
-        if (jvmIndex == -1) jvmIndex = Math.max(0, runtimes.size() - 1);
-        if (!runtimes.isEmpty()) mDefaultRuntime.setSelection(jvmIndex);
+        // Scan installed JRE runtimes and decode custom instance icon strictly off the UI thread
+        final String wantedRuntime = instance.selectedRuntime;
+        MojoApplication.sExecutorService.execute(() -> {
+            final List<Runtime> runtimes = MultiRTUtils.getRuntimes();
+            int computedIdx = -1;
+            if (wantedRuntime != null) {
+                computedIdx = runtimes.indexOf(new Runtime(wantedRuntime));
+            }
+            if (computedIdx == -1) computedIdx = Math.max(0, runtimes.size() - 1);
+            final int finalIdx = computedIdx;
+            Tools.runOnUiThread(() -> {
+                if (!isAdded() || mInstance != instance || mDefaultRuntime == null) return;
+                mInstanceIcon.setImageDrawable(InstanceIconProvider.fetchIcon(getResources(), instance));
+                mDefaultRuntime.setAdapter(new RTSpinnerAdapter(requireContext(), runtimes));
+                if (!runtimes.isEmpty()) mDefaultRuntime.setSelection(finalIdx);
+            });
+        });
 
         int rendererIndex = mRenderNames.indexOf(instance.getLaunchRenderer());
         if (rendererIndex == -1) {
@@ -1231,12 +1282,18 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     @Override
     public void onCropped(Bitmap contentBitmap) {
         mInstanceIcon.setImageBitmap(contentBitmap);
-        try {
-            mInstance.encodeNewIcon(contentBitmap);
-            reloadInstanceRail();
-        } catch (IOException e) {
-            Tools.showErrorRemote(e);
-        }
+        final Instance target = mInstance;
+        if (target == null) return;
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                target.encodeNewIcon(contentBitmap);
+                Tools.runOnUiThread(() -> {
+                    if (isAdded()) reloadInstanceRail();
+                });
+            } catch (IOException e) {
+                Tools.showErrorRemote(e);
+            }
+        });
     }
 
     @Override
@@ -1283,18 +1340,22 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
             holder.itemView.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION || pos == mSelected) return;
-                DisplayInstance clicked = mList.get(pos);
-                Instances.setSelectedInstance(clicked);
+                final DisplayInstance clicked = mList.get(pos);
+                final int prev = mSelected;
+                mSelected = pos;
+                notifyItemChanged(prev);
+                notifyItemChanged(mSelected);
                 mSelectedControlLayout = null;
-                Instance full = Instances.loadSelectedInstance();
-                if (full != null && getContext() != null) {
-                    int prev = mSelected;
-                    mSelected = pos;
-                    notifyItemChanged(prev);
-                    notifyItemChanged(mSelected);
-                    loadValues(full, getContext());
-                    ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
-                }
+                MojoApplication.sExecutorService.execute(() -> {
+                    Instances.setSelectedInstance(clicked);
+                    final Instance full = Instances.loadSelectedInstance();
+                    Tools.runOnUiThread(() -> {
+                        if (full != null && isAdded() && getContext() != null) {
+                            loadValues(full, getContext());
+                            ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+                        }
+                    });
+                });
             });
         }
 

@@ -222,12 +222,26 @@ public class PerformanceHudOverlay extends AppCompatTextView
     private String mPeakThermalLabel = "OK";
     private int mPeakThermalRank = -1;
     @Nullable private String mThermalGovernorBadge;
+    @Nullable private String mWaypointBadge;
 
     /** Updates the live Thermal &amp; Battery Governor status badge (e.g. {@code "THM 80%"}). */
     public void setThermalGovernorBadge(@Nullable String badge) {
         mThermalGovernorBadge = (badge != null && !badge.trim().isEmpty()) ? badge.trim() : null;
         if (mMonitoring && getVisibility() == VISIBLE) {
             invalidate();
+        }
+    }
+
+    /** Updates the pinned Coordinate / Death Waypoint line on the HUD without client mods or F3. */
+    public void setWaypointBadge(@Nullable String badge) {
+        String clean = (badge != null && !badge.trim().isEmpty()) ? badge.trim() : null;
+        if ((mWaypointBadge == null && clean == null)
+                || (mWaypointBadge != null && mWaypointBadge.equals(clean))) {
+            return;
+        }
+        mWaypointBadge = clean;
+        if (mMonitoring && getVisibility() == VISIBLE) {
+            refreshDisplayMetrics();
         }
     }
 
@@ -989,6 +1003,9 @@ public class PerformanceHudOverlay extends AppCompatTextView
             if (mThermalGovernorBadge != null) {
                 mTextBuilder.append(" • ").append(mThermalGovernorBadge);
             }
+            if (mWaypointBadge != null) {
+                mTextBuilder.append(" • ").append(mWaypointBadge);
+            }
         } else {
             int scalePct = Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f);
             long uptimeSec = Math.max(0L, (SystemClock.elapsedRealtime() - mSessionStartMs) / 1000L);
@@ -1021,6 +1038,9 @@ public class PerformanceHudOverlay extends AppCompatTextView
                     uptimeSec / 60L, uptimeSec % 60L));
             if (mLocked) {
                 mTextBuilder.append(" [LOCK]");
+            }
+            if (mWaypointBadge != null) {
+                mTextBuilder.append('\n').append(mWaypointBadge);
             }
         }
         setText(mTextBuilder.toString());

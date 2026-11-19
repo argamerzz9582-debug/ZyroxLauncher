@@ -12,17 +12,63 @@
     android:paddingHorizontal="10dp"
     android:paddingVertical="7dp">
 
-    <TextView
-        android:id="@+id/tv_mod_version_name"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:layout_marginEnd="8dp"
-        android:textColor="@color/zyrox_text_primary"
-        android:textSize="11.5sp"
-        android:maxLines="2"
-        android:ellipsize="end"
-        tools:text="1.20.4 — v5.12.1 (Fabric)" />
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_mod_version_recommended"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_zyrox_badge_info"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:text="RECOMMENDED"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="8.5sp"
+                android:singleLine="true"
+                android:includeFontPadding="false"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/tv_mod_version_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="11.5sp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                tools:text="1.21.4 — v0.6.5" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_mod_version_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/zyrox_text_secondary"
+            android:textSize="9.5sp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Stable Release • Fabric • Auto-deps" />
+    </LinearLayout>
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/btn_mod_version_install"

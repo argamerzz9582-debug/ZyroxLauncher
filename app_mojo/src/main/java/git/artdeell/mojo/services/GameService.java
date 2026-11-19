@@ -42,14 +42,17 @@ public class GameService extends Service {
         return svc != null && (svc.mServiceRunning || svc.mLocalBinder.isActive);
     }
 
-    /** Purges launcher-shell GIF/video/shader backdrops without disrupting GameActivity's loading view. */
-    private static void reclaimLauncherMediaMemory(boolean emergencyLowMemory) {
+    /**
+     * Releases all background GIF decode workers, recycled bitmap frames, looping video decoders,
+     * and shader backdrop surfaces so zero launcher media memory remains pinned when the JVM runs.
+     */
+    public static void reclaimLauncherMediaMemory(boolean releaseAllGifBitmaps) {
         try {
             ZyroxGifDecoder.cancelAllActiveDecodes();
             ZyroxLoopingVideoView.suspendLauncherBackdrops();
             ZyroxShaderBackgroundView.releaseAllForGameStart();
-            if (emergencyLowMemory) {
-                ZyroxSeamlessGifView.purgeAllActiveInstances(false);
+            if (releaseAllGifBitmaps) {
+                ZyroxSeamlessGifView.purgeAllActiveInstances(true);
                 ZyroxLoopingVideoView.suspendInactiveDecoders(true);
             }
         } catch (Throwable ignored) {
@@ -68,6 +71,8 @@ public class GameService extends Service {
         if(intent != null && intent.getBooleanExtra("kill", false)) {
             mServiceRunning = false;
             mLocalBinder.isActive = false;
+            reclaimLauncherMediaMemory(true);
+            git.artdeell.mojo.servers.ZyroxRoomBridge.stopAll();
             stopSelf();
             Process.killProcess(Process.myPid());
             return START_NOT_STICKY;
@@ -122,12 +127,16 @@ public class GameService extends Service {
         mServiceRunning = false;
         mLocalBinder.isActive = false;
         sGameService = new WeakReference<>(null);
+        reclaimLauncherMediaMemory(true);
+        git.artdeell.mojo.servers.ZyroxRoomBridge.stopAll();
         super.onDestroy();
     }
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        //At this point in time  only the game runs and the user poofed the window, time to die
+        //At this point in time only the game runs and the user closed the task; release sockets & bitmaps
+        reclaimLauncherMediaMemory(true);
+        git.artdeell.mojo.servers.ZyroxRoomBridge.stopAll();
         stopSelf();
         Process.killProcess(Process.myPid());
     }

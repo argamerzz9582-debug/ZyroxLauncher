@@ -226,6 +226,13 @@ public class AppUpdateDialogFragment extends DialogFragment {
             return;
         }
 
+        if (!AppUpdateChecker.isDeviceOnline(ctx)) {
+            Toast.makeText(ctx,
+                    "You appear to be offline — connect to Wi-Fi or mobile data to download this update.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+
         // If the release has no downloadable .apk asset, fall back to opening the HTTPS release page
         if (!AppUpdateChecker.isTrustedGitHubDownloadUrl(mRelease.apkDownloadUrl)) {
             AppUpdateChecker.openHttpsUrl(ctx, mRelease.htmlUrl);
@@ -312,11 +319,16 @@ public class AppUpdateDialogFragment extends DialogFragment {
             try {
                 mInstallPermissionLauncher.launch(
                         AppUpdateChecker.createInstallPermissionSettingsIntent(ctx));
-            } catch (Throwable t) {
-                mAwaitingInstallPermission = false;
-                Toast.makeText(ctx,
-                        "Could not open install settings: " + t.getMessage(),
-                        Toast.LENGTH_LONG).show();
+            } catch (Throwable primaryErr) {
+                try {
+                    mInstallPermissionLauncher.launch(
+                            new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS));
+                } catch (Throwable fallbackErr) {
+                    mAwaitingInstallPermission = false;
+                    Toast.makeText(ctx,
+                            "Enable \"Install unknown apps\" in Android Settings → Apps → Zyrox Launcher.",
+                            Toast.LENGTH_LONG).show();
+                }
             }
             return;
         }

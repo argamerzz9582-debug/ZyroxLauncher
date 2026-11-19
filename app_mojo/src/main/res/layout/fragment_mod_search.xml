@@ -180,6 +180,49 @@
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!-- Liquid Glass Active-Instance Compatibility Lock Chip + Strict Compatibility Toggle -->
+        <LinearLayout
+            android:id="@+id/layout_store_compat_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_zyrox_input"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp">
+
+            <TextView
+                android:id="@+id/tv_compat_lock_chip"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_zyrox_badge_info"
+                android:paddingHorizontal="9dp"
+                android:paddingVertical="3dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="10.5sp"
+                android:fontFamily="@font/minecraft_pixel"
+                app:fontFamily="@font/minecraft_pixel"
+                tools:text="Compatible with MC 1.21.4 • Fabric" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_strict_compatibility"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:checked="true"
+                android:text="Strict Compatibility"
+                android:textColor="@color/zyrox_amber"
+                android:textSize="10.5sp"
+                android:switchPadding="6dp"
+                android:thumb="@drawable/bg_zyrox_switch_thumb"
+                app:track="@drawable/bg_zyrox_switch_track"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
+
         <ProgressBar
             android:id="@+id/search_mod_progressbar"
             style="?android:attr/progressBarStyleHorizontal"

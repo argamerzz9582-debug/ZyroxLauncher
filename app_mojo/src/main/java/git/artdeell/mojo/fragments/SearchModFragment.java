@@ -73,11 +73,17 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private Button mImportButton;
     private TaskCountListener mTaskCountListener;
 
-    // Content type, Platform & Category filter chips
+    // Content type, Platform, Category & Active-Instance Strict Compatibility state
     private String mActiveContentType = git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MODPACK;
     private TextView[] mContentTypeTabs;
     private TextView[] mPlatformChips;
     private TextView[] mCategoryChips;
+    private TextView mCompatLockChip;
+    private androidx.appcompat.widget.SwitchCompat mStrictCompatSwitch;
+    private boolean mStrictCompatibility = true;
+    @Nullable private String mBoundCleanMcVersion;
+    @NonNull private String mBoundInstanceLoader = git.artdeell.mojo.instances.Instance.LOADER_VANILLA;
+    @Nullable private String mBoundInstanceName;
 
     // Slide-over Right Glass Version Drawer
     private View mVersionDrawer;
@@ -202,7 +208,10 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mRecyclerview.setItemAnimator(null);
         mRecyclerview.setAdapter(mModItemAdapter);
 
+        mCompatLockChip = view.findViewById(R.id.tv_compat_lock_chip);
+        mStrictCompatSwitch = view.findViewById(R.id.switch_strict_compatibility);
         setupFilterChips(view);
+        bindActiveInstanceCompatibility(view);
 
         mSearchEditText.setOnEditorActionListener((v, actionId, event) -> {
             searchMods(mSearchEditText.getText().toString());
@@ -221,6 +230,127 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         ProgressKeeper.addTaskCountListener(mTaskCountListener);
 
         searchMods(null);
+    }
+
+    /**
+     * Auto-binds the Mod Store to the active instance's clean Minecraft base version and detected
+     * modloader, keeping the Liquid Glass compatibility chip and Strict Compatibility switch synced.
+     */
+    private void bindActiveInstanceCompatibility(@NonNull View root) {
+        if (mStrictCompatSwitch != null) {
+            mStrictCompatSwitch.setChecked(mStrictCompatibility);
+            mStrictCompatSwitch.setOnCheckedChangeListener((btn, checked) -> {
+                mStrictCompatibility = checked;
+                syncCompatibilityFilters();
+                updateCompatibilityChipUi();
+                searchMods(mSearchEditText != null ? mSearchEditText.getText().toString() : "");
+            });
+        }
+        if (mCompatLockChip != null) {
+            mCompatLockChip.setOnClickListener(v -> {
+                if (mStrictCompatSwitch != null) {
+                    mStrictCompatSwitch.setChecked(!mStrictCompatSwitch.isChecked());
+                }
+            });
+        }
+
+        final git.artdeell.mojo.instances.Instance active =
+                git.artdeell.mojo.instances.Instances.loadSelectedInstance();
+        if (active != null) {
+            mBoundInstanceName = (active.name != null && !active.name.trim().isEmpty())
+                    ? active.name.trim() : active.versionId;
+            mBoundInstanceLoader = active.getDetectedModLoader();
+            mBoundCleanMcVersion = active.getCleanMinecraftVersion();
+            syncCompatibilityFilters();
+            updateCompatibilityChipUi();
+
+            // If a symbolic channel (e.g. latest_fabric / latest_release) was not synced yet,
+            // resolve its clean Mojang base version on a background thread and refresh seamlessly.
+            if (mBoundCleanMcVersion == null
+                    && git.artdeell.mojo.instances.Instance.isSymbolicVersionId(active.versionId)) {
+                MojoApplication.sExecutorService.execute(() -> {
+                    String resolved = git.artdeell.mojo.content.ModrinthContentInstaller
+                            .resolveCleanMinecraftVersionOnline(active);
+                    if (resolved != null && !resolved.isEmpty()) {
+                        runOnUiThread(() -> {
+                            if (!isAdded()) return;
+                            mBoundCleanMcVersion = resolved;
+                            if (mStrictCompatibility) {
+                                syncCompatibilityFilters();
+                                updateCompatibilityChipUi();
+                                searchMods(mSearchEditText.getText().toString());
+                            }
+                        });
+                    }
+                });
+            }
+        } else {
+            mBoundInstanceName = null;
+            mBoundCleanMcVersion = null;
+            mBoundInstanceLoader = git.artdeell.mojo.instances.Instance.LOADER_VANILLA;
+            syncCompatibilityFilters();
+            updateCompatibilityChipUi();
+        }
+    }
+
+    @Nullable
+    private String resolveEffectiveStoreLoader(@NonNull String contentType) {
+        if (!git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MOD.equals(contentType)
+                && !git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MODPACK.equals(contentType)) {
+            return null;
+        }
+        if (!git.artdeell.mojo.instances.Instance.LOADER_VANILLA.equals(mBoundInstanceLoader)) {
+            return mBoundInstanceLoader;
+        }
+        // Vanilla MC 1.14+ instances auto-upgrade to Fabric on 1-tap mod install
+        if (git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MOD.equals(contentType)
+                && git.artdeell.mojo.instances.Instance.supportsFabricLoader(mBoundCleanMcVersion)) {
+            return git.artdeell.mojo.instances.Instance.LOADER_FABRIC;
+        }
+        return null;
+    }
+
+    private void syncCompatibilityFilters() {
+        mSearchFilters.strictCompatibility = mStrictCompatibility;
+        if (mStrictCompatibility) {
+            mSearchFilters.mcVersion = mBoundCleanMcVersion;
+            mSearchFilters.loader = resolveEffectiveStoreLoader(mActiveContentType);
+        } else {
+            mSearchFilters.mcVersion = null;
+            mSearchFilters.loader = null;
+        }
+    }
+
+    private void updateCompatibilityChipUi() {
+        if (mCompatLockChip == null) return;
+        String verLabel = (mSearchFilters.mcVersion != null && !mSearchFilters.mcVersion.isEmpty())
+                ? mSearchFilters.mcVersion
+                : mBoundCleanMcVersion;
+        if (!mStrictCompatibility) {
+            if (verLabel != null && !verLabel.isEmpty()) {
+                mCompatLockChip.setText("Showing All Versions (Instance: MC " + verLabel + ")");
+            } else {
+                mCompatLockChip.setText("Showing All Versions & Loaders");
+            }
+            mCompatLockChip.setAlpha(0.78f);
+            return;
+        }
+        mCompatLockChip.setAlpha(1.0f);
+        if (verLabel == null || verLabel.isEmpty()) {
+            mCompatLockChip.setText("Compatible with Active Instance");
+            return;
+        }
+        String activeLoader = mSearchFilters.loader;
+        String loaderDisplay;
+        if (activeLoader != null && !activeLoader.isEmpty()) {
+            boolean autoFabric = git.artdeell.mojo.instances.Instance.LOADER_VANILLA.equals(mBoundInstanceLoader)
+                    && git.artdeell.mojo.instances.Instance.LOADER_FABRIC.equals(activeLoader);
+            loaderDisplay = git.artdeell.mojo.instances.Instance.formatLoaderDisplayName(activeLoader)
+                    + (autoFabric ? " (Auto)" : "");
+        } else {
+            loaderDisplay = git.artdeell.mojo.instances.Instance.formatLoaderDisplayName(mBoundInstanceLoader);
+        }
+        mCompatLockChip.setText("Compatible with MC " + verLabel + " • " + loaderDisplay);
     }
 
     private void setupFilterChips(@NonNull View view) {
@@ -283,19 +413,29 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
 
         cAll.setOnClickListener(v -> applyCategory(cAll, null, null));
         cOpt.setOnClickListener(v -> applyCategory(cOpt, "optimization", null));
-        cPacks.setOnClickListener(v -> applyCategory(cPacks, null, "modpack"));
-        cFabric.setOnClickListener(v -> applyCategory(cFabric, "fabric", null));
-        cForge.setOnClickListener(v -> applyCategory(cForge, "forge", null));
-        cQuilt.setOnClickListener(v -> applyCategory(cQuilt, "quilt", null));
-        cNeo.setOnClickListener(v -> applyCategory(cNeo, "neoforge", null));
+        cPacks.setOnClickListener(v -> {
+            if (mContentTypeTabs != null && mContentTypeTabs.length > 0 && mContentTypeTabs[0] != null) {
+                applyContentType(mContentTypeTabs[0],
+                        git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MODPACK);
+            } else {
+                applyCategory(cPacks, null, "modpack");
+            }
+        });
+        cFabric.setOnClickListener(v -> applyLoaderChip(cFabric, git.artdeell.mojo.instances.Instance.LOADER_FABRIC));
+        cForge.setOnClickListener(v -> applyLoaderChip(cForge, git.artdeell.mojo.instances.Instance.LOADER_FORGE));
+        cQuilt.setOnClickListener(v -> applyLoaderChip(cQuilt, git.artdeell.mojo.instances.Instance.LOADER_QUILT));
+        cNeo.setOnClickListener(v -> applyLoaderChip(cNeo, git.artdeell.mojo.instances.Instance.LOADER_NEOFORGE));
         cShaders.setOnClickListener(v -> {
             if (mContentTypeTabs != null && mContentTypeTabs.length > 2 && mContentTypeTabs[2] != null) {
                 applyContentType(mContentTypeTabs[2],
                         git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_SHADER);
             } else {
                 selectChip(mCategoryChips, cShaders);
+                mActiveContentType = git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_SHADER;
                 mSearchFilters.category = null;
                 mSearchFilters.projectTypeOverride = git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_SHADER;
+                syncCompatibilityFilters();
+                updateCompatibilityChipUi();
                 searchMods(mSearchEditText.getText().toString().trim());
             }
         });
@@ -307,16 +447,20 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             selectChip(mContentTypeTabs, tab);
         }
         git.artdeell.mojo.instances.Instance active = git.artdeell.mojo.instances.Instances.loadSelectedInstance();
-        String instMc = active != null
-                ? git.artdeell.mojo.content.ModrinthContentInstaller.extractMinecraftVersion(active.versionId) : null;
-        String instLoader = active != null
-                ? git.artdeell.mojo.content.ModrinthContentInstaller.extractModLoader(active.versionId) : null;
+        if (active != null) {
+            mBoundInstanceName = (active.name != null && !active.name.trim().isEmpty())
+                    ? active.name.trim() : active.versionId;
+            mBoundInstanceLoader = active.getDetectedModLoader();
+            String freshMc = active.getCleanMinecraftVersion();
+            if (freshMc != null) {
+                mBoundCleanMcVersion = freshMc;
+            }
+        }
 
+        mSearchFilters.category = null;
         if (git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MODPACK.equals(contentType)) {
             mSearchFilters.isModpack = true;
-            mSearchFilters.projectTypeOverride = null;
-            mSearchFilters.category = null;
-            mSearchFilters.mcVersion = null;
+            mSearchFilters.projectTypeOverride = git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MODPACK;
             mSearchFilters.platform = SearchFilters.PLATFORM_ALL;
             if (mPlatformChips != null && mPlatformChips.length > 0) {
                 selectChip(mPlatformChips, mPlatformChips[0]);
@@ -328,50 +472,83 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             if (mPlatformChips != null && mPlatformChips.length > 1) {
                 selectChip(mPlatformChips, mPlatformChips[1]);
             }
-            mSearchFilters.mcVersion = instMc;
-            mSearchFilters.category = git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MOD.equals(contentType)
-                    ? instLoader : null;
-            if (active != null && isAdded()) {
-                String targetName = active.name != null && !active.name.isEmpty() ? active.name : active.versionId;
-                Toast.makeText(requireContext(),
-                        "Target instance: " + targetName + (instMc != null ? (" (" + instMc + ")") : ""),
-                        Toast.LENGTH_SHORT).show();
-            }
         }
+        syncCompatibilityFilters();
+        updateCompatibilityChipUi();
         if (mCategoryChips != null && mCategoryChips.length > 0) {
             selectChip(mCategoryChips, mCategoryChips[0]);
         }
         searchMods(mSearchEditText.getText().toString());
     }
 
-    /** Shared 1-Click FPS Boost Pack dialog callable from both Store and Content Manager. */
+    /**
+     * Shared 1-Tap FPS Boost Pack dialog callable from Store, Instance Studio, and Content Manager.
+     * Supports Fabric, Quilt, Forge, NeoForge, symbolic channels, and automatic Fabric Loader
+     * installation on Vanilla Minecraft 1.14+ instances.
+     */
     public static void promptInstallFpsBoostPack(@NonNull Context ctx, @Nullable Runnable onFinishedUi) {
         final git.artdeell.mojo.instances.Instance inst = git.artdeell.mojo.instances.Instances.loadSelectedInstance();
         if (inst == null) {
             Toast.makeText(ctx, R.string.no_instance, Toast.LENGTH_LONG).show();
             return;
         }
-        String mc = git.artdeell.mojo.content.ModrinthContentInstaller.extractMinecraftVersion(inst.versionId);
-        String loader = git.artdeell.mojo.content.ModrinthContentInstaller.extractModLoader(inst.versionId);
-        if (mc == null || loader == null) {
+        final String cleanMc = inst.getCleanMinecraftVersion();
+        final String detectedLoader = inst.getDetectedModLoader();
+        final boolean isVanilla = git.artdeell.mojo.instances.Instance.LOADER_VANILLA.equals(detectedLoader);
+        final boolean isSymbolic = git.artdeell.mojo.instances.Instance.isSymbolicVersionId(inst.versionId);
+        final boolean canAutoFabric = isSymbolic
+                || (cleanMc != null && git.artdeell.mojo.instances.Instance.supportsFabricLoader(cleanMc));
+
+        if (isVanilla && !canAutoFabric) {
+            String legacyLabel = cleanMc != null ? cleanMc : String.valueOf(inst.versionId);
             new AlertDialog.Builder(ctx)
-                    .setTitle("Mod Loader Needed for FPS Boost")
-                    .setMessage("Active instance (" + (inst.versionId != null ? inst.versionId : "Vanilla")
-                            + ") is plain Vanilla.\n\nInstall Fabric, Quilt, NeoForge, or Forge on this instance first, then tap FPS Boost to auto-install Sodium, Lithium, FerriteCore, Entity Culling, and ImmediatelyFast!")
-                    .setPositiveButton(android.R.string.ok, null)
+                    .setTitle("1-Tap FPS Boost (MC " + legacyLabel + ")")
+                    .setMessage("Minecraft " + legacyLabel
+                            + " predates Fabric Loader (requires MC 1.14+).\n\n"
+                            + "Tap Optimize to apply low-latency options.txt settings "
+                            + "(Render Distance 8, Entity Shadows OFF, Particles Low, VSync OFF), "
+                            + "or install Forge first for legacy optimization mods.")
+                    .setPositiveButton("Optimize options.txt", (d, w) ->
+                            MojoApplication.sExecutorService.execute(() -> {
+                                git.artdeell.mojo.utils.GameOptionsUtils
+                                        .applyFpsBoostOptions(inst.getGameDirectory());
+                                runOnUiThread(() -> {
+                                    Toast.makeText(ctx.getApplicationContext(),
+                                            "Optimized options.txt for Minecraft " + legacyLabel,
+                                            Toast.LENGTH_LONG).show();
+                                    if (onFinishedUi != null) onFinishedUi.run();
+                                });
+                            }))
+                    .setNegativeButton(android.R.string.cancel, null)
                     .show();
             return;
         }
+
+        final String effectiveLoader = isVanilla
+                ? git.artdeell.mojo.instances.Instance.LOADER_FABRIC : detectedLoader;
+        final String loaderDisplay = git.artdeell.mojo.instances.Instance.formatLoaderDisplayName(effectiveLoader);
+        final String mcDisplay = cleanMc != null ? cleanMc : "Latest Release";
         final boolean[] includeIris = {true};
+
+        String title = isVanilla
+                ? ("1-Tap FPS Boost (Auto-Fabric • MC " + mcDisplay + ")")
+                : ("1-Tap FPS Boost (" + loaderDisplay + " • MC " + mcDisplay + ")");
+        String optionLabel = isVanilla
+                ? "Auto-install Fabric + Include Iris Shaders"
+                : "Include Iris / Oculus Shader Support";
+
         new AlertDialog.Builder(ctx)
-                .setTitle("1-Click FPS Boost Pack (" + loader.toUpperCase(java.util.Locale.ROOT) + " " + mc + ")")
+                .setTitle(title)
                 .setMultiChoiceItems(
-                        new CharSequence[]{"Include Iris / Oculus Shader Support"},
+                        new CharSequence[]{optionLabel},
                         new boolean[]{true},
                         (d, which, checked) -> includeIris[0] = checked)
-                .setPositiveButton("Install Stack", (d, w) -> {
+                .setPositiveButton(isVanilla ? "Install Fabric + FPS Pack" : "Install FPS Pack", (d, w) -> {
                     final Context appCtx = ctx.getApplicationContext();
-                    Toast.makeText(appCtx, "Downloading verified FPS Boost mods…", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(appCtx,
+                            (isVanilla ? "Installing Fabric Loader + " : "Installing ")
+                                    + loaderDisplay + " FPS Boost for MC " + mcDisplay + "…",
+                            Toast.LENGTH_SHORT).show();
                     ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, 10, R.string.zyrox_fps_boost_installing);
                     MojoApplication.sExecutorService.execute(() -> {
                         try {
@@ -379,7 +556,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                                     git.artdeell.mojo.content.ModrinthContentInstaller.installZeroLagFpsPack(
                                             inst, includeIris[0], null);
                             runOnUiThread(() -> {
-                                Toast.makeText(appCtx, sum.message, Toast.LENGTH_LONG).show();
+                                showSummaryOrToast(ctx, appCtx, "1-Tap FPS Boost Complete", sum);
                                 if (onFinishedUi != null) onFinishedUi.run();
                             });
                         } catch (Exception e) {
@@ -392,6 +569,27 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private static void showSummaryOrToast(@NonNull Context uiCtx,
+                                           @NonNull Context appCtx,
+                                           @NonNull String title,
+                                           @NonNull git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary sum) {
+        try {
+            if (uiCtx instanceof android.app.Activity) {
+                android.app.Activity act = (android.app.Activity) uiCtx;
+                if (!act.isFinishing() && !act.isDestroyed()) {
+                    new AlertDialog.Builder(act)
+                            .setTitle(title)
+                            .setMessage(sum.buildDetailedReport())
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show();
+                    return;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        Toast.makeText(appCtx, sum.message, Toast.LENGTH_LONG).show();
     }
 
     private void selectChip(TextView[] group, TextView active) {
@@ -409,7 +607,24 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private void applyCategory(TextView chip, @Nullable String category, @Nullable String projectType) {
         selectChip(mCategoryChips, chip);
         mSearchFilters.category = category;
-        mSearchFilters.projectTypeOverride = projectType;
+        if (projectType != null) {
+            mActiveContentType = projectType;
+            mSearchFilters.isModpack = git.artdeell.mojo.content.ModrinthContentInstaller
+                    .TYPE_MODPACK.equals(projectType);
+            mSearchFilters.projectTypeOverride = projectType;
+        } else {
+            mSearchFilters.projectTypeOverride = mActiveContentType;
+        }
+        syncCompatibilityFilters();
+        updateCompatibilityChipUi();
+        searchMods(mSearchEditText.getText().toString());
+    }
+
+    private void applyLoaderChip(TextView chip, @NonNull String loader) {
+        selectChip(mCategoryChips, chip);
+        mSearchFilters.category = null;
+        mSearchFilters.loader = loader;
+        updateCompatibilityChipUi();
         searchMods(mSearchEditText.getText().toString());
     }
 
@@ -418,8 +633,24 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             mDetailFuture.cancel(true);
             mDetailFuture = null;
         }
+        final String filterMc = mStrictCompatibility
+                ? (mSearchFilters.mcVersion != null ? mSearchFilters.mcVersion : mBoundCleanMcVersion)
+                : null;
+        final String filterLoader = mStrictCompatibility ? mSearchFilters.loader : null;
+        final String filterType = mActiveContentType;
+        final boolean strict = mStrictCompatibility;
+
         mDrawerTitle.setText(item.title);
-        mDrawerSummary.setText(item.description);
+        if (strict && filterMc != null && !filterMc.isEmpty()) {
+            String ld = (filterLoader != null && !filterLoader.isEmpty())
+                    ? (" • " + git.artdeell.mojo.instances.Instance.formatLoaderDisplayName(filterLoader))
+                    : "";
+            mDrawerSummary.setText("Compatible builds for MC " + filterMc + ld
+                    + " — top stable release marked RECOMMENDED.");
+        } else {
+            mDrawerSummary.setText(item.description);
+        }
+        mDrawerError.setText(R.string.search_modpack_download_error);
         mDrawerError.setVisibility(View.GONE);
         mDrawerProgress.setVisibility(View.VISIBLE);
         mDrawerVersionList.setAdapter(null);
@@ -434,12 +665,23 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         }
 
         mDetailFuture = new SelfReferencingFuture(myFuture -> {
-            ModDetail detail = modpackApi.getModDetails(item);
+            ModDetail detail = modpackApi.getModDetails(
+                    item, filterMc, filterLoader, filterType, strict);
             runOnUiThread(() -> {
                 if (myFuture.isCancelled() || !isAdded()) return;
                 mDetailFuture = null;
                 mDrawerProgress.setVisibility(View.GONE);
                 if (detail == null || detail.versionNames == null || detail.versionNames.length == 0) {
+                    if (strict && filterMc != null && !filterMc.isEmpty()) {
+                        String ld = (filterLoader != null && !filterLoader.isEmpty())
+                                ? (" (" + git.artdeell.mojo.instances.Instance.formatLoaderDisplayName(filterLoader) + ")")
+                                : "";
+                        mDrawerError.setText("No compatible release published for Minecraft "
+                                + filterMc + ld
+                                + " yet. Toggle Strict Compatibility OFF to inspect all versions.");
+                    } else {
+                        mDrawerError.setText(R.string.search_modpack_download_error);
+                    }
                     mDrawerError.setVisibility(View.VISIBLE);
                     return;
                 }
@@ -534,7 +776,10 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
             mSelectedVersion.setText(mSearchFilters.mcVersion);
 
             mApplyButton.setOnClickListener(v -> {
-                mSearchFilters.mcVersion = mSelectedVersion.getText().toString();
+                String picked = mSelectedVersion.getText().toString().trim();
+                String clean = git.artdeell.mojo.instances.Instance.extractCleanMinecraftVersion(picked);
+                mSearchFilters.mcVersion = picked.isEmpty() ? null : (clean != null ? clean : picked);
+                updateCompatibilityChipUi();
                 searchMods(mSearchEditText.getText().toString());
                 dialogInterface.dismiss();
             });
@@ -564,6 +809,29 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         @Override
         public void onBindViewHolder(@NonNull VH holder, int position) {
             holder.versionName.setText(mNames.get(position));
+
+            boolean isRecommended = (position == mDetail.recommendedIndex);
+            if (holder.recommendedBadge != null) {
+                holder.recommendedBadge.setVisibility(isRecommended ? View.VISIBLE : View.GONE);
+            }
+            if (holder.versionMeta != null) {
+                String channel = (mDetail.versionTypes != null && position < mDetail.versionTypes.length)
+                        ? mDetail.versionTypes[position] : "release";
+                String channelLabel = "beta".equalsIgnoreCase(channel) ? "Beta"
+                        : ("alpha".equalsIgnoreCase(channel) ? "Alpha" : "Stable Release");
+                String loaderTag = (mDetail.versionLoaders != null && position < mDetail.versionLoaders.length)
+                        ? mDetail.versionLoaders[position] : "";
+                StringBuilder meta = new StringBuilder(channelLabel);
+                if (loaderTag != null && !loaderTag.isEmpty()) {
+                    meta.append(" • ").append(loaderTag);
+                }
+                if (git.artdeell.mojo.content.ModrinthContentInstaller.TYPE_MOD.equals(mActiveContentType)) {
+                    meta.append(" • Auto-deps");
+                }
+                holder.versionMeta.setText(meta.toString());
+                holder.versionMeta.setVisibility(View.VISIBLE);
+            }
+
             holder.installBtn.setOnClickListener(v -> {
                 int pos = holder.getAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION) return;
@@ -580,6 +848,8 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                             ? mDetail.versionUrls[pos] : null;
                     final String sha1 = (mDetail.versionHashes != null && pos < mDetail.versionHashes.length)
                             ? mDetail.versionHashes[pos] : null;
+                    final String verId = (mDetail.versionIds != null && pos < mDetail.versionIds.length)
+                            ? mDetail.versionIds[pos] : null;
                     if (dlUrl == null || dlUrl.isEmpty()) {
                         Toast.makeText(v.getContext(), "Download URL unavailable for this version", Toast.LENGTH_SHORT).show();
                         return;
@@ -592,8 +862,16 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                         try {
                             git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary summary =
                                     git.artdeell.mojo.content.ModrinthContentInstaller.installDirectArtifact(
-                                            active, targetType, mItem.id, mItem.title, dlUrl, sha1, null);
-                            runOnUiThread(() -> Toast.makeText(appCtx, summary.message, Toast.LENGTH_LONG).show());
+                                            active, targetType, mItem.id, verId,
+                                            mItem.title, dlUrl, sha1, null);
+                            runOnUiThread(() -> {
+                                Toast.makeText(appCtx, summary.message, Toast.LENGTH_LONG).show();
+                                if (isAdded() && summary.autoInstalledLoaderId != null) {
+                                    mBoundInstanceLoader = active.getDetectedModLoader();
+                                    syncCompatibilityFilters();
+                                    updateCompatibilityChipUi();
+                                }
+                            });
                         } catch (Exception e) {
                             runOnUiThread(() -> Toast.makeText(appCtx,
                                     "Install failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
@@ -619,12 +897,16 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         }
 
         class VH extends RecyclerView.ViewHolder {
+            final TextView recommendedBadge;
             final TextView versionName;
+            final TextView versionMeta;
             final Button installBtn;
 
             VH(@NonNull View itemView) {
                 super(itemView);
+                recommendedBadge = itemView.findViewById(R.id.tv_mod_version_recommended);
                 versionName = itemView.findViewById(R.id.tv_mod_version_name);
+                versionMeta = itemView.findViewById(R.id.tv_mod_version_meta);
                 installBtn = itemView.findViewById(R.id.btn_mod_version_install);
             }
         }

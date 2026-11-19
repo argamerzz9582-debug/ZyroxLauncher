@@ -74,6 +74,16 @@ public class ModrinthApi implements ModpackApi {
     }
 
     @Override
+    public ModDetail getModDetails(ModItem item,
+                                   String cleanMcVersion,
+                                   String loader,
+                                   String projectType,
+                                   boolean strictCompatibility) {
+        return mRepository.getModrinthDetails(
+                item, cleanMcVersion, loader, projectType, strictCompatibility);
+    }
+
+    @Override
     public LoaderInstaller installModpack(ModDetail modDetail, int selectedVersion) throws IOException {
         return ModpackInstaller.downloadModpack(modDetail, selectedVersion, this::installMrpack);
     }

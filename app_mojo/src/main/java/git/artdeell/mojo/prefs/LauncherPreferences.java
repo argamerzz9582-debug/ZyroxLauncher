@@ -121,6 +121,10 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_VOICE_CHAT_OVERLAY = false;
     /** Enables real-time PowerManager thermal & battery dynamic resolution scaling in-game. */
     public static boolean PREF_ZYROX_THERMAL_GOVERNOR = true;
+    /** Shows the floating in-game Coordinate & Death Waypoint HUD pill (no client mods / no F3). */
+    public static boolean PREF_ZYROX_WAYPOINT_PILL = false;
+    /** Automatically reconnects after a 5-second cancellable countdown when a server times out. */
+    public static boolean PREF_ZYROX_AUTO_RECONNECT = false;
 
     public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
     public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
@@ -136,6 +140,10 @@ public class LauncherPreferences {
     public static final String KEY_ZYROX_DEFAULT_FABRIC_READY = "zyroxDefaultFabricReady";
     public static final String KEY_ZYROX_VOICE_CHAT_OVERLAY = "zyroxVoiceChatOverlay";
     public static final String KEY_ZYROX_THERMAL_GOVERNOR = "zyroxThermalGovernor";
+    public static final String KEY_ZYROX_WAYPOINT_PILL = "zyroxWaypointPill";
+    public static final String KEY_ZYROX_WAYPOINT_POS_X = "zyroxWaypointPosX";
+    public static final String KEY_ZYROX_WAYPOINT_POS_Y = "zyroxWaypointPosY";
+    public static final String KEY_ZYROX_AUTO_RECONNECT = "zyroxAutoReconnect";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -216,6 +224,8 @@ public class LauncherPreferences {
         PREF_ZYROX_DEFAULT_FABRIC_READY = DEFAULT_PREF.getBoolean(KEY_ZYROX_DEFAULT_FABRIC_READY, false);
         PREF_ZYROX_VOICE_CHAT_OVERLAY = DEFAULT_PREF.getBoolean(KEY_ZYROX_VOICE_CHAT_OVERLAY, false);
         PREF_ZYROX_THERMAL_GOVERNOR = DEFAULT_PREF.getBoolean(KEY_ZYROX_THERMAL_GOVERNOR, true);
+        PREF_ZYROX_WAYPOINT_PILL = DEFAULT_PREF.getBoolean(KEY_ZYROX_WAYPOINT_PILL, false);
+        PREF_ZYROX_AUTO_RECONNECT = DEFAULT_PREF.getBoolean(KEY_ZYROX_AUTO_RECONNECT, false);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

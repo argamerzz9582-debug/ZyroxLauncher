@@ -638,20 +638,32 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         if (level >= TRIM_MEMORY_UI_HIDDEN
                 || level == TRIM_MEMORY_RUNNING_LOW
                 || level == TRIM_MEMORY_RUNNING_CRITICAL) {
-            if (mShaderBackground != null) {
-                mShaderBackground.onStop();
-            }
-            ZyroxShaderBackgroundView.releaseAllForGameStart();
+            releaseAllLauncherBackgroundMedia(level >= TRIM_MEMORY_RUNNING_LOW);
         }
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
+        releaseAllLauncherBackgroundMedia(true);
+    }
+
+    /**
+     * Deterministically halts and recycles all background shader, GIF frame bitmap, and looping
+     * video decoder buffers so zero launcher graphics memory remains pinned before JVM boot.
+     */
+    public void releaseAllLauncherBackgroundMedia(boolean permanent) {
         if (mShaderBackground != null) {
-            mShaderBackground.onStop();
+            if (permanent) {
+                mShaderBackground.onDestroy();
+            } else {
+                mShaderBackground.onStop();
+            }
         }
+        git.artdeell.mojo.ui.ZyroxGifDecoder.cancelAllActiveDecodes();
         ZyroxShaderBackgroundView.releaseAllForGameStart();
+        git.artdeell.mojo.ui.ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+        git.artdeell.mojo.ui.ZyroxSeamlessGifView.purgeAllActiveInstances(permanent);
     }
 
     /**
@@ -685,10 +697,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected void onStop() {
-        if (mShaderBackground != null) {
-            mShaderBackground.onStop();
-        }
-        ZyroxShaderBackgroundView.releaseAllForGameStart();
+        releaseAllLauncherBackgroundMedia(false);
         android.hardware.display.DisplayManager dm =
                 (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null) {
@@ -700,8 +709,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     protected void onDestroy() {
-        if (mShaderBackground != null) {
-            mShaderBackground.onDestroy();
+        releaseAllLauncherBackgroundMedia(true);
+        if (isFinishing()) {
+            git.artdeell.mojo.servers.ZyroxRoomBridge.stopAll();
         }
         if (mAccountSpinner != null) {
             mAccountSpinner.cleanUpListeners();

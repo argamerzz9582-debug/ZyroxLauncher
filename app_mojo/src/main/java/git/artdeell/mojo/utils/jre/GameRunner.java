@@ -286,7 +286,8 @@ public class GameRunner {
         }
 
         // 6. Fulfill deferred one-shot Zero-Lag FPS Pack installation if queued by Onboarding/OptiFine flow
-        if (instance.pendingAutoFpsPack && ModrinthContentInstaller.extractModLoader(versionToken) != null) {
+        if (instance.pendingAutoFpsPack && (ModrinthContentInstaller.extractModLoader(versionToken) != null
+                || Instance.supportsFabricLoader(Instance.extractCleanMinecraftVersion(versionToken)))) {
             boolean wantIris = instance.pendingAutoIncludeIris;
             instance.pendingAutoFpsPack = false;
             instance.pendingAutoIncludeIris = false;
@@ -433,6 +434,9 @@ public class GameRunner {
         // Optional user-requested Server Manager quick-connect launch flags
         String quickConnectServer = ServerListManager.consumePendingQuickConnect();
         if (quickConnectServer != null) {
+            // If quickConnectServer originated from a P2P ZYX Room, bind a live tunnel inside :game
+            quickConnectServer = git.artdeell.mojo.servers.ZyroxRoomBridge
+                    .ensurePendingTunnelInGameProcess(quickConnectServer);
             try {
                 Date relDate = DateUtils.getOriginalReleaseDate(versionInfo);
                 // --quickPlayMultiplayer was introduced in Minecraft 1.20 (released 2023-06-07)

@@ -142,6 +142,22 @@ public final class GameOptionsUtils {
         }
     }
 
+    /**
+     * Applies safe, competitive FPS-boost settings directly to {@code options.txt} inside
+     * {@code gameDir} while preserving all user keybinds, controls, and existing preferences:
+     * {@code renderDistance:8}, {@code simulationDistance:6}, {@code entityShadows:false},
+     * {@code particles:1} (Decreased), and {@code enableVsync:false}.
+     */
+    public static boolean applyFpsBoostOptions(@NonNull File gameDir) {
+        Map<String, String> tweaks = new LinkedHashMap<>();
+        tweaks.put("renderDistance", "8");
+        tweaks.put("simulationDistance", "6");
+        tweaks.put("entityShadows", "false");
+        tweaks.put("particles", "1");
+        tweaks.put("enableVsync", "false");
+        return applyOverrides(gameDir, tweaks);
+    }
+
     /** Reads {@code options.txt} key:value pairs in insertion order. */
     @NonNull
     public static Map<String, String> readOptionsMap(@Nullable File optionsFile) throws IOException {

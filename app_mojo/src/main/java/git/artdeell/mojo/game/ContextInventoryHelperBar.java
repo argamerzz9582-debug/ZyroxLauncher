@@ -45,7 +45,25 @@ public final class ContextInventoryHelperBar extends LinearLayout {
     private final TextView mBtnShiftLatch;
     private final ZyroxLiquidGlassDrawable mShiftBg;
     private boolean mShiftLatched = false;
+    private boolean mCtrlPulsed = false;
+    private boolean mRightMousePulsed = false;
     private boolean mGameLoaded = false;
+    private final Runnable mReleaseRightClickTask = () -> {
+        if (!mRightMousePulsed) return;
+        mRightMousePulsed = false;
+        try {
+            CallbackBridge.sendMouseButton(LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT, false);
+        } catch (Throwable ignored) {
+        }
+    };
+    private final Runnable mReleaseCtrlTask = () -> {
+        if (!mCtrlPulsed) return;
+        mCtrlPulsed = false;
+        try {
+            PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, false, 0);
+        } catch (Throwable ignored) {
+        }
+    };
 
     public ContextInventoryHelperBar(@NonNull Context context,
                                      @Nullable Runnable onOpenRadialWheel) {
@@ -113,19 +131,37 @@ public final class ContextInventoryHelperBar extends LinearLayout {
                 isGrabbing,
                 isInControlEditor);
         if (!show) {
+            animate().cancel();
             releaseLatchedModifiers();
             if (getVisibility() != GONE) {
                 setVisibility(GONE);
             }
         } else if (getVisibility() != VISIBLE) {
+            animate().cancel();
             setAlpha(0f);
             setVisibility(VISIBLE);
             animate().alpha(1f).setDuration(140L).start();
         }
     }
 
-    /** Safely releases any held modifier key (called on gameplay resume, pause, and destroy). */
+    /** Safely releases any held modifier/mouse state (on gameplay resume, focus loss, pause, destroy). */
     public void releaseLatchedModifiers() {
+        Tools.MAIN_HANDLER.removeCallbacks(mReleaseRightClickTask);
+        Tools.MAIN_HANDLER.removeCallbacks(mReleaseCtrlTask);
+        if (mRightMousePulsed) {
+            mRightMousePulsed = false;
+            try {
+                CallbackBridge.sendMouseButton(LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT, false);
+            } catch (Throwable ignored) {
+            }
+        }
+        if (mCtrlPulsed) {
+            mCtrlPulsed = false;
+            try {
+                PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, false, 0);
+            } catch (Throwable ignored) {
+            }
+        }
         if (mShiftLatched) {
             mShiftLatched = false;
             try {
@@ -134,6 +170,21 @@ public final class ContextInventoryHelperBar extends LinearLayout {
             }
             updateShiftVisual();
         }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (!hasWindowFocus) {
+            releaseLatchedModifiers();
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        animate().cancel();
+        releaseLatchedModifiers();
+        super.onDetachedFromWindow();
     }
 
     public boolean isShiftLatched() {
@@ -160,26 +211,33 @@ public final class ContextInventoryHelperBar extends LinearLayout {
         mBtnShiftLatch.invalidate();
     }
 
-    private static void triggerSplitStack() {
+    private void triggerSplitStack() {
         try {
+            Tools.MAIN_HANDLER.removeCallbacks(mReleaseRightClickTask);
+            mRightMousePulsed = true;
             CallbackBridge.sendMouseButton(LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT, true);
-            Tools.MAIN_HANDLER.postDelayed(
-                    () -> CallbackBridge.sendMouseButton(LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT, false),
-                    32L);
+            Tools.MAIN_HANDLER.postDelayed(mReleaseRightClickTask, 32L);
         } catch (Throwable ignored) {
+            mRightMousePulsed = false;
         }
     }
 
-    private static void triggerDropStack() {
+    private void triggerDropStack() {
         try {
+            Tools.MAIN_HANDLER.removeCallbacks(mReleaseCtrlTask);
+            mCtrlPulsed = true;
             PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, true, 0);
             Tools.MAIN_HANDLER.postDelayed(() -> {
-                PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_Q, true, 0);
-                PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_Q, false, 0);
-                Tools.MAIN_HANDLER.postDelayed(
-                        () -> PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, false, 0), 35L);
+                if (!mCtrlPulsed) return;
+                try {
+                    PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_Q, true, 0);
+                    PLATFORM.sendKeyEvent(KeyEvent.KEYCODE_Q, false, 0);
+                } catch (Throwable ignored) {
+                }
+                Tools.MAIN_HANDLER.postDelayed(mReleaseCtrlTask, 35L);
             }, 30L);
         } catch (Throwable ignored) {
+            mCtrlPulsed = false;
         }
     }
 
