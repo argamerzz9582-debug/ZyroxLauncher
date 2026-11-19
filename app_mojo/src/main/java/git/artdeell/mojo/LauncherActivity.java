@@ -304,6 +304,14 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 try {
                     git.artdeell.mojo.utils.jre.GameRunner.runPreFlightAdvisors(
                             appCtx, selectedInstance, resolvedVersionId);
+                    // If advisor auto-installed Fabric Loader onto a Vanilla instance, sync launch ID
+                    if (Tools.isValidString(selectedInstance.versionId)
+                            && !selectedInstance.versionId.equals(resolvedVersionId)
+                            && !Instance.isSymbolicVersionId(selectedInstance.versionId)) {
+                        resolvedVersionId = selectedInstance.versionId;
+                        ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER,
+                                ExtraConstants.REFRESH_VERSION_SPINNER);
+                    }
                 } catch (Throwable t) {
                     android.util.Log.w("LauncherActivity",
                             "Pre-flight advisor warning: " + t.getMessage());
@@ -352,11 +360,11 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 });
             });
         };
-        java.io.File versionJar = new java.io.File(Tools.DIR_HOME_VERSION,
-                initialNormalizedId + "/" + initialNormalizedId + ".jar");
+        boolean clientJarReady = isMinecraftClientJarInstalled(
+                new java.io.File(Tools.DIR_HOME_VERSION), initialNormalizedId);
         long freeBytes = git.artdeell.mojo.utils.NetworkPolicyHelper.queryFreeDiskBytes(
                 new java.io.File(Tools.DIR_GAME_HOME));
-        if (!versionJar.isFile() && freeBytes > 0L
+        if (!clientJarReady && freeBytes > 0L
                 && freeBytes < 128L * 1024L * 1024L) {
             new androidx.appcompat.app.AlertDialog.Builder(this)
                     .setTitle("Low Storage Warning")
@@ -368,7 +376,7 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                     .show();
             return false;
         }
-        if (!versionJar.isFile() && git.artdeell.mojo.utils.NetworkPolicyHelper.shouldWarnForMobileDownload(
+        if (!clientJarReady && git.artdeell.mojo.utils.NetworkPolicyHelper.shouldWarnForMobileDownload(
                 this,
                 git.artdeell.mojo.utils.NetworkPolicyHelper.DEFAULT_LARGE_MOBILE_DOWNLOAD_BYTES,
                 git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_WARN_MOBILE_DATA)) {
@@ -384,6 +392,30 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         startLaunch.run();
         return false;
     };
+
+    /**
+     * Checks whether the base Minecraft client JAR is already present on disk for {@code versionId}
+     * — including inherited base versions for Fabric, Quilt, Forge, and NeoForge profiles so
+     * already-installed modded profiles launch immediately on mobile data without false popups.
+     */
+    public static boolean isMinecraftClientJarInstalled(@androidx.annotation.Nullable java.io.File versionsRoot,
+                                                        @androidx.annotation.Nullable String versionId) {
+        if (versionsRoot == null || !Tools.isValidString(versionId)
+                || Instance.isSymbolicVersionId(versionId)) {
+            return false;
+        }
+        String trimmed = versionId.trim();
+        java.io.File directJar = new java.io.File(versionsRoot, trimmed + "/" + trimmed + ".jar");
+        if (directJar.isFile() && directJar.length() > 65536L) {
+            return true;
+        }
+        String cleanMc = Instance.extractCleanMinecraftVersion(trimmed);
+        if (!cleanMc.isEmpty() && !cleanMc.equals(trimmed)) {
+            java.io.File baseJar = new java.io.File(versionsRoot, cleanMc + "/" + cleanMc + ".jar");
+            return baseJar.isFile() && baseJar.length() > 65536L;
+        }
+        return false;
+    }
 
     /**
      * Surfaces the static Pre-Launch Mod Conflict &amp; Dependency Simulator diagnosis with a
@@ -617,6 +649,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 }
             };
 
+    @androidx.annotation.Nullable
+    private android.net.ConnectivityManager.NetworkCallback mOnlineUpdateCallback;
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -625,6 +660,29 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                 (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null) {
             dm.registerDisplayListener(mDisplayRotationListener, null);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                android.net.ConnectivityManager cm =
+                        (android.net.ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null && mOnlineUpdateCallback == null) {
+                    mOnlineUpdateCallback = new android.net.ConnectivityManager.NetworkCallback() {
+                        @Override
+                        public void onAvailable(@NonNull android.net.Network network) {
+                            Tools.runOnUiThread(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                Fragment cur = getSupportFragmentManager()
+                                        .findFragmentById(R.id.container_fragment);
+                                if (cur instanceof MainMenuFragment && cur.isResumed()) {
+                                    ((MainMenuFragment) cur).onConnectivityRestored();
+                                }
+                            });
+                        }
+                    };
+                    cm.registerDefaultNetworkCallback(mOnlineUpdateCallback);
+                }
+            } catch (Throwable ignored) {
+            }
         }
         Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
         if (current != null) {
@@ -698,6 +756,17 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
     @Override
     protected void onStop() {
         releaseAllLauncherBackgroundMedia(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && mOnlineUpdateCallback != null) {
+            try {
+                android.net.ConnectivityManager cm =
+                        (android.net.ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (cm != null) {
+                    cm.unregisterNetworkCallback(mOnlineUpdateCallback);
+                }
+            } catch (Throwable ignored) {
+            }
+            mOnlineUpdateCallback = null;
+        }
         android.hardware.display.DisplayManager dm =
                 (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null) {

@@ -161,7 +161,15 @@ public class AppUpdateDialogFragment extends DialogFragment {
         if (mRelease.expectedSha256 != null || mRelease.checksumAssetUrl != null) {
             meta.append("  ·  SHA-256 Verified");
         }
+        meta.append("  ·  Keeps Worlds & Mods");
         metaView.setText(meta.toString());
+
+        if (!git.artdeell.mojo.prefs.LauncherPreferences.isReducedMotionEnabled(requireContext())) {
+            view.setAlpha(0f);
+            view.setScaleX(0.94f);
+            view.setScaleY(0.94f);
+            view.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(190L).start();
+        }
 
         changelogView.setText(AppUpdateChecker.formatMarkdownChangelog(mRelease.body));
 
@@ -179,7 +187,7 @@ public class AppUpdateDialogFragment extends DialogFragment {
                 cancelActiveDownload();
                 return;
             }
-            AppUpdateChecker.snoozeUpdatePrompt(requireContext());
+            AppUpdateChecker.snoozeUpdatePrompt(requireContext(), mRelease.tagName);
             dismissAllowingStateLoss();
         });
 
@@ -191,12 +199,14 @@ public class AppUpdateDialogFragment extends DialogFragment {
         super.onStart();
         Dialog dialog = getDialog();
         if (dialog == null || dialog.getWindow() == null) return;
+        dialog.setCanceledOnTouchOutside(false);
         Window window = dialog.getWindow();
         window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        window.setDimAmount(0.56f);
         DisplayMetrics dm = requireContext().getResources().getDisplayMetrics();
         int targetWidth = Math.min(
                 Math.round(560f * dm.density),
-                Math.round(dm.widthPixels * 0.86f));
+                Math.round(dm.widthPixels * 0.88f));
         window.setLayout(targetWidth, WindowManager.LayoutParams.WRAP_CONTENT);
     }
 

@@ -136,12 +136,28 @@ public class AboutSecurityFragment extends Fragment {
         signCard.addView(brandRow);
         signCard.addView(ZyroxStudioUi.createSubtitle(ctx, report.buildCopyableSummary()));
 
+        git.artdeell.mojo.updater.AppUpdateChecker.ReleaseInfo cachedUpd =
+                git.artdeell.mojo.updater.AppUpdateChecker.getAvailableUpdate(ctx);
+        if (cachedUpd != null && cachedUpd.updateAvailable) {
+            signCard.addView(ZyroxStudioUi.createBadge(
+                    ctx, "⬆ Update Available: " + cachedUpd.tagName + " — ready for 1-tap install", false));
+        }
+
         LinearLayout actRow = new LinearLayout(ctx);
         actRow.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button btnCheckUpd = ZyroxStudioUi.createPrimaryButton(ctx, "Check Updates");
-        btnCheckUpd.setOnClickListener(v ->
-                git.artdeell.mojo.updater.AppUpdateChecker.checkNowInteractive(requireContext()));
+        String updBtnLabel = (cachedUpd != null && cachedUpd.updateAvailable)
+                ? ("⬆ Update to " + cachedUpd.tagName)
+                : "Check Updates";
+        Button btnCheckUpd = ZyroxStudioUi.createPrimaryButton(ctx, updBtnLabel);
+        btnCheckUpd.setOnClickListener(v -> {
+            if (cachedUpd != null && cachedUpd.updateAvailable && getActivity() != null) {
+                git.artdeell.mojo.updater.AppUpdateChecker.markAutoPromptShown(cachedUpd.tagName);
+                git.artdeell.mojo.updater.AppUpdateChecker.showUpdateDialog(requireActivity(), cachedUpd);
+            } else {
+                git.artdeell.mojo.updater.AppUpdateChecker.checkNowInteractive(requireContext());
+            }
+        });
         actRow.addView(btnCheckUpd, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), 0));
 

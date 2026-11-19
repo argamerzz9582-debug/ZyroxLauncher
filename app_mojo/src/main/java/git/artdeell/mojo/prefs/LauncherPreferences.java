@@ -125,7 +125,10 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_WAYPOINT_PILL = false;
     /** Automatically reconnects after a 5-second cancellable countdown when a server times out. */
     public static boolean PREF_ZYROX_AUTO_RECONNECT = false;
+    /** Automatically checks GitHub Releases on launch &amp; shows the in-app update popup. */
+    public static boolean PREF_ZYROX_AUTO_UPDATE_CHECK = true;
 
+    public static final String KEY_ZYROX_AUTO_UPDATE_CHECK = "zyroxAutoUpdateCheck";
     public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
     public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
     public static final String KEY_ZYROX_HUD_Y = "zyroxHudPosY";
@@ -226,6 +229,7 @@ public class LauncherPreferences {
         PREF_ZYROX_THERMAL_GOVERNOR = DEFAULT_PREF.getBoolean(KEY_ZYROX_THERMAL_GOVERNOR, true);
         PREF_ZYROX_WAYPOINT_PILL = DEFAULT_PREF.getBoolean(KEY_ZYROX_WAYPOINT_PILL, false);
         PREF_ZYROX_AUTO_RECONNECT = DEFAULT_PREF.getBoolean(KEY_ZYROX_AUTO_RECONNECT, false);
+        PREF_ZYROX_AUTO_UPDATE_CHECK = DEFAULT_PREF.getBoolean(KEY_ZYROX_AUTO_UPDATE_CHECK, true);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

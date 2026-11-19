@@ -62,7 +62,7 @@ public class ZyroxV24OverhaulVerificationTest {
     @Test
     public void verifiesBuildGradleUncompressedMp4AndOfficialLogoSuite() throws Exception {
         String gradle = readUtf8(resolveFile("build.gradle"));
-        assertTrue("Version must be bumped to 2.6.0", gradle.contains("return \"2.6.0\""));
+        assertTrue("Version must be bumped to 2.7.0", gradle.contains("return \"2.7.0\""));
         assertTrue("MP4 assets must be stored uncompressed for openRawResourceFd streaming",
                 gradle.contains("noCompress") && gradle.contains("'mp4'"));
 

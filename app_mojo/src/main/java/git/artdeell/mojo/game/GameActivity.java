@@ -323,10 +323,12 @@ public class GameActivity extends BaseActivity
             setTitle("Zyrox Launcher (" + version + ")");
 
             String[] baseActions = getResources().getStringArray(R.array.menu_ingame);
-            String[] allActions = new String[baseActions.length + 2];
+            String[] allActions = new String[baseActions.length + 4];
             System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
             allActions[baseActions.length] = getString(R.string.zyrox_toggle_perf_hud);
             allActions[baseActions.length + 1] = getString(R.string.zyrox_quick_macros);
+            allActions[baseActions.length + 2] = getString(R.string.zyrox_switch_control_profile);
+            allActions[baseActions.length + 3] = getString(R.string.zyrox_waypoints_menu);
             gameActionArrayAdapter = new ArrayAdapter<>(this,
                     R.layout.item_zyrox_ingame_menu, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
@@ -341,6 +343,12 @@ public class GameActivity extends BaseActivity
                         break;
                     case 6:
                         QuickMacroDialog.show(GameActivity.this);
+                        break;
+                    case 7:
+                        showQuickControlProfileSwitcher();
+                        break;
+                    case 8:
+                        if (mHudCoordinator != null) mHudCoordinator.showWaypointsManagerDialog();
                         break;
                     default: break;
                 }
@@ -821,6 +829,40 @@ public class GameActivity extends BaseActivity
                 .setTitle(R.string.control_customkey)
                 .setItems(KeycodeUtils.generateKeyName(), (d, pos) -> KeycodeUtils.execKeyIndex(pos))
                 .show();
+    }
+
+    /** Instant 1-tap in-game control profile switcher (no need to enter full editor mid-match). */
+    private void showQuickControlProfileSwitcher() {
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            final java.util.List<File> files = ControlProfileManager.listControlFiles();
+            Tools.runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (files.isEmpty()) {
+                    Toast.makeText(this, "No saved control profiles found.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                CharSequence[] items = new CharSequence[files.size()];
+                String currentPath = mActiveControlLayoutPath != null ? mActiveControlLayoutPath : "";
+                for (int i = 0; i < files.size(); i++) {
+                    File f = files.get(i);
+                    String label = ControlProfileManager.formatProfileBadge(f.getName());
+                    boolean active = currentPath.equals(f.getAbsolutePath());
+                    items[i] = active ? ("✓  " + label + "  (Active)") : ("    " + label);
+                }
+                new AlertDialog.Builder(this)
+                        .setTitle(R.string.zyrox_switch_control_profile)
+                        .setItems(items, (d, idx) -> {
+                            if (idx >= 0 && idx < files.size()) {
+                                File chosen = files.get(idx);
+                                applyControlLayoutFile(chosen.getAbsolutePath(),
+                                        ControlProfileManager.formatProfileBadge(chosen.getName()));
+                            }
+                        })
+                        .setNeutralButton(R.string.zyrox_hud_presets, (d, w) -> openCustomControls())
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
     }
 
     private void openCustomControls() {
