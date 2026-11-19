@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingHorizontal="18dp"
+    android:paddingVertical="10dp">
+
+    <LinearLayout
+        android:id="@+id/onboarding_glass_root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_zyrox_glass_modal"
+        android:elevation="14dp"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <!-- Top Step Header Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_zyrox_logo" />
+
+            <TextView
+                android:id="@+id/tv_onboarding_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:fontFamily="@font/minecraft_pixel"
+                android:letterSpacing="0.06"
+                android:text="WELCOME TO ZYROX"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="12sp"
+                app:fontFamily="@font/minecraft_pixel" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/pill_step_1"
+                style="@style/Zyrox.FilterChip"
+                android:layout_height="26dp"
+                android:text="1 · Account"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/pill_step_2"
+                style="@style/Zyrox.FilterChip"
+                android:layout_height="26dp"
+                android:layout_marginStart="6dp"
+                android:text="2 · Device"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/pill_step_3"
+                style="@style/Zyrox.FilterChip"
+                android:layout_height="26dp"
+                android:layout_marginStart="6dp"
+                android:text="3 · Play Preset"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/btn_onboarding_skip"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:layout_marginStart="10dp"
+                android:gravity="center"
+                android:paddingHorizontal="8dp"
+                android:text="Skip"
+                android:textColor="@color/zyrox_text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <View
+            style="@style/ThickDivider"
+            android:layout_marginVertical="8dp" />
+
+        <!-- ========================================================================= -->
+        <!-- STEP 1: ACCOUNT SELECTION + LIVE SKIN HEAD PREVIEW                        -->
+        <!-- ========================================================================= -->
+        <ScrollView
+            android:id="@+id/step_1_account"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Choose How You Want to Sign In"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_step1_account_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Sign in with Microsoft for official servers, Ely.by for custom skins, or create an instant Offline profile."
+                    android:textColor="@color/zyrox_text_secondary"
+                    android:textSize="11.5sp" />
+
+                <!-- 3 Liquid Glass Auth Cards -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <!-- Microsoft Card -->
+                    <LinearLayout
+                        android:id="@+id/card_auth_microsoft"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_glass_card"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_zyrox_badge_info"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="2dp"
+                            android:text="OFFICIAL"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Microsoft Account"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Hypixel, Realms &amp; full Java Edition skins."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+
+                        <Button
+                            android:id="@+id/btn_onboard_microsoft"
+                            android:layout_width="match_parent"
+                            android:layout_height="32dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/btn_zyrox_play"
+                            android:text="Sign In"
+                            android:textAllCaps="false"
+                            android:textColor="@color/zyrox_lg_text"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Ely.by Card -->
+                    <LinearLayout
+                        android:id="@+id/card_auth_elyby"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_glass_card"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_zyrox_badge"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="2dp"
+                            android:text="SKINS &amp; CAPES"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Ely.by Account"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="OAuth2 login with multiplayer skins &amp; capes."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+
+                        <Button
+                            android:id="@+id/btn_onboard_elyby"
+                            android:layout_width="match_parent"
+                            android:layout_height="32dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/btn_zyrox_secondary"
+                            android:text="Connect Ely.by"
+                            android:textAllCaps="false"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <!-- Offline / Local Card with Live Isometric Skin Head Preview -->
+                    <LinearLayout
+                        android:id="@+id/card_auth_offline"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.25"
+                        android:background="@drawable/bg_zyrox_glass_card"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <ImageView
+                                android:id="@+id/iv_onboard_skin_preview"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:contentDescription="@string/app_short_name"
+                                android:scaleType="fitCenter"
+                                android:src="@drawable/ic_default_steve_head" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tv_onboard_preview_name"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:ellipsize="end"
+                                    android:singleLine="true"
+                                    android:text="Offline / Local"
+                                    android:textColor="@color/zyrox_text_primary"
+                                    android:textSize="12.5sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:id="@+id/tv_onboard_preview_badge"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Instant singleplayer &amp; LAN"
+                                    android:textColor="@color/zyrox_text_muted"
+                                    android:textSize="10sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <EditText
+                            android:id="@+id/et_onboard_offline_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="34dp"
+                            android:layout_marginTop="8dp"
+                            android:background="@drawable/bg_zyrox_input"
+                            android:hint="Player username (3–16 chars)"
+                            android:imeOptions="flagNoExtractUi|actionDone"
+                            android:inputType="textNoSuggestions"
+                            android:maxLength="16"
+                            android:paddingHorizontal="10dp"
+                            android:singleLine="true"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textColorHint="@color/zyrox_text_muted"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ========================================================================= -->
+        <!-- STEP 2: SMART DEVICE CALIBRATION                                          -->
+        <!-- ========================================================================= -->
+        <ScrollView
+            android:id="@+id/step_2_calibration"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Smart Device Calibration Complete"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_zyrox_glass_surface"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/tv_calibration_headline"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="2dp"
+                        android:textColor="@color/zyrox_text_primary"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold"
+                        tools:text="Detected Adreno 740 &amp; 12 GB RAM — Auto-configured Turnip + Vulkan Zink + 4,096 MB Heap for maximum stability." />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_cal_metric_gpu"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_zyrox_glass_card"
+                            android:padding="9dp"
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11sp"
+                            tools:text="GPU Engine\nTurnip + Zink" />
+
+                        <TextView
+                            android:id="@+id/tv_cal_metric_ram"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_zyrox_glass_card"
+                            android:padding="9dp"
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11sp"
+                            tools:text="Safe JVM RAM\n3,072 MB Heap" />
+
+                        <TextView
+                            android:id="@+id/tv_cal_metric_java"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_zyrox_glass_card"
+                            android:padding="9dp"
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="11sp"
+                            tools:text="Java Advisor\nAuto (8 / 17 / 21)" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_calibration_detail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="You can tweak any setting later in Instance Studio → Advanced / Pro Mode."
+                        android:textColor="@color/zyrox_text_muted"
+                        android:textSize="10.5sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ========================================================================= -->
+        <!-- STEP 3: PLAY PRESET SELECTION                                             -->
+        <!-- ========================================================================= -->
+        <ScrollView
+            android:id="@+id/step_3_preset"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Pick Your Starting Playstyle"
+                    android:textColor="@color/zyrox_text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_step3_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Zyrox will create and tune your first ready-to-play Minecraft profile automatically."
+                    android:textColor="@color/zyrox_text_secondary"
+                    android:textSize="11.5sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <!-- Preset 1: Vanilla Smooth -->
+                    <LinearLayout
+                        android:id="@+id/card_preset_vanilla"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_glass_card"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_zyrox_badge"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="2dp"
+                            android:text="CLASSIC"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="Vanilla Smooth"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Pure latest Minecraft Java with balanced RAM, optimal GPU renderer, and smooth touch controls."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+
+                    <!-- Preset 2: FPS Boosted (Sodium) -->
+                    <LinearLayout
+                        android:id="@+id/card_preset_fps"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_glass_surface"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_zyrox_badge_info"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="2dp"
+                            android:text="RECOMMENDED"
+                            android:textColor="@color/zyrox_firefly_gold"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="FPS Boosted (Sodium)"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Fabric + Sodium, Lithium, FerriteCore &amp; ImmediatelyFast + auto-tuned zero-lag options.txt."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+
+                    <!-- Preset 3: PvP Ready -->
+                    <LinearLayout
+                        android:id="@+id/card_preset_pvp"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_zyrox_glass_card"
+                        android:orientation="vertical"
+                        android:padding="11dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_zyrox_badge"
+                            android:paddingHorizontal="7dp"
+                            android:paddingVertical="2dp"
+                            android:text="COMPETITIVE"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="PvP Ready"
+                            android:textColor="@color/zyrox_text_primary"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Uncapped Max FPS engine, zero VSync input lag, low particles, wide FOV, and combat controls."
+                            android:textColor="@color/zyrox_text_secondary"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- Bottom Navigation Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_onboarding_back"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/btn_zyrox_secondary"
+                android:paddingHorizontal="14dp"
+                android:text="Back"
+                android:textAllCaps="false"
+                android:textColor="@color/zyrox_text_primary"
+                android:textSize="11.5sp"
+                android:visibility="invisible" />
+
+            <ProgressBar
+                android:id="@+id/pb_onboarding_busy"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="12dp"
+                android:visibility="gone" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <Button
+                android:id="@+id/btn_onboarding_next"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:background="@drawable/btn_zyrox_play"
+                android:paddingHorizontal="20dp"
+                android:text="Continue →"
+                android:textAllCaps="false"
+                android:textColor="@color/zyrox_lg_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

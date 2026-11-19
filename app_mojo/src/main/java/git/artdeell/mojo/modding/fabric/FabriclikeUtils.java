@@ -107,6 +107,30 @@ public class FabriclikeUtils {
     }
 
     /**
+     * Resolves the recommended stable loader build for {@code gameVersion} and installs its
+     * profile JSON under {@code versions/<versionId>/<versionId>.json}.
+     */
+    @NonNull
+    public String installLatestForGameVersion(@NonNull String gameVersion) throws IOException {
+        String cleanVer = gameVersion.trim();
+        FabricVersion recommended = getRecommendedLoaderVersion(cleanVer);
+        if (recommended == null || recommended.version == null || recommended.version.trim().isEmpty()) {
+            FabricVersion[] all = downloadLoaderVersions(cleanVer, true);
+            if (all != null && all.length > 0) {
+                recommended = all[0];
+            }
+        }
+        if (recommended == null || recommended.version == null || recommended.version.trim().isEmpty()) {
+            throw new IOException("No " + mName + " loader release available for Minecraft " + cleanVer);
+        }
+        String installedId = install(cleanVer, recommended.version.trim());
+        if (installedId == null || installedId.trim().isEmpty()) {
+            throw new IOException("Failed to install " + mName + " profile for Minecraft " + cleanVer);
+        }
+        return installedId;
+    }
+
+    /**
      * Verifies {@code (gameVersion, loaderVersion)} compatibility against official loader metadata,
      * downloads and validates the resulting profile JSON, and installs it under
      * {@code versions/<versionId>/<versionId>.json}.

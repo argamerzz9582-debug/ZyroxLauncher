@@ -30,12 +30,14 @@ public class CommonApi implements ModpackApi {
     private final ModpackApi mCurseforgeApi;
     private final ModpackApi mModrinthApi;
     private final ModpackApi[] mModpackApis;
+    private final String mCurseforgeApiKey;
 
     public static final byte PACK_MODRINTH = 1;
     public static final byte PACK_CURSEFORGE = 2;
     public static final byte PACK_UNDEFINED = 0;
 
     public CommonApi(String curseforgeApiKey) {
+        mCurseforgeApiKey = curseforgeApiKey;
         mModrinthApi = new ModrinthApi();
         if (!CurseForgeProvider.isApiKeyConfigured(curseforgeApiKey)) {
             mCurseforgeApi = null;
@@ -48,75 +50,130 @@ public class CommonApi implements ModpackApi {
 
     @Override
     public SearchResult searchMod(SearchFilters searchFilters, SearchResult previousPageResult) {
-        CommonApiSearchResult commonApiSearchResult = (CommonApiSearchResult) previousPageResult;
-        // If there are no previous page results, create a new array. Otherwise, use the one from the previous page
-        SearchResult[] results = commonApiSearchResult == null ?
-                new SearchResult[mModpackApis.length] : commonApiSearchResult.searchResults;
-
-        int totalSize = 0;
-
-        Future<?>[] futures = new Future<?>[mModpackApis.length];
-        for(int i = 0; i < mModpackApis.length; i++) {
-            ModpackApi api = mModpackApis[i];
-            if(searchFilters.platform == SearchFilters.PLATFORM_MODRINTH && api != mModrinthApi) continue;
-            if(searchFilters.platform == SearchFilters.PLATFORM_CURSEFORGE && api != mCurseforgeApi) continue;
-            if(searchFilters.projectTypeOverride != null && api != mModrinthApi) continue;
-            // If there is an array and its length is zero, this means that we've exhausted the results for this
-            // search query and we don't need to actually do the search
-            if(results[i] != null && results[i].results.length == 0) continue;
-            // If the previous page result is not null (aka the arrays aren't fresh)
-            // and the previous result is null, it means that na error has occured on the previous
-            // page. We lost contingency anyway, so don't bother requesting.
-            if(previousPageResult != null && results[i] == null) continue;
-            futures[i] = MojoApplication.sExecutorService.submit(new ApiDownloadTask(i, searchFilters,
-                    results[i]));
+        // Explicit CurseForge tab selection: check API key & rate-limit window, then seamlessly
+        // fall back to Modrinth with a non-intrusive status banner instead of failing or emptying.
+        if (searchFilters != null && searchFilters.platform == SearchFilters.PLATFORM_CURSEFORGE) {
+            CommonApiSearchResult prevCommon = (previousPageResult instanceof CommonApiSearchResult)
+                    ? (CommonApiSearchResult) previousPageResult : null;
+            if (mCurseforgeApi != null && CurseForgeProvider.canQueryCurseForge(mCurseforgeApiKey)
+                    && searchFilters.projectTypeOverride == null) {
+                SearchResult prevCf = (prevCommon != null && prevCommon.searchResults.length > 1)
+                        ? prevCommon.searchResults[1] : null;
+                try {
+                    SearchResult cfRes = mCurseforgeApi.searchMod(searchFilters, prevCf);
+                    if (cfRes != null && cfRes.results != null) {
+                        CommonApiSearchResult wrapped = prevCommon != null ? prevCommon : new CommonApiSearchResult();
+                        wrapped.searchResults = new SearchResult[]{null, cfRes};
+                        wrapped.results = cfRes.results;
+                        wrapped.totalResultCount = cfRes.totalResultCount;
+                        wrapped.fallbackNotice = null;
+                        return wrapped;
+                    }
+                } catch (Exception e) {
+                    Log.w("CommonApi", "CurseForge search failed, falling back to Modrinth: " + e.getMessage());
+                }
+            }
+            SearchFilters mrFilters = copyFiltersForModrinth(searchFilters);
+            SearchResult prevMr = (prevCommon != null && prevCommon.searchResults.length > 0)
+                    ? prevCommon.searchResults[0] : null;
+            SearchResult mrRes = mModrinthApi.searchMod(mrFilters, prevMr);
+            if (mrRes == null) return null;
+            CommonApiSearchResult wrapped = prevCommon != null ? prevCommon : new CommonApiSearchResult();
+            wrapped.searchResults = new SearchResult[]{mrRes};
+            wrapped.results = mrRes.results != null ? mrRes.results : new ModItem[0];
+            wrapped.totalResultCount = mrRes.totalResultCount;
+            wrapped.fallbackNotice = CurseForgeProvider.buildModrinthFallbackNotice(mCurseforgeApiKey);
+            return wrapped;
         }
 
-        if(Thread.interrupted()) {
+        CommonApiSearchResult commonApiSearchResult = (previousPageResult instanceof CommonApiSearchResult)
+                ? (CommonApiSearchResult) previousPageResult : null;
+        SearchResult[] results = (commonApiSearchResult == null
+                || commonApiSearchResult.searchResults.length != mModpackApis.length)
+                ? new SearchResult[mModpackApis.length] : commonApiSearchResult.searchResults;
+
+        int totalSize = 0;
+        boolean curseForgeDegraded = false;
+        boolean allowCurseForge = searchFilters == null
+                || (searchFilters.platform == SearchFilters.PLATFORM_ALL
+                && searchFilters.projectTypeOverride == null);
+
+        Future<?>[] futures = new Future<?>[mModpackApis.length];
+        for (int i = 0; i < mModpackApis.length; i++) {
+            ModpackApi api = mModpackApis[i];
+            if (searchFilters != null) {
+                if (searchFilters.platform == SearchFilters.PLATFORM_MODRINTH && api != mModrinthApi) continue;
+                if (searchFilters.projectTypeOverride != null && api != mModrinthApi) continue;
+            }
+            if (api == mCurseforgeApi && !CurseForgeProvider.canQueryCurseForge(mCurseforgeApiKey)) {
+                curseForgeDegraded = allowCurseForge && CurseForgeProvider.isRateLimitedOrBlocked();
+                continue;
+            }
+            if (results[i] != null && results[i].results != null && results[i].results.length == 0) continue;
+            if (previousPageResult != null && results[i] == null) continue;
+            futures[i] = MojoApplication.sExecutorService.submit(
+                    new ApiDownloadTask(i, searchFilters, results[i]));
+        }
+
+        if (Thread.interrupted()) {
             cancelAllFutures(futures);
             return null;
         }
         boolean hasSuccessful = false;
-        // Count up all the results
-        for(int i = 0; i < mModpackApis.length; i++) {
+        for (int i = 0; i < mModpackApis.length; i++) {
             Future<?> future = futures[i];
-            if(future == null) continue;
+            if (future == null) continue;
             try {
                 SearchResult searchResult = results[i] = (SearchResult) future.get();
-                if(searchResult != null) hasSuccessful = true;
-                else continue;
-                totalSize += searchResult.totalResultCount;
-            }catch (Exception e) {
+                if (searchResult != null && searchResult.results != null) {
+                    hasSuccessful = true;
+                    totalSize += searchResult.totalResultCount;
+                } else if (mModpackApis[i] == mCurseforgeApi && allowCurseForge) {
+                    curseForgeDegraded = true;
+                }
+            } catch (InterruptedException ie) {
                 cancelAllFutures(futures);
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
                 return null;
+            } catch (Exception e) {
+                results[i] = null;
+                Log.w("CommonApi", "Mod platform query degraded: " + e.getMessage());
+                if (mModpackApis[i] == mCurseforgeApi && allowCurseForge) {
+                    curseForgeDegraded = true;
+                }
             }
         }
-        if(!hasSuccessful) {
+        if (!hasSuccessful) {
             return null;
         }
-        // Then build an array with all the mods
         ArrayList<ModItem[]> filteredResults = new ArrayList<>(results.length);
-
-        // Sanitize returned values
-        for(SearchResult result : results) {
-            if(result == null) continue;
-            ModItem[] searchResults = result.results;
-            // If the length is zero, we don't need to perform needless copies
-            if(searchResults.length == 0) continue;
-            filteredResults.add(searchResults);
+        for (SearchResult result : results) {
+            if (result == null || result.results == null || result.results.length == 0) continue;
+            filteredResults.add(result.results);
         }
         filteredResults.trimToSize();
-        if(Thread.interrupted()) return null;
+        if (Thread.interrupted()) return null;
 
         ModItem[] concatenatedItems = buildFusedResponse(filteredResults);
-        if(Thread.interrupted()) return null;
-        // Recycle or create new search result
-        if(commonApiSearchResult == null) commonApiSearchResult = new CommonApiSearchResult();
+        if (Thread.interrupted()) return null;
+        if (commonApiSearchResult == null) commonApiSearchResult = new CommonApiSearchResult();
         commonApiSearchResult.searchResults = results;
         commonApiSearchResult.totalResultCount = totalSize;
         commonApiSearchResult.results = concatenatedItems;
+        commonApiSearchResult.fallbackNotice = curseForgeDegraded
+                ? CurseForgeProvider.buildModrinthFallbackNotice(mCurseforgeApiKey) : null;
         return commonApiSearchResult;
+    }
+
+    private static SearchFilters copyFiltersForModrinth(@NonNull SearchFilters src) {
+        SearchFilters copy = new SearchFilters();
+        copy.isModpack = src.isModpack;
+        copy.name = src.name;
+        copy.mcVersion = src.mcVersion;
+        copy.platform = SearchFilters.PLATFORM_MODRINTH;
+        copy.category = src.category;
+        copy.projectTypeOverride = src.projectTypeOverride;
+        return copy;
     }
 
     @Override

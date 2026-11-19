@@ -51,6 +51,9 @@ public final class QuickMacroDialog {
     private static final String PREF_NAME = "zyrox_quick_macros_v1";
     private static final String KEY_CUSTOM_MACROS = "macros_json";
     private static final String KEY_MACRO_SEQUENCES = "sequences_json_v2";
+    private static final String KEY_RADIAL_SLOTS = "radial_wheel_slots_v1";
+    /** Phase 4.5 — Number of customizable wedges on the Liquid Glass Radial Command Wheel. */
+    public static final int RADIAL_SLOT_COUNT = 8;
     private static final int MAX_MACROS = 16;
     public static final int MAX_SEQUENCE_STEPS = 16;
     public static final int MIN_DELAY_MS = 15;
@@ -374,9 +377,34 @@ public final class QuickMacroDialog {
 
         final AlertDialog[] holder = new AlertDialog[1];
 
+        // 0. Phase 4.5 — 8-Slot Liquid Glass Radial Quick-Chat & Command Wheel
+        root.addView(ZyroxStudioUi.createSectionLabel(ctx,
+                "RADIAL COMMAND WHEEL (SWIPE OR TAP • ZERO KEYBOARD LAG)"),
+                ZyroxStudioUi.vParam(0));
+
+        final List<MacroSequence> radialSlots = new ArrayList<>(loadRadialSlots(ctx));
+        final RadialCommandWheelView wheelView = new RadialCommandWheelView(ctx, radialSlots,
+                selectedIndex -> {
+                    if (selectedIndex >= 0 && selectedIndex < radialSlots.size()) {
+                        MacroSequence chosen = radialSlots.get(selectedIndex);
+                        if (holder[0] != null) holder[0].dismiss();
+                        executeSequence(chosen);
+                    }
+                });
+        int wheelSize = ZyroxStudioUi.dp(ctx, 232);
+        LinearLayout.LayoutParams wheelLp = new LinearLayout.LayoutParams(wheelSize, wheelSize);
+        wheelLp.gravity = Gravity.CENTER_HORIZONTAL;
+        wheelLp.topMargin = ZyroxStudioUi.dp(ctx, 6);
+        root.addView(wheelView, wheelLp);
+
+        Button editWheelBtn = ZyroxStudioUi.createSecondaryButton(ctx, "Customize 8 Radial Wheel Slots");
+        editWheelBtn.setOnClickListener(v ->
+                showRadialSlotPickerDialog(ctx, radialSlots, wheelView));
+        root.addView(editWheelBtn, ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 6)));
+
         // 1. Instant Function Key Chords
         root.addView(ZyroxStudioUi.createSectionLabel(ctx, "INSTANT GAMEPLAY ACTIONS"),
-                ZyroxStudioUi.vParam(0));
+                ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 10)));
 
         String[][] quickKeys = {
                 {"Screenshot (F2)", "Perspective (F5)"},
@@ -785,6 +813,285 @@ public final class QuickMacroDialog {
     private static void performHaptic(@NonNull View v) {
         if (LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS) {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        }
+    }
+
+    // =============================================================================================
+    // PHASE 4.5 — 8-SLOT LIQUID GLASS RADIAL QUICK-CHAT & COMMAND WHEEL
+    // =============================================================================================
+
+    public interface OnRadialSlotSelectedListener {
+        void onSlotSelected(int slotIndex);
+    }
+
+    /**
+     * Pure deterministic 8-wedge radial hit-test (0 = North/Top, clockwise in 45° sectors;
+     * returns {@code -1} inside the center cancel dead-zone or outside {@code outerRadiusPx}).
+     */
+    public static int resolveRadialSector(float dx,
+                                          float dy,
+                                          float deadZoneRadiusPx,
+                                          float outerRadiusPx) {
+        double dist = Math.hypot(dx, dy);
+        if (dist < Math.max(1f, deadZoneRadiusPx)
+                || (outerRadiusPx > 0f && dist > outerRadiusPx * 1.18f)) {
+            return -1;
+        }
+        // Shift origin to 12 o'clock (North = 0°), increasing clockwise [0, 360)
+        double deg = Math.toDegrees(Math.atan2(dy, dx)) + 90.0;
+        if (deg < 0.0) deg += 360.0;
+        double sectorSpan = 360.0 / RADIAL_SLOT_COUNT; // 45°
+        int sector = (int) Math.floor(((deg + sectorSpan * 0.5) % 360.0) / sectorSpan);
+        return Math.max(0, Math.min(RADIAL_SLOT_COUNT - 1, sector));
+    }
+
+    /** Default 8 high-utility server chat &amp; F3 debug wedges (zero soft-keyboard stall). */
+    @NonNull
+    public static List<MacroSequence> getDefaultRadialSlots() {
+        List<MacroSequence> defaults = new ArrayList<>(RADIAL_SLOT_COUNT);
+        defaults.add(new MacroSequence("/spawn", parseSequenceScript("CMD:/spawn")));
+        defaults.add(new MacroSequence("/home", parseSequenceScript("CMD:/home")));
+        defaults.add(new MacroSequence("/tpa", parseSequenceScript("CMD:/tpa ")));
+        defaults.add(new MacroSequence("GG", parseSequenceScript("CMD:GG")));
+        defaults.add(new MacroSequence("/hub", parseSequenceScript("CMD:/hub")));
+        defaults.add(new MacroSequence("F3+A", parseSequenceScript("CHORD:F3+A")));
+        defaults.add(new MacroSequence("F3+B", parseSequenceScript("CHORD:F3+B")));
+        defaults.add(new MacroSequence("F3+G", parseSequenceScript("CHORD:F3+G")));
+        return defaults;
+    }
+
+    @NonNull
+    public static List<MacroSequence> loadRadialSlots(@NonNull Context ctx) {
+        List<MacroSequence> defaults = getDefaultRadialSlots();
+        try {
+            SharedPreferences sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+            String raw = sp.getString(KEY_RADIAL_SLOTS, null);
+            List<MacroSequence> saved = deserializeSequencesJson(raw);
+            if (saved.size() == RADIAL_SLOT_COUNT) {
+                return saved;
+            }
+        } catch (Throwable ignored) {
+        }
+        return defaults;
+    }
+
+    private static void saveRadialSlots(@NonNull Context ctx, @NonNull List<MacroSequence> slots) {
+        ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_RADIAL_SLOTS, serializeSequencesJson(slots))
+                .apply();
+    }
+
+    private static void showRadialSlotPickerDialog(@NonNull Context ctx,
+                                                   @NonNull List<MacroSequence> slots,
+                                                   @NonNull RadialCommandWheelView wheelView) {
+        final String[] compass = {"N (Top)", "NE", "E (Right)", "SE", "S (Bottom)", "SW", "W (Left)", "NW"};
+        String[] items = new String[RADIAL_SLOT_COUNT];
+        for (int i = 0; i < RADIAL_SLOT_COUNT; i++) {
+            MacroSequence s = slots.get(i);
+            items[i] = (i + 1) + ". " + compass[i] + " — " + s.label + "  [" + s.formatScript() + "]";
+        }
+        new AlertDialog.Builder(ctx)
+                .setTitle("Customize Radial Wheel Slot")
+                .setItems(items, (d, which) -> showEditSingleRadialSlotDialog(ctx, slots, which, wheelView))
+                .setNeutralButton("Reset Defaults", (d, w) -> {
+                    slots.clear();
+                    slots.addAll(getDefaultRadialSlots());
+                    saveRadialSlots(ctx, slots);
+                    wheelView.invalidate();
+                    Toast.makeText(ctx, "Radial wheel reset to defaults.", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void showEditSingleRadialSlotDialog(@NonNull Context ctx,
+                                                       @NonNull List<MacroSequence> slots,
+                                                       int slotIndex,
+                                                       @NonNull RadialCommandWheelView wheelView) {
+        MacroSequence current = slots.get(slotIndex);
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p = ZyroxStudioUi.dp(ctx, 14);
+        box.setPadding(p, ZyroxStudioUi.dp(ctx, 8), p, ZyroxStudioUi.dp(ctx, 4));
+
+        EditText etLabel = ZyroxStudioUi.createGlassInput(ctx, "Short wheel label (e.g. /warp)");
+        etLabel.setFilters(new InputFilter[]{new InputFilter.LengthFilter(10)});
+        etLabel.setText(current.label);
+        box.addView(etLabel);
+
+        EditText etAction = ZyroxStudioUi.createGlassInput(
+                ctx, "Command (e.g. /spawn, GG) or script (CHORD:F3+A)");
+        etAction.setText(current.formatScript());
+        box.addView(etAction, ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 8)));
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Edit Radial Slot #" + (slotIndex + 1))
+                .setView(box)
+                .setPositiveButton("Save Slot", (d, w) -> {
+                    String lbl = etLabel.getText().toString().trim();
+                    String raw = etAction.getText().toString().trim();
+                    if (raw.isEmpty()) return;
+                    // Allow plain chat/slash input like "/bed" or "GLHF" without forcing CMD: prefix
+                    List<MacroStep> parsed = parseSequenceScript(raw);
+                    if (parsed.isEmpty()) {
+                        parsed = parseSequenceScript("CMD:" + raw);
+                    }
+                    if (parsed.isEmpty()) {
+                        Toast.makeText(ctx, "Invalid command or macro script.", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String finalLabel = lbl.isEmpty()
+                            ? (raw.length() > 8 ? raw.substring(0, 8) : raw) : lbl;
+                    slots.set(slotIndex, new MacroSequence(finalLabel, parsed));
+                    saveRadialSlots(ctx, slots);
+                    wheelView.invalidate();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** Zero-allocation Canvas 8-wedge High-Contrast Liquid Glass radial wheel. */
+    private static final class RadialCommandWheelView extends View {
+        private final List<MacroSequence> mSlots;
+        private final OnRadialSlotSelectedListener mListener;
+        private final float mDensity;
+        private final android.graphics.Paint mScrimPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mActiveWedgePaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mRimPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mSpokePaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mHubPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mLabelPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint mSubPaint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.RectF mOuterOval = new android.graphics.RectF();
+        private int mHoveredSector = -1;
+
+        RadialCommandWheelView(@NonNull Context ctx,
+                               @NonNull List<MacroSequence> slots,
+                               @NonNull OnRadialSlotSelectedListener listener) {
+            super(ctx);
+            mSlots = slots;
+            mListener = listener;
+            mDensity = Math.max(1f, ctx.getResources().getDisplayMetrics().density);
+
+            // High-Contrast #660B0F17 Liquid Glass dark scrim base
+            mScrimPaint.setStyle(android.graphics.Paint.Style.FILL);
+            mScrimPaint.setColor(0x990B0F17);
+
+            mActiveWedgePaint.setStyle(android.graphics.Paint.Style.FILL);
+            mActiveWedgePaint.setColor(0x5872E4FF);
+
+            mRimPaint.setStyle(android.graphics.Paint.Style.STROKE);
+            mRimPaint.setStrokeWidth(1.5f * mDensity);
+            mRimPaint.setColor(git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable.SPECULAR_BORDER_TOP);
+
+            mSpokePaint.setStyle(android.graphics.Paint.Style.STROKE);
+            mSpokePaint.setStrokeWidth(1.0f * mDensity);
+            mSpokePaint.setColor(0x2EFFFFFF);
+
+            mHubPaint.setStyle(android.graphics.Paint.Style.FILL);
+            mHubPaint.setColor(0xCC0B0F17);
+
+            mLabelPaint.setColor(0xFFF6FAFF);
+            mLabelPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            mLabelPaint.setTypeface(android.graphics.Typeface.create(
+                    android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD));
+            mLabelPaint.setTextSize(11.5f * mDensity);
+            mLabelPaint.setShadowLayer(2.5f, 0f, 1f, 0xCC05080E);
+
+            mSubPaint.setColor(0xFFA8E8FF);
+            mSubPaint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            mSubPaint.setTextSize(9.5f * mDensity);
+        }
+
+        @Override
+        protected void onDraw(@NonNull android.graphics.Canvas canvas) {
+            float cx = getWidth() * 0.5f;
+            float cy = getHeight() * 0.5f;
+            float outerR = Math.min(cx, cy) - 4f * mDensity;
+            if (outerR <= 16f) return;
+            float innerR = outerR * 0.30f;
+            float labelR = innerR + (outerR - innerR) * 0.56f;
+
+            mOuterOval.set(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
+            canvas.drawCircle(cx, cy, outerR, mScrimPaint);
+
+            float span = 360f / RADIAL_SLOT_COUNT;
+            if (mHoveredSector >= 0 && mHoveredSector < RADIAL_SLOT_COUNT) {
+                float startDeg = -90f - span * 0.5f + mHoveredSector * span;
+                canvas.drawArc(mOuterOval, startDeg, span, true, mActiveWedgePaint);
+            }
+
+            for (int i = 0; i < RADIAL_SLOT_COUNT; i++) {
+                double spokeRad = Math.toRadians(-90.0 - span * 0.5 + i * span);
+                float sx0 = cx + (float) Math.cos(spokeRad) * innerR;
+                float sy0 = cy + (float) Math.sin(spokeRad) * innerR;
+                float sx1 = cx + (float) Math.cos(spokeRad) * outerR;
+                float sy1 = cy + (float) Math.sin(spokeRad) * outerR;
+                canvas.drawLine(sx0, sy0, sx1, sy1, mSpokePaint);
+
+                if (i < mSlots.size()) {
+                    double midRad = Math.toRadians(-90.0 + i * span);
+                    float lx = cx + (float) Math.cos(midRad) * labelR;
+                    float ly = cy + (float) Math.sin(midRad) * labelR + 4f * mDensity;
+                    mLabelPaint.setColor(i == mHoveredSector ? 0xFFFFFFFF : 0xFFE6F0FF);
+                    canvas.drawText(mSlots.get(i).label, lx, ly, mLabelPaint);
+                }
+            }
+
+            canvas.drawCircle(cx, cy, outerR, mRimPaint);
+            canvas.drawCircle(cx, cy, innerR, mHubPaint);
+            canvas.drawCircle(cx, cy, innerR, mRimPaint);
+
+            String centerLabel = (mHoveredSector >= 0 && mHoveredSector < mSlots.size())
+                    ? mSlots.get(mHoveredSector).label : "SWIPE";
+            canvas.drawText(centerLabel, cx, cy + 3.5f * mDensity, mSubPaint);
+        }
+
+        @Override
+        public boolean onTouchEvent(android.view.MotionEvent event) {
+            float cx = getWidth() * 0.5f;
+            float cy = getHeight() * 0.5f;
+            float outerR = Math.min(cx, cy) - 4f * mDensity;
+            float innerR = outerR * 0.30f;
+            int action = event.getActionMasked();
+
+            if (action == android.view.MotionEvent.ACTION_DOWN
+                    || action == android.view.MotionEvent.ACTION_MOVE) {
+                if (getParent() != null) {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+                int sec = resolveRadialSector(event.getX() - cx, event.getY() - cy, innerR, outerR);
+                if (sec != mHoveredSector) {
+                    mHoveredSector = sec;
+                    if (sec >= 0) performHaptic(this);
+                    invalidate();
+                }
+                return true;
+            }
+            if (action == android.view.MotionEvent.ACTION_UP) {
+                int chosen = mHoveredSector;
+                mHoveredSector = -1;
+                invalidate();
+                if (chosen >= 0) {
+                    performHaptic(this);
+                    mListener.onSlotSelected(chosen);
+                }
+                return true;
+            }
+            if (action == android.view.MotionEvent.ACTION_CANCEL) {
+                mHoveredSector = -1;
+                invalidate();
+                return true;
+            }
+            return super.onTouchEvent(event);
         }
     }
 }

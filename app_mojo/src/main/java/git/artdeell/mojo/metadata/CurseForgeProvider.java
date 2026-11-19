@@ -64,8 +64,65 @@ public class CurseForgeProvider {
         }
     }
 
+    private static final long DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000L;
+    private static final long AUTH_FAILURE_COOLDOWN_MS = 10 * 60_000L;
+    private static volatile long sCooldownUntilMs = 0L;
+    private static volatile int sLastFailureHttpCode = 0;
+
     public static boolean isApiKeyConfigured(@Nullable String apiKey) {
-        return apiKey != null && !apiKey.trim().isEmpty() && !"DUMMY".equals(apiKey.trim());
+        if (apiKey == null) return false;
+        String clean = apiKey.trim();
+        return clean.length() >= 8
+                && !"DUMMY".equalsIgnoreCase(clean)
+                && !"NONE".equalsIgnoreCase(clean)
+                && !"NULL".equalsIgnoreCase(clean);
+    }
+
+    /** Returns {@code true} when CurseForge has a valid API key AND is not inside a 429/403 cooldown. */
+    public static boolean canQueryCurseForge(@Nullable String apiKey) {
+        return isApiKeyConfigured(apiKey) && System.currentTimeMillis() >= sCooldownUntilMs;
+    }
+
+    /** Returns {@code true} when CurseForge is temporarily cooling down due to HTTP 429/401/403. */
+    public static boolean isRateLimitedOrBlocked() {
+        return System.currentTimeMillis() < sCooldownUntilMs;
+    }
+
+    /** Records an upstream HTTP error so subsequent queries skip CurseForge and fall back cleanly. */
+    public static void recordUpstreamFailure(int httpStatusCode, long retryAfterMs) {
+        sLastFailureHttpCode = httpStatusCode;
+        long now = System.currentTimeMillis();
+        if (httpStatusCode == 429) {
+            long wait = retryAfterMs > 0L
+                    ? Math.min(300_000L, retryAfterMs)
+                    : DEFAULT_RATE_LIMIT_COOLDOWN_MS;
+            sCooldownUntilMs = now + wait;
+        } else if (httpStatusCode == 401 || httpStatusCode == 403) {
+            sCooldownUntilMs = now + AUTH_FAILURE_COOLDOWN_MS;
+        } else if (httpStatusCode >= 500) {
+            sCooldownUntilMs = now + 20_000L;
+        }
+    }
+
+    /** Resets transient rate-limit cooldown state (called on success or manual retry). */
+    public static void resetRateLimitState() {
+        sCooldownUntilMs = 0L;
+        sLastFailureHttpCode = 0;
+    }
+
+    /** Returns a friendly, non-intrusive status banner string when falling back to Modrinth. */
+    @NonNull
+    public static String buildModrinthFallbackNotice(@Nullable String apiKey) {
+        if (!isApiKeyConfigured(apiKey)) {
+            return "CurseForge API key not configured - seamlessly showing verified Modrinth results.";
+        }
+        if (sLastFailureHttpCode == 429) {
+            return "CurseForge is rate-limited right now - automatically showing Modrinth results.";
+        }
+        if (sLastFailureHttpCode == 401 || sLastFailureHttpCode == 403) {
+            return "CurseForge API access unavailable - automatically showing Modrinth results.";
+        }
+        return "CurseForge temporarily unreachable - automatically showing Modrinth results.";
     }
 
     public static boolean isReleaseMinecraftVersion(@Nullable String version) {

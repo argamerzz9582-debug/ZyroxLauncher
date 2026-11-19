@@ -109,6 +109,12 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_HUD_COMPACT = false;
     /** Enables 120Hz/144Hz unbuffered historical touch sampling and sub-frame aim interpolation. */
     public static boolean PREF_ZYROX_HIGH_RATE_TOUCH = true;
+    /** True once the 3-step first-launch Zyrox onboarding wizard has completed or been skipped. */
+    public static boolean PREF_ZYROX_ONBOARDING_DONE = false;
+    /** Enables context-aware auto-switching between Inventory/GUI helper bar and Combat/Build HUD. */
+    public static boolean PREF_ZYROX_CONTEXT_CONTROLS = true;
+    /** Remembers whether the user expanded Advanced / Pro Mode inside InstanceEditorFragment. */
+    public static boolean PREF_ZYROX_INSTANCE_PRO_MODE = false;
 
     public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
     public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
@@ -118,6 +124,9 @@ public class LauncherPreferences {
     public static final String KEY_ZYROX_HUD_LOCKED = "zyroxHudLocked";
     public static final String KEY_ZYROX_HUD_COMPACT = "zyroxHudCompact";
     public static final String KEY_ZYROX_HIGH_RATE_TOUCH = "zyroxHighRateTouch";
+    public static final String KEY_ZYROX_ONBOARDING_DONE = "zyroxOnboardingDone";
+    public static final String KEY_ZYROX_CONTEXT_CONTROLS = "zyroxContextControls";
+    public static final String KEY_ZYROX_INSTANCE_PRO_MODE = "zyroxInstanceProMode";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -192,6 +201,9 @@ public class LauncherPreferences {
         PREF_ZYROX_HUD_LOCKED = DEFAULT_PREF.getBoolean(KEY_ZYROX_HUD_LOCKED, false);
         PREF_ZYROX_HUD_COMPACT = DEFAULT_PREF.getBoolean(KEY_ZYROX_HUD_COMPACT, false);
         PREF_ZYROX_HIGH_RATE_TOUCH = DEFAULT_PREF.getBoolean(KEY_ZYROX_HIGH_RATE_TOUCH, true);
+        PREF_ZYROX_ONBOARDING_DONE = DEFAULT_PREF.getBoolean(KEY_ZYROX_ONBOARDING_DONE, false);
+        PREF_ZYROX_CONTEXT_CONTROLS = DEFAULT_PREF.getBoolean(KEY_ZYROX_CONTEXT_CONTROLS, true);
+        PREF_ZYROX_INSTANCE_PRO_MODE = DEFAULT_PREF.getBoolean(KEY_ZYROX_INSTANCE_PRO_MODE, false);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

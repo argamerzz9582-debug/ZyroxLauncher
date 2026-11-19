@@ -37,6 +37,23 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     /** Default legacy control background color treated as standard ultra-clear Liquid Glass. */
     public static final int LEGACY_DEFAULT_CONTROL_BG = 0x4D000000;
 
+    /** Phase 3 High-Contrast Liquid Glass dark base scrim ({@code #660B0F17}) for WCAG readability. */
+    public static final int HIGH_CONTRAST_SCRIM = 0x660B0F17;
+    /** Phase 3 Specular border top highlight ({@code #4DFFFFFF}). */
+    public static final int SPECULAR_BORDER_TOP = 0x4DFFFFFF;
+    /** Phase 3 Specular border bottom fade ({@code #0DFFFFFF}). */
+    public static final int SPECULAR_BORDER_BOTTOM = 0x0DFFFFFF;
+    /** Minimum device RAM (MB) required to enable Android 12+ hardware {@code RenderEffect} blur. */
+    public static final int MIN_HARDWARE_BLUR_RAM_MB = 5500;
+
+    /** Adaptive GPU blur tier selected automatically per Android API, RAM, and GPU vendor. */
+    public enum GlassBlurTier {
+        /** Android 12+ (API 31+) mid/high-tier Adreno/Xclipse GPU: real-time RenderEffect blur. */
+        HARDWARE_RENDER_EFFECT,
+        /** Android 11 or low-RAM / Mali / PowerVR device: zero-overhead frosted 2-layer gradient. */
+        FROSTED_GRADIENT_FALLBACK
+    }
+
     // Ultra-sheer Starlight Sapphire-Crystal optical Liquid Glass tokens (~94% clear, crisp edges)
     public static final int NORMAL_HALO_TOP = 0x2409101E;
     public static final int NORMAL_HALO_BOTTOM = 0x36070C18;
@@ -75,6 +92,8 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
     private final boolean mHudSurfaceMode;
 
     // Reusable paints & rects — strictly zero allocations inside draw()
+    private final Paint mScrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mSpecularBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mHaloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mBodyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mDomePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -120,6 +139,8 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         mDensity = density > 0f ? density : 2.75f;
         mHudSurfaceMode = hudSurfaceMode;
 
+        mScrimPaint.setStyle(Paint.Style.FILL);
+        mSpecularBorderPaint.setStyle(Paint.Style.STROKE);
         mHaloPaint.setStyle(Paint.Style.STROKE);
         mBodyPaint.setStyle(Paint.Style.FILL);
         mDomePaint.setStyle(Paint.Style.FILL);
@@ -273,6 +294,21 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
                 bottomBarBottom
         );
         mBottomBarRadius = bottomBarHeight * 0.5f;
+
+        // 0. High-Contrast 2-Layer Glass Foundation (#660B0F17 dark scrim + #4DFFFFFF->#0DFFFFFF border)
+        int baseScrimAlpha = Color.alpha(HIGH_CONTRAST_SCRIM); // 0x66 = 102 (~40% dark WCAG scrim)
+        int effectiveScrimAlpha = mHudSurfaceMode
+                ? Math.max(24, Math.min(220, Math.round(baseScrimAlpha * (0.65f + (mHudOpacityPercent / 100f)))))
+                : Math.round(baseScrimAlpha * 0.35f);
+        mScrimPaint.setColor(scaleAlpha((effectiveScrimAlpha << 24) | (HIGH_CONTRAST_SCRIM & 0x00FFFFFF)));
+
+        mSpecularBorderPaint.setStrokeWidth(Math.max(1.0f, 1.1f * mDensity));
+        mSpecularBorderPaint.setShader(new LinearGradient(
+                0f, mBodyRect.top, 0f, mBodyRect.bottom,
+                scaleAlpha(SPECULAR_BORDER_TOP),
+                scaleAlpha(SPECULAR_BORDER_BOTTOM),
+                Shader.TileMode.CLAMP
+        ));
 
         // 1. Outer contrast contour (subtle dark micro-shadow idle; soft ice aura pressed)
         mHaloPaint.setStrokeWidth(haloStroke);
@@ -431,8 +467,18 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             canvas.drawRoundRect(mHaloRect, mHaloRadius, mHaloRadius, mHaloPaint);
         }
 
-        // 2. Ultra-sheer crystal liquid-glass lens fill (~93–96% see-through!)
+        // 1b. Layer 1 of High-Contrast Glass: #660B0F17 dark readability scrim (prevents white-on-white washout)
+        if (!mDisabled && (mHudSurfaceMode || mHighContrastScrimEnabled)) {
+            canvas.drawRoundRect(mBodyRect, mBodyRadius, mBodyRadius, mScrimPaint);
+        }
+
+        // 2. Optical crystal liquid-glass lens fill
         canvas.drawRoundRect(mBodyRect, mBodyRadius, mBodyRadius, mBodyPaint);
+
+        // 2b. Layer 2 of High-Contrast Glass: Top-to-bottom specular border (#4DFFFFFF -> #0DFFFFFF)
+        if (mHudSurfaceMode || mHighContrastScrimEnabled) {
+            canvas.drawRoundRect(mBodyRect, mBodyRadius, mBodyRadius, mSpecularBorderPaint);
+        }
 
         if (!lowEffects && !mDisabled && mInnerRect.width() > 6f * mDensity && mInnerRect.height() > 6f * mDensity) {
             // 3. Upper curved convex dome highlight
@@ -571,6 +617,94 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         return false;
     }
 
+    private boolean mHighContrastScrimEnabled = false;
+
+    /** Enables the full {@code #660B0F17} WCAG dark scrim + {@code #4DFFFFFF->#0DFFFFFF} specular rim. */
+    public void setHighContrastScrimEnabled(boolean enabled) {
+        if (mHighContrastScrimEnabled != enabled) {
+            mHighContrastScrimEnabled = enabled;
+            mGeometryDirty = true;
+            invalidateSelf();
+        }
+    }
+
+    public boolean isHighContrastScrimEnabled() {
+        return mHudSurfaceMode || mHighContrastScrimEnabled;
+    }
+
+    /**
+     * Pure deterministic GPU blur tier classifier: enables hardware {@code RenderEffect} ONLY on
+     * Android 12+ (API 31+) mid/high-tier Adreno 7xx/8xx / Xclipse / Desktop GPUs with
+     * {@code >= 5.5 GB} RAM; falls back seamlessly to zero-overhead 2-layer frosted gradient glass
+     * on Android 11, low-RAM phones, Mali, PowerVR, and legacy Adreno GPUs.
+     */
+    @NonNull
+    public static GlassBlurTier resolveGlassBlurTier(
+            int sdkInt,
+            int totalRamMb,
+            @Nullable git.artdeell.mojo.utils.GpuUtils.GpuArchitecture architecture,
+            boolean lowEffectsPref) {
+        if (lowEffectsPref) {
+            return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
+        }
+        if (sdkInt < android.os.Build.VERSION_CODES.S) {
+            return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
+        }
+        if (totalRamMb > 0 && totalRamMb < MIN_HARDWARE_BLUR_RAM_MB) {
+            return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
+        }
+        if (architecture == null
+                || architecture.isArmFamily()
+                || architecture == git.artdeell.mojo.utils.GpuUtils.GpuArchitecture.POWERVR
+                || architecture == git.artdeell.mojo.utils.GpuUtils.GpuArchitecture.ADRENO_LEGACY
+                || architecture == git.artdeell.mojo.utils.GpuUtils.GpuArchitecture.UNKNOWN) {
+            return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
+        }
+        return GlassBlurTier.HARDWARE_RENDER_EFFECT;
+    }
+
+    /** Evaluates the current device's optimal {@link GlassBlurTier} without throwing on any OEM. */
+    @NonNull
+    public static GlassBlurTier resolveDeviceGlassBlurTier(@NonNull android.content.Context context) {
+        try {
+            int ramMb = git.artdeell.mojo.Tools.getTotalDeviceMemory(context);
+            git.artdeell.mojo.utils.GpuUtils.GLInfo gl = git.artdeell.mojo.utils.GpuUtils.getGlInfo();
+            return resolveGlassBlurTier(
+                    android.os.Build.VERSION.SDK_INT,
+                    ramMb,
+                    gl != null ? gl.architecture : null,
+                    LauncherPreferences.PREF_ZYROX_LOW_EFFECTS);
+        } catch (Throwable ignored) {
+            return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
+        }
+    }
+
+    /**
+     * Applies Android 12+ hardware {@link android.graphics.RenderEffect} blur to a dedicated blur
+     * underlay view when the device qualifies for {@link GlassBlurTier#HARDWARE_RENDER_EFFECT}, or
+     * clears {@code RenderEffect} immediately on Android 11 / low-RAM / Mali devices and protected
+     * GIF/MP4 backdrops so frame rates stay locked at native refresh rate.
+     */
+    public static boolean applyAdaptiveRenderEffectBlur(@Nullable android.view.View blurUnderlayView,
+                                                        @NonNull android.content.Context context,
+                                                        float radiusDp) {
+        if (blurUnderlayView == null) return false;
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+            return false;
+        }
+        if (!isEligibleForForegroundBlur(blurUnderlayView)
+                || resolveDeviceGlassBlurTier(context) != GlassBlurTier.HARDWARE_RENDER_EFFECT
+                || radiusDp <= 0.5f) {
+            blurUnderlayView.setRenderEffect(null);
+            return false;
+        }
+        float density = Math.max(1f, context.getResources().getDisplayMetrics().density);
+        float radiusPx = Math.min(36f, Math.max(2f, radiusDp * density));
+        blurUnderlayView.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(
+                radiusPx, radiusPx, android.graphics.Shader.TileMode.CLAMP));
+        return true;
+    }
+
     /**
      * Attaches a foreground-isolated Liquid Glass surface to {@code cardView} while explicitly
      * clearing any accidental {@link android.graphics.RenderEffect} on background GIF hierarchies.
@@ -584,7 +718,9 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             }
             return;
         }
-        cardView.setBackground(new ZyroxLiquidGlassDrawable(density, hudSurfaceMode));
+        ZyroxLiquidGlassDrawable glass = new ZyroxLiquidGlassDrawable(density, hudSurfaceMode);
+        glass.setHighContrastScrimEnabled(true);
+        cardView.setBackground(glass);
         cardView.setClipToOutline(true);
     }
 

@@ -1,8 +1,7 @@
 package git.artdeell.mojo.fragments;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -10,6 +9,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -18,6 +19,7 @@ import androidx.fragment.app.Fragment;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -36,13 +38,15 @@ import git.artdeell.mojo.security.LogRedactor;
 import git.artdeell.mojo.ui.ZyroxLogHighlighter;
 
 /**
- * Zyrox 2.0 Smart Crash & Log Inspector (Zyrox Guard) — Dark glass monospace terminal with
- * deterministic local crash classification, confidence scoring, redacted clipboard/file export,
- * and safe recovery shortcuts.
+ * Zyrox Smart Crash &amp; Log Inspector (Zyrox Guard) — Dark Liquid Glass monospace terminal with
+ * deterministic local crash diagnosis, 1-Tap Fix &amp; Relaunch shortcuts, and mandatory
+ * {@link LogRedactor} token/UUID/session scrubbing on display, clipboard copy, SAF file export,
+ * and Android share sheet dispatch.
  */
 public class LogInspectorFragment extends Fragment {
     public static final String TAG = "LOG_INSPECTOR_FRAGMENT";
     private static final int MAX_PREVIEW_BYTES = 96 * 1024;
+    private static final long MAX_EXPORT_BYTES = 8L * 1024L * 1024L;
 
     private TextView mStatusBadge;
     private TextView mMetaView;
@@ -53,6 +57,11 @@ public class LogInspectorFragment extends Fragment {
     private Button mGuardActionBtn;
     private String mCurrentRedactedLog = "";
     private ZyroxCrashAnalyzer.Diagnosis mCurrentDiagnosis;
+
+    private final ActivityResultLauncher<String> mExportLogLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.CreateDocument("text/plain"),
+                    this::onExportLogUriSelected);
 
     public LogInspectorFragment() {
         super(R.layout.fragment_log_inspector);
@@ -71,6 +80,10 @@ public class LogInspectorFragment extends Fragment {
         view.findViewById(R.id.btn_log_refresh).setOnClickListener(v -> loadLatestLog());
         view.findViewById(R.id.btn_log_clear).setOnClickListener(v -> clearLatestLog());
         view.findViewById(R.id.btn_log_copy).setOnClickListener(v -> copyLog(v.getContext()));
+        View exportBtn = view.findViewById(R.id.btn_log_export);
+        if (exportBtn != null) {
+            exportBtn.setOnClickListener(v -> startRedactedExport());
+        }
         view.findViewById(R.id.btn_log_share).setOnClickListener(v -> Tools.shareLog(v.getContext()));
         view.findViewById(R.id.btn_log_relaunch).setOnClickListener(v -> {
             Tools.backToMainMenu(requireActivity());
@@ -78,6 +91,44 @@ public class LogInspectorFragment extends Fragment {
         });
 
         loadLatestLog();
+    }
+
+    private void startRedactedExport() {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        File logFile = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
+        if (!logFile.isFile() || logFile.length() == 0L) {
+            Toast.makeText(ctx, R.string.zyrox_log_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        mExportLogLauncher.launch("zyrox-log-redacted.txt");
+    }
+
+    private void onExportLogUriSelected(@Nullable Uri targetUri) {
+        if (targetUri == null || getContext() == null) return;
+        final Context appCtx = getContext().getApplicationContext();
+        final File logFile = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
+        MojoApplication.sExecutorService.execute(() -> {
+            if (!logFile.isFile() || logFile.length() == 0L) {
+                Tools.runOnUiThread(() ->
+                        Toast.makeText(appCtx, R.string.zyrox_log_empty, Toast.LENGTH_SHORT).show());
+                return;
+            }
+            try (OutputStream out = appCtx.getContentResolver().openOutputStream(targetUri, "wt")) {
+                if (out == null) throw new IOException("Cannot open selected destination");
+                LogRedactor.writeRedactedStream(logFile, out, MAX_EXPORT_BYTES);
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx,
+                        "Exported privacy-redacted log (OAuth tokens & UUIDs stripped).",
+                        Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                final String safeErr = LogRedactor.redact(e.getMessage());
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx,
+                        "Log export failed: " + safeErr,
+                        Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void loadLatestLog() {
@@ -102,7 +153,8 @@ public class LogInspectorFragment extends Fragment {
             ZyroxCrashAnalyzer.Diagnosis diagnosis = ZyroxCrashAnalyzer.analyze(redacted);
             CharSequence highlighted = ZyroxLogHighlighter.highlightBlock(redacted);
             boolean hasCrash = diagnosis.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED;
-            String meta = String.format(Locale.ROOT, "latestlog.txt  •  %.1f KB  •  AUTO-REDACTED", totalLen / 1024f);
+            String meta = String.format(Locale.ROOT,
+                    "latestlog.txt  •  %.1f KB  •  AUTO-REDACTED", totalLen / 1024f);
 
             Tools.runOnUiThread(() -> {
                 if (!isAdded()) return;
@@ -130,8 +182,30 @@ public class LogInspectorFragment extends Fragment {
             return;
         }
         mGuardContainer.setVisibility(View.VISIBLE);
-        mGuardSummary.setText("ZYROX GUARD: " + diag.formatCompactSummary());
+        mGuardSummary.setText("ZYROX GUARD: " + LogRedactor.redact(diag.formatCompactSummary()));
         if (mGuardActionBtn == null) return;
+
+        if (ZyroxCrashAnalyzer.supportsOneTapFix(diag)) {
+            mGuardActionBtn.setVisibility(View.VISIBLE);
+            mGuardActionBtn.setText(ZyroxCrashAnalyzer.getOneTapFixButtonLabel(diag));
+            mGuardActionBtn.setOnClickListener(v -> {
+                final Context appCtx = v.getContext().getApplicationContext();
+                mGuardActionBtn.setEnabled(false);
+                MojoApplication.sExecutorService.execute(() -> {
+                    ZyroxCrashAnalyzer.FixOutcome outcome =
+                            ZyroxCrashAnalyzer.executeOneTapFix(appCtx, diag);
+                    Tools.runOnUiThread(() -> {
+                        if (mGuardActionBtn != null) mGuardActionBtn.setEnabled(true);
+                        Toast.makeText(appCtx, outcome.message, Toast.LENGTH_LONG).show();
+                        if (outcome.applied && isAdded()) {
+                            Tools.backToMainMenu(requireActivity());
+                            ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                        }
+                    });
+                });
+            });
+            return;
+        }
 
         switch (diag.primaryAction) {
             case OPEN_INSTANCE_STUDIO:
@@ -197,21 +271,22 @@ public class LogInspectorFragment extends Fragment {
         });
     }
 
-    private void copyLog(Context context) {
-        ClipboardManager mgr = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (mgr != null) {
-            String safePayload = LogRedactor.redact(
-                    mCurrentRedactedLog.isEmpty() ? mLogContentView.getText().toString() : mCurrentRedactedLog);
-            if (mCurrentDiagnosis != null
-                    && mCurrentDiagnosis.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
-                safePayload = mCurrentDiagnosis.formatCompactSummary() + "\n\n" + safePayload;
-            }
-            mgr.setPrimaryClip(ClipData.newPlainText("zyrox_log", safePayload));
+    private void copyLog(@Nullable Context context) {
+        if (context == null) return;
+        String rawCandidate = mCurrentRedactedLog.isEmpty()
+                ? (mLogContentView != null ? mLogContentView.getText().toString() : "")
+                : mCurrentRedactedLog;
+        if (mCurrentDiagnosis != null
+                && mCurrentDiagnosis.category != ZyroxCrashAnalyzer.Category.NO_CRASH_DETECTED) {
+            rawCandidate = mCurrentDiagnosis.formatCompactSummary() + "\n\n" + rawCandidate;
+        }
+        if (LogRedactor.copyRedactedToClipboard(context, "zyrox_log", rawCandidate)) {
             Toast.makeText(context, R.string.zyrox_log_copied, Toast.LENGTH_SHORT).show();
         }
     }
 
-    public static String readLogTail(File file, int maxBytes) {
+    @NonNull
+    public static String readLogTail(@Nullable File file, int maxBytes) {
         if (file == null || !file.isFile()) return "";
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
             long len = raf.length();
@@ -225,13 +300,13 @@ public class LogInspectorFragment extends Fragment {
             if (offset > 0) {
                 int firstNl = text.indexOf('\n');
                 if (firstNl >= 0 && firstNl + 1 < text.length()) {
-                    text = "... [earlier lines truncated — use SHARE LOG for full redacted file]\n"
+                    text = "... [earlier lines truncated — use EXPORT/SHARE LOG for full redacted file]\n"
                             + text.substring(firstNl + 1);
                 }
             }
-            return text;
+            return LogRedactor.redact(text);
         } catch (IOException e) {
-            return e.toString();
+            return LogRedactor.redact("Failed to read log: " + e.getMessage());
         }
     }
 }

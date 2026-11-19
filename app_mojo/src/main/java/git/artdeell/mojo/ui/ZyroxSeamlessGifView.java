@@ -119,6 +119,64 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
 
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private static final long MAX_CUSTOM_GIF_BYTES = 32L * 1024L * 1024L;
+    private static final List<java.lang.ref.WeakReference<ZyroxSeamlessGifView>> ACTIVE_VIEWS =
+            new ArrayList<>();
+
+    private static void registerInstance(@NonNull ZyroxSeamlessGifView view) {
+        synchronized (ACTIVE_VIEWS) {
+            for (int i = ACTIVE_VIEWS.size() - 1; i >= 0; i--) {
+                ZyroxSeamlessGifView v = ACTIVE_VIEWS.get(i).get();
+                if (v == null || v == view || v.mReleased) {
+                    ACTIVE_VIEWS.remove(i);
+                }
+            }
+            ACTIVE_VIEWS.add(new java.lang.ref.WeakReference<>(view));
+        }
+    }
+
+    private static void unregisterInstance(@NonNull ZyroxSeamlessGifView view) {
+        synchronized (ACTIVE_VIEWS) {
+            for (int i = ACTIVE_VIEWS.size() - 1; i >= 0; i--) {
+                ZyroxSeamlessGifView v = ACTIVE_VIEWS.get(i).get();
+                if (v == null || v == view) {
+                    ACTIVE_VIEWS.remove(i);
+                }
+            }
+        }
+    }
+
+    /**
+     * Immediately halts all active GIF views, cancels in-flight decodes, and recycles every frame
+     * bitmap on the main thread when {@code LauncherActivity.onStop()} or {@code GameService} fires.
+     */
+    public static void purgeAllActiveInstances(final boolean permanentRelease) {
+        ZyroxGifDecoder.cancelAllActiveDecodes();
+        Runnable task = () -> {
+            List<ZyroxSeamlessGifView> snapshot = new ArrayList<>();
+            synchronized (ACTIVE_VIEWS) {
+                for (int i = ACTIVE_VIEWS.size() - 1; i >= 0; i--) {
+                    ZyroxSeamlessGifView v = ACTIVE_VIEWS.get(i).get();
+                    if (v == null || v.mReleased) {
+                        ACTIVE_VIEWS.remove(i);
+                    } else {
+                        snapshot.add(v);
+                    }
+                }
+            }
+            for (ZyroxSeamlessGifView v : snapshot) {
+                if (permanentRelease) {
+                    v.release();
+                } else {
+                    v.trimFrames();
+                }
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            task.run();
+        } else {
+            MAIN_HANDLER.post(task);
+        }
+    }
 
     private final Paint mBasePaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     private final Paint mBlendPaint = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
@@ -189,6 +247,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
             initBicubicShaderApi33();
         }
         syncScalingFilterFromPreferences();
+        registerInstance(this);
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
@@ -344,7 +403,16 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     public void trimFrames() {
         stopActivePlayback();
         cancelInFlightDecode();
-        recycleAllOnUiThread();
+        mBicubicPaint.setShader(null);
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            recycleAllOnUiThread();
+            invalidate();
+        } else {
+            MAIN_HANDLER.post(() -> {
+                recycleAllOnUiThread();
+                invalidate();
+            });
+        }
     }
 
     /** Permanently stops playback and releases every hardware drawable and bitmap buffer. */
@@ -352,9 +420,16 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         if (mReleased) return;
         mReleased = true;
         mShouldAnimate = false;
+        unregisterInstance(this);
         stopActivePlayback();
         cancelInFlightDecode();
-        recycleAllOnUiThread();
+        mBicubicPaint.setShader(null);
+        mBicubicRuntimeShader = null;
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            recycleAllOnUiThread();
+        } else {
+            MAIN_HANDLER.post(this::recycleAllOnUiThread);
+        }
     }
 
     @Override
@@ -378,6 +453,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         final File targetFile = mGifFile;
         final boolean nearest = isNearestNeighborFilter();
         final AtomicBoolean cancelFlag = new AtomicBoolean(false);
+        ZyroxGifDecoder.registerActiveDecode(cancelFlag);
         mActiveDecodeCancel = cancelFlag;
         mDecoding = true;
 

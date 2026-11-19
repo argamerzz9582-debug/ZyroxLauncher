@@ -52,6 +52,7 @@ public class ServerManagerFragment extends Fragment {
     private TextView mHeaderLine;
     private LinearLayout mListContainer;
     private final List<ServerListManager.ServerEntry> mServers = new ArrayList<>();
+    private final List<Instance> mCachedInstances = new ArrayList<>();
 
     private final ActivityResultLauncher<String> mExportLauncher =
             registerForActivityResult(new ActivityResultContracts.CreateDocument("application/json"), this::onExportSelected);
@@ -74,13 +75,18 @@ public class ServerManagerFragment extends Fragment {
         mHeaderLine = ZyroxStudioUi.createSubtitle(ctx, "Loading saved servers...");
         topBar.addView(mHeaderLine, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
+        Button btnLan = ZyroxStudioUi.createSecondaryButton(ctx, "Scan LAN", true);
+        btnLan.setOnClickListener(v -> runLanWorldScan());
+        topBar.addView(btnLan, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
         Button btnPingAll = ZyroxStudioUi.createSecondaryButton(ctx, "Ping All", true);
         btnPingAll.setOnClickListener(v -> pingAllServers());
         topBar.addView(btnPingAll, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
 
         Button btnImport = ZyroxStudioUi.createSecondaryButton(ctx, "Import", true);
-        btnImport.setOnClickListener(v -> mImportLauncher.launch(new String[]{"application/json", "*/*"}));
+        btnImport.setOnClickListener(v -> mImportLauncher.launch(new String[]{"*/*"}));
         topBar.addView(btnImport, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
 
@@ -123,8 +129,16 @@ public class ServerManagerFragment extends Fragment {
             try {
                 List<ServerListManager.ServerEntry> list =
                         ServerListManager.loadServers(mInstance.getGameDirectory());
+                List<Instance> allInstances = Collections.emptyList();
+                try {
+                    allInstances = Instances.loadAllInstances();
+                } catch (Exception ignored) {
+                }
+                final List<Instance> finalInst = allInstances;
                 Tools.runOnUiThread(() -> {
                     if (!isAdded()) return;
+                    mCachedInstances.clear();
+                    if (finalInst != null) mCachedInstances.addAll(finalInst);
                     mServers.clear();
                     mServers.addAll(list);
                     sortFavoritesFirst();
@@ -164,11 +178,37 @@ public class ServerManagerFragment extends Fragment {
         mHeaderLine.setText(mInstance.name + " • " + mServers.size() + " saved server(s) in servers.dat");
 
         if (mServers.isEmpty()) {
+            LinearLayout guideCard = ZyroxStudioUi.createItemCard(ctx);
+            int pad = ZyroxStudioUi.dp(ctx, 14);
+            guideCard.setPadding(pad, pad, pad, pad);
+            guideCard.addView(ZyroxStudioUi.createTitle(ctx, "Ready for Multiplayer"));
             TextView empty = ZyroxStudioUi.createSubtitle(ctx,
-                    "No servers saved yet for this instance.\nTap '+ Add Server' to add a server synced directly with Minecraft's Multiplayer menu, or 'Import' a server list.");
-            empty.setPadding(ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 24),
-                    ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 24));
-            mListContainer.addView(empty);
+                    "Add popular verified Java servers in 1 tap, scan your local Wi-Fi for active LAN worlds, "
+                            + "or enter any server IP — Zyrox syncs directly with servers.dat and auto-matches the right Minecraft version.");
+            empty.setPadding(0, ZyroxStudioUi.dp(ctx, 4), 0, ZyroxStudioUi.dp(ctx, 12));
+            guideCard.addView(empty);
+
+            LinearLayout actions = new LinearLayout(ctx);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setGravity(Gravity.CENTER_VERTICAL);
+
+            Button btnPopular = ZyroxStudioUi.createPrimaryButton(ctx, "Add Popular Servers");
+            btnPopular.setOnClickListener(v -> addPopularServersStarterPack());
+            actions.addView(btnPopular, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36)));
+
+            Button btnScanLan = ZyroxStudioUi.createSecondaryButton(ctx, "Scan Local LAN Worlds", false);
+            btnScanLan.setOnClickListener(v -> runLanWorldScan());
+            actions.addView(btnScanLan, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36), ZyroxStudioUi.dp(ctx, 8)));
+
+            Button btnCustom = ZyroxStudioUi.createSecondaryButton(ctx, "+ Custom IP", false);
+            btnCustom.setOnClickListener(v -> showEditDialog(null));
+            actions.addView(btnCustom, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36), ZyroxStudioUi.dp(ctx, 8)));
+
+            guideCard.addView(actions);
+            mListContainer.addView(guideCard);
             return;
         }
 
@@ -240,10 +280,30 @@ public class ServerManagerFragment extends Fragment {
             row.addView(btnEdit, ZyroxStudioUi.spacedParam(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 4)));
 
-            Button btnJoin = ZyroxStudioUi.createPrimaryButton(ctx, "Join");
-            btnJoin.setOnClickListener(v -> quickJoin(s));
-            row.addView(btnJoin, ZyroxStudioUi.spacedParam(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+            final String reqMc = s.lastOnline ? s.lastResolvedMcVersion : null;
+            final Instance matchingOther = findMatchingInstance(reqMc);
+            final boolean currentMatches = reqMc == null
+                    || ServerPinger.doesInstanceMatchVersion(mInstance.versionId, reqMc)
+                    || Instance.VERSION_LATEST_RELEASE.equals(mInstance.versionId);
+
+            if (reqMc != null && !currentMatches && matchingOther == null) {
+                Button btnCreateJoin = ZyroxStudioUi.createPrimaryButton(
+                        ctx, "Create " + reqMc + " Instance & Join");
+                btnCreateJoin.setOnClickListener(v -> createMatchedInstanceAndJoin(s, reqMc));
+                row.addView(btnCreateJoin, ZyroxStudioUi.spacedParam(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+            } else if (reqMc != null && !currentMatches) {
+                Button btnSwitchJoin = ZyroxStudioUi.createPrimaryButton(
+                        ctx, "Switch " + reqMc + " & Join");
+                btnSwitchJoin.setOnClickListener(v -> switchInstanceAndJoin(matchingOther, s));
+                row.addView(btnSwitchJoin, ZyroxStudioUi.spacedParam(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+            } else {
+                Button btnJoin = ZyroxStudioUi.createPrimaryButton(ctx, "Join");
+                btnJoin.setOnClickListener(v -> quickJoin(s));
+                row.addView(btnJoin, ZyroxStudioUi.spacedParam(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+            }
 
             card.addView(row);
             mListContainer.addView(card);
@@ -322,9 +382,13 @@ public class ServerManagerFragment extends Fragment {
                     server.lastPlayers = (res.onlinePlayers >= 0 && res.maxPlayers >= 0)
                             ? (res.onlinePlayers + "/" + res.maxPlayers) : null;
                     server.lastVersion = res.versionName;
+                    server.lastProtocol = res.protocolVersion;
+                    server.lastResolvedMcVersion = res.resolvedMcVersion;
                     server.lastMotd = !res.formattedMotd.isEmpty() ? res.formattedMotd : res.motd;
                     if (res.faviconBase64 != null) server.iconBase64 = res.faviconBase64;
                 } else {
+                    server.lastProtocol = -1;
+                    server.lastResolvedMcVersion = null;
                     server.lastMotd = "Offline (" + (res.errorMessage != null ? res.errorMessage : "unreachable") + ")";
                 }
                 renderList();
@@ -336,6 +400,151 @@ public class ServerManagerFragment extends Fragment {
         for (ServerListManager.ServerEntry s : new ArrayList<>(mServers)) {
             pingSingle(s);
         }
+    }
+
+    private void addPopularServersStarterPack() {
+        String[][] curated = new String[][]{
+                {"Hypixel Network", "mc.hypixel.net", "Minigames"},
+                {"Wynncraft MMORPG", "play.wynncraft.com", "RPG"},
+                {"CubeCraft Games", "play.cubecraft.net", "Minigames"},
+                {"Minemen Club", "minemen.club", "PvP"}
+        };
+        for (String[] row : curated) {
+            ServerListManager.ServerEntry entry = new ServerListManager.ServerEntry(row[0], row[1]);
+            entry.group = row[2];
+            mServers.add(entry);
+        }
+        saveAndRender();
+        pingAllServers();
+    }
+
+    private void runLanWorldScan() {
+        final Context ctx = requireContext();
+        Toast.makeText(ctx, "Scanning local Wi-Fi (224.0.2.60:4445) for LAN worlds…",
+                Toast.LENGTH_SHORT).show();
+        MojoApplication.sExecutorService.execute(() -> {
+            final List<ServerPinger.LanWorldEntry> lanWorlds =
+                    ServerPinger.scanLocalLanWorlds(2200);
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (lanWorlds.isEmpty()) {
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle("No Local LAN Worlds Found")
+                            .setMessage("Make sure the host opened their world via Pause → Open to LAN on the same Wi-Fi network or mobile hotspot, then scan again.")
+                            .setPositiveButton("Scan Again", (d, w) -> runLanWorldScan())
+                            .setNegativeButton(android.R.string.ok, null)
+                            .show();
+                    return;
+                }
+                String[] labels = new String[lanWorlds.size()];
+                for (int i = 0; i < lanWorlds.size(); i++) {
+                    ServerPinger.LanWorldEntry e = lanWorlds.get(i);
+                    labels[i] = e.motd + "  (" + e.address + ")";
+                }
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Discovered LAN Worlds (" + lanWorlds.size() + ")")
+                        .setItems(labels, (d, which) -> {
+                            ServerPinger.LanWorldEntry picked = lanWorlds.get(which);
+                            ServerListManager.ServerEntry entry =
+                                    new ServerListManager.ServerEntry(picked.motd, picked.address);
+                            entry.group = "LAN";
+                            mServers.add(entry);
+                            saveAndRender();
+                            quickJoin(entry);
+                        })
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
+    }
+
+    @Nullable
+    private Instance findMatchingInstance(@Nullable String mcVersion) {
+        if (mcVersion == null || mcVersion.isEmpty()) return null;
+        for (Instance inst : mCachedInstances) {
+            if (inst != null && ServerPinger.doesInstanceMatchVersion(inst.versionId, mcVersion)) {
+                return inst;
+            }
+        }
+        return null;
+    }
+
+    private void switchInstanceAndJoin(@NonNull Instance target,
+                                       @NonNull ServerListManager.ServerEntry server) {
+        final Context appCtx = requireContext().getApplicationContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                List<ServerListManager.ServerEntry> targetList =
+                        ServerListManager.loadServers(target.getGameDirectory());
+                boolean exists = false;
+                for (ServerListManager.ServerEntry e : targetList) {
+                    if (e.address.equalsIgnoreCase(server.address)) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    targetList.add(server);
+                    ServerListManager.saveServers(target.getGameDirectory(), targetList);
+                }
+                Instances.setSelectedInstance(target);
+                ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+                Tools.runOnUiThread(() -> {
+                    ServerListManager.setPendingQuickConnect(server.address);
+                    Toast.makeText(appCtx,
+                            "Switched to \"" + target.name + "\" & joining " + server.name + "…",
+                            Toast.LENGTH_SHORT).show();
+                    if (isAdded()) {
+                        Tools.backToMainMenu(requireActivity());
+                        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                    }
+                });
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "Switch failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void createMatchedInstanceAndJoin(@NonNull ServerListManager.ServerEntry server,
+                                              @NonNull String mcVersion) {
+        final Context appCtx = requireContext().getApplicationContext();
+        Toast.makeText(appCtx,
+                "Creating calibrated Minecraft " + mcVersion + " instance for " + server.name + "…",
+                Toast.LENGTH_SHORT).show();
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                final String title = server.name + " (" + mcVersion + ")";
+                Instance created = Instances.createInstance(inst -> {
+                    inst.name = title;
+                    inst.versionId = mcVersion;
+                    inst.performancePreset = Instance.PRESET_MAX_FPS;
+                    inst.sharedData = false;
+                }, "Server_" + mcVersion.replace('.', '_'));
+                git.artdeell.mojo.diagnostics.GraphicsAdvisor.ensureOptimalInstanceRenderer(
+                        appCtx, created, mcVersion);
+                ServerListManager.saveServers(
+                        created.getGameDirectory(), Collections.singletonList(server));
+                git.artdeell.mojo.utils.GameOptionsUtils.applyZeroLagFpsOptions(
+                        created.getGameDirectory(), false);
+                Instances.setSelectedInstance(created);
+                ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+
+                Tools.runOnUiThread(() -> {
+                    ServerListManager.setPendingQuickConnect(server.address);
+                    Toast.makeText(appCtx,
+                            "Created \"" + created.name + "\" — launching into " + server.name + "!",
+                            Toast.LENGTH_LONG).show();
+                    if (isAdded()) {
+                        Tools.backToMainMenu(requireActivity());
+                        ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+                    }
+                });
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "Auto-setup failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private void quickJoin(@NonNull ServerListManager.ServerEntry server) {

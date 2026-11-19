@@ -29,6 +29,22 @@ public final class ServerPinger {
     // Generic SLP status ping protocol version (-1 reports server's real version without client bias)
     private static final int SLP_PROTOCOL_QUERY = -1;
 
+    public static final String LAN_MULTICAST_GROUP = "224.0.2.60";
+    public static final int LAN_MULTICAST_PORT = 4445;
+
+    /** Discovered local Wi-Fi Minecraft "Open to LAN" world broadcast entry. */
+    public static final class LanWorldEntry {
+        @NonNull public final String motd;
+        @NonNull public final String address;
+        public final int port;
+
+        public LanWorldEntry(@NonNull String motd, @NonNull String address, int port) {
+            this.motd = motd;
+            this.address = address;
+            this.port = port;
+        }
+    }
+
     public static final class PingResult {
         public final boolean online;
         public final long latencyMs;
@@ -37,6 +53,8 @@ public final class ServerPinger {
         public final int onlinePlayers;
         public final int maxPlayers;
         @NonNull public final String versionName;
+        public final int protocolVersion;
+        @Nullable public final String resolvedMcVersion;
         @Nullable public final String faviconBase64;
         @Nullable public final String errorMessage;
 
@@ -49,7 +67,7 @@ public final class ServerPinger {
                           @Nullable String faviconBase64,
                           @Nullable String errorMessage) {
             this(online, latencyMs, motd, motd, onlinePlayers, maxPlayers,
-                    versionName, faviconBase64, errorMessage);
+                    versionName, -1, null, faviconBase64, errorMessage);
         }
 
         public PingResult(boolean online,
@@ -61,6 +79,22 @@ public final class ServerPinger {
                           @NonNull String versionName,
                           @Nullable String faviconBase64,
                           @Nullable String errorMessage) {
+            this(online, latencyMs, motd, formattedMotd, onlinePlayers, maxPlayers,
+                    versionName, -1, mapProtocolToMcVersion(-1, versionName),
+                    faviconBase64, errorMessage);
+        }
+
+        public PingResult(boolean online,
+                          long latencyMs,
+                          @NonNull String motd,
+                          @NonNull String formattedMotd,
+                          int onlinePlayers,
+                          int maxPlayers,
+                          @NonNull String versionName,
+                          int protocolVersion,
+                          @Nullable String resolvedMcVersion,
+                          @Nullable String faviconBase64,
+                          @Nullable String errorMessage) {
             this.online = online;
             this.latencyMs = latencyMs;
             this.motd = motd;
@@ -68,6 +102,8 @@ public final class ServerPinger {
             this.onlinePlayers = onlinePlayers;
             this.maxPlayers = maxPlayers;
             this.versionName = versionName;
+            this.protocolVersion = protocolVersion;
+            this.resolvedMcVersion = resolvedMcVersion;
             this.faviconBase64 = faviconBase64;
             this.errorMessage = errorMessage;
         }
@@ -175,10 +211,17 @@ public final class ServerPinger {
         try {
             JsonObject root = new JsonParser().parse(jsonText).getAsJsonObject();
             String versionName = "Unknown";
+            int protocolVersion = -1;
             if (root.has("version") && root.get("version").isJsonObject()) {
                 JsonObject v = root.getAsJsonObject("version");
                 if (v.has("name") && v.get("name").isJsonPrimitive()) {
                     versionName = stripSectionCodes(v.get("name").getAsString());
+                }
+                if (v.has("protocol") && v.get("protocol").isJsonPrimitive()) {
+                    try {
+                        protocolVersion = v.get("protocol").getAsInt();
+                    } catch (NumberFormatException ignored) {
+                    }
                 }
             }
             int online = -1;
@@ -204,10 +247,221 @@ public final class ServerPinger {
                     favicon = rawIcon.substring(prefix.length()).replace("\n", "").trim();
                 }
             }
-            return new PingResult(true, latencyMs, motd, formattedMotd, online, max, versionName, favicon, null);
+            String resolvedMc = mapProtocolToMcVersion(protocolVersion, versionName);
+            return new PingResult(true, latencyMs, motd, formattedMotd, online, max,
+                    versionName, protocolVersion, resolvedMc, favicon, null);
         } catch (Exception e) {
             return offline("Malformed server status response");
         }
+    }
+
+    private static final java.util.regex.Pattern MC_RELEASE_TOKEN =
+            java.util.regex.Pattern.compile("\\b(1\\.\\d{1,2}(?:\\.\\d{1,2})?|2[6-9]\\.\\d{1,2}(?:\\.\\d{1,2})?)\\b");
+
+    /**
+     * Maps a Minecraft Java Edition SLP {@code version.protocol} number (with fallback to
+     * {@code version.name}) into a concrete installable release version ID for 1-tap instance
+     * auto-matching.
+     */
+    @Nullable
+    public static String mapProtocolToMcVersion(int protocol, @Nullable String versionName) {
+        if (protocol > 0) {
+            switch (protocol) {
+                case 4:
+                case 5:
+                    return "1.7.10";
+                case 47:
+                    return "1.8.9";
+                case 107:
+                case 108:
+                case 109:
+                case 110:
+                    return "1.9.4";
+                case 210:
+                    return "1.10.2";
+                case 315:
+                case 316:
+                    return "1.11.2";
+                case 335:
+                case 338:
+                case 340:
+                    return "1.12.2";
+                case 393:
+                case 401:
+                case 404:
+                    return "1.13.2";
+                case 477:
+                case 480:
+                case 485:
+                case 490:
+                case 498:
+                    return "1.14.4";
+                case 573:
+                case 575:
+                case 578:
+                    return "1.15.2";
+                case 735:
+                case 736:
+                    return "1.16.1";
+                case 751:
+                    return "1.16.2";
+                case 753:
+                    return "1.16.3";
+                case 754:
+                    return "1.16.5";
+                case 755:
+                    return "1.17";
+                case 756:
+                    return "1.17.1";
+                case 757:
+                    return "1.18.1";
+                case 758:
+                    return "1.18.2";
+                case 759:
+                    return "1.19";
+                case 760:
+                    return "1.19.2";
+                case 761:
+                    return "1.19.3";
+                case 762:
+                    return "1.19.4";
+                case 763:
+                    return "1.20.1";
+                case 764:
+                    return "1.20.2";
+                case 765:
+                    return "1.20.4";
+                case 766:
+                    return "1.20.6";
+                case 767:
+                    return "1.21.1";
+                case 768:
+                    return "1.21.3";
+                case 769:
+                    return "1.21.4";
+                case 770:
+                    return "1.21.5";
+                case 771:
+                    return "1.21.6";
+                case 772:
+                    return "1.21.8";
+                case 773:
+                    return "1.21.10";
+                case 774:
+                    return "1.21.11";
+                default:
+                    break;
+            }
+        }
+        if (versionName != null && !versionName.isEmpty()) {
+            String lastMatch = null;
+            java.util.regex.Matcher m = MC_RELEASE_TOKEN.matcher(versionName);
+            while (m.find()) {
+                // Prefer highest version in multi-protocol ranges such as "1.8.x-1.21.4"
+                lastMatch = m.group(1);
+            }
+            return lastMatch;
+        }
+        return null;
+    }
+
+    /**
+     * Returns {@code true} when an instance {@code versionId} (vanilla, Fabric, Quilt, Forge,
+     * NeoForge, or OptiFine) matches {@code targetMcVersion}.
+     */
+    public static boolean doesInstanceMatchVersion(@Nullable String instanceVersionId,
+                                                   @Nullable String targetMcVersion) {
+        if (instanceVersionId == null || targetMcVersion == null) return false;
+        String inst = instanceVersionId.trim();
+        String target = targetMcVersion.trim();
+        if (inst.isEmpty() || target.isEmpty()) return false;
+        if (inst.equalsIgnoreCase(target)) return true;
+        java.util.regex.Matcher m = MC_RELEASE_TOKEN.matcher(inst);
+        while (m.find()) {
+            if (target.equals(m.group(1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Parses a standard Minecraft LAN UDP payload ({@code [MOTD]My World[/MOTD][AD]51234[/AD]}).
+     */
+    @Nullable
+    public static LanWorldEntry parseLanAnnouncement(@Nullable String payload,
+                                                     @Nullable String senderHost) {
+        if (payload == null || senderHost == null || senderHost.trim().isEmpty()) return null;
+        int mStart = payload.indexOf("[MOTD]");
+        int mEnd = payload.indexOf("[/MOTD]");
+        int aStart = payload.indexOf("[AD]");
+        int aEnd = payload.indexOf("[/AD]");
+        if (aStart < 0 || aEnd <= aStart + 4) return null;
+        int port;
+        try {
+            port = Integer.parseInt(payload.substring(aStart + 4, aEnd).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (port < 1 || port > 65535) return null;
+        String rawMotd = (mStart >= 0 && mEnd > mStart + 6)
+                ? payload.substring(mStart + 6, mEnd) : "LAN World";
+        String cleanMotd = stripSectionCodes(rawMotd).trim();
+        if (cleanMotd.isEmpty()) cleanMotd = "LAN World";
+        String host = senderHost.trim();
+        if (host.startsWith("/")) host = host.substring(1);
+        String formattedAddr = host.contains(":")
+                ? ("[" + host + "]:" + port) : (host + ":" + port);
+        return new LanWorldEntry(cleanMotd, formattedAddr, port);
+    }
+
+    /**
+     * Listens briefly on Minecraft's official local Wi-Fi multicast group ({@code 224.0.2.60:4445})
+     * for active "Open to LAN" worlds when explicitly triggered by the user.
+     */
+    @NonNull
+    public static java.util.List<LanWorldEntry> scanLocalLanWorlds(int timeoutMs) {
+        int clampedMs = Math.max(400, Math.min(5000, timeoutMs));
+        java.util.LinkedHashMap<String, LanWorldEntry> found = new java.util.LinkedHashMap<>();
+        long deadline = System.currentTimeMillis() + clampedMs;
+        java.net.MulticastSocket socket = null;
+        java.net.InetAddress group = null;
+        try {
+            socket = new java.net.MulticastSocket(LAN_MULTICAST_PORT);
+            socket.setReuseAddress(true);
+            group = java.net.InetAddress.getByName(LAN_MULTICAST_GROUP);
+            socket.joinGroup(group);
+            byte[] buf = new byte[1500];
+            while (found.size() < 16) {
+                long remain = deadline - System.currentTimeMillis();
+                if (remain <= 0L) break;
+                socket.setSoTimeout((int) Math.min(650L, remain));
+                java.net.DatagramPacket pkt = new java.net.DatagramPacket(buf, buf.length);
+                try {
+                    socket.receive(pkt);
+                    String text = new String(
+                            pkt.getData(), pkt.getOffset(), pkt.getLength(), StandardCharsets.UTF_8);
+                    String host = pkt.getAddress() != null ? pkt.getAddress().getHostAddress() : null;
+                    LanWorldEntry entry = parseLanAnnouncement(text, host);
+                    if (entry != null && !found.containsKey(entry.address)) {
+                        found.put(entry.address, entry);
+                    }
+                } catch (java.net.SocketTimeoutException ignored) {
+                }
+            }
+        } catch (IOException ignored) {
+        } finally {
+            if (socket != null) {
+                if (group != null) {
+                    try {
+                        socket.leaveGroup(group);
+                    } catch (IOException ignored) {
+                    }
+                }
+                socket.close();
+            }
+        }
+        return new java.util.ArrayList<>(found.values());
     }
 
     private static void flattenChatComponent(@Nullable JsonElement el,

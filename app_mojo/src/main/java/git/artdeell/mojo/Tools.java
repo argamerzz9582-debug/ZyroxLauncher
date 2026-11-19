@@ -513,22 +513,30 @@ public final class Tools {
 
     /**
      * Triggers the Android share chooser with a sanitized, token-redacted copy of {@code latestlog.txt}.
-     * Never auto-uploads logs; shares only on explicit user action.
+     * Performs streaming redaction on the background executor and never exposes raw credentials.
      */
     public static void shareLog(Context context){
-        File sourceLog = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
+        if (context == null) return;
+        final Context appCtx = context.getApplicationContext();
+        final File sourceLog = new File(Tools.DIR_GAME_HOME, "latestlog.txt");
         if (!sourceLog.isFile() || sourceLog.length() == 0L) {
-            android.widget.Toast.makeText(context, R.string.zyrox_log_empty, android.widget.Toast.LENGTH_SHORT).show();
+            runOnUiThread(() -> android.widget.Toast.makeText(
+                    appCtx, R.string.zyrox_log_empty, android.widget.Toast.LENGTH_SHORT).show());
             return;
         }
-        try {
-            File exportDir = new File(Tools.DIR_GAME_HOME, "logs");
-            File redactedLog = new File(exportDir, "latestlog-redacted.txt");
-            git.artdeell.mojo.security.LogRedactor.writeRedactedLogFile(sourceLog, redactedLog, 8L * 1024L * 1024L);
-            openPath(context, redactedLog, true);
-        } catch (IOException e) {
-            android.widget.Toast.makeText(context, e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-        }
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                File exportDir = new File(Tools.DIR_GAME_HOME, "logs");
+                File redactedLog = new File(exportDir, "latestlog-redacted.txt");
+                git.artdeell.mojo.security.LogRedactor.writeRedactedLogFile(
+                        sourceLog, redactedLog, 8L * 1024L * 1024L);
+                runOnUiThread(() -> openPath(appCtx, redactedLog, true));
+            } catch (IOException e) {
+                final String safeErr = git.artdeell.mojo.security.LogRedactor.redact(e.getMessage());
+                runOnUiThread(() -> android.widget.Toast.makeText(
+                        appCtx, safeErr, android.widget.Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     /**
@@ -562,6 +570,23 @@ public final class Tools {
      * @param share whether to open a "Share" or an "Open" dialog.
      */
     public static void openPath(Context context, File file, boolean share) {
+        // Enforce automatic credential redaction whenever sharing any unredacted launcher/MC log file
+        if (share && file != null && file.isFile()) {
+            String lowerName = file.getName().toLowerCase(java.util.Locale.ROOT);
+            if ((lowerName.endsWith(".log") || lowerName.equals("latestlog.txt")
+                    || lowerName.startsWith("crash-"))
+                    && !lowerName.contains("-redacted")) {
+                try {
+                    File exportDir = new File(Tools.DIR_GAME_HOME, "logs");
+                    File safeCopy = new File(exportDir, file.getName() + "-redacted.txt");
+                    file = git.artdeell.mojo.security.LogRedactor.writeRedactedLogFile(
+                            file, safeCopy, 8L * 1024L * 1024L);
+                } catch (IOException e) {
+                    Log.w("Tools", "Blocked share of unredacted log file");
+                    return;
+                }
+            }
+        }
         Uri contentUri = DocumentsContract.buildDocumentUri(context.getString(R.string.storageProviderAuthorities), file.getAbsolutePath());
         String mimeType = getMimeType(file);
         Intent intent = new Intent();

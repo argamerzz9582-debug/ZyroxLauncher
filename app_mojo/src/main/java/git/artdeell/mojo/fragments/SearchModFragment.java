@@ -66,6 +66,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private ModItemAdapter mModItemAdapter;
     private ProgressBar mSearchProgressBar;
     private TextView mStatusTextView;
+    private TextView mProviderBannerView;
     private ColorStateList mDefaultTextColor;
     private ModpackApi modpackApi;
     private final SearchFilters mSearchFilters;
@@ -88,7 +89,8 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     private RecyclerView mDrawerVersionList;
     private Future<?> mDetailFuture;
 
-    ActivityResultLauncher<String> mImportLauncher = registerForActivityResult(new ActivityResultContracts.GetContent(),
+    ActivityResultLauncher<Object> mImportLauncher = registerForActivityResult(
+            new git.artdeell.mojo.contracts.OpenDocumentWithExtension("mrpack", "zip"),
             uri -> {
                 if (uri == null || getContext() == null) return;
                 Context context = getContext();
@@ -98,7 +100,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
 
     public void triggerLocalImport() {
         if (!ProgressLayout.ensureNoOngoingTasks(requireContext())) return;
-        mImportLauncher.launch("*/*");
+        mImportLauncher.launch(null);
     }
 
     public boolean handleBackPressed() {
@@ -110,8 +112,17 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
     }
 
     public void performLocalInstall(Uri uri, Context context, ContentResolver contentResolver) {
-        String fileName = Tools.getFileName(context, uri);
-        if (fileName == null) return;
+        String fileName = git.artdeell.mojo.contracts.OpenDocumentWithExtension.resolveFileName(context, uri);
+        if (fileName == null || fileName.isEmpty()) return;
+        if (!git.artdeell.mojo.contracts.OpenDocumentWithExtension.hasAllowedExtension(
+                fileName, "mrpack", "zip")) {
+            final String badName = fileName;
+            runOnUiThread(() -> Toast.makeText(
+                    context.getApplicationContext(),
+                    "Unsupported modpack file \"" + badName + "\". Expected .mrpack or .zip",
+                    Toast.LENGTH_LONG).show());
+            return;
+        }
         File outFile = new File(Tools.DIR_CACHE, fileName + ".cf");
         ProgressLayout.setProgress(ProgressLayout.INSTALL_MODPACK, R.string.multirt_progress_caching);
         try (InputStream inputStream = contentResolver.openInputStream(uri);
@@ -156,6 +167,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         mSearchProgressBar = view.findViewById(R.id.search_mod_progressbar);
         mRecyclerview = view.findViewById(R.id.search_mod_list);
         mStatusTextView = view.findViewById(R.id.search_mod_status_text);
+        mProviderBannerView = view.findViewById(R.id.tv_store_provider_banner);
         mFilterButton = view.findViewById(R.id.search_mod_filter);
         mImportButton = view.findViewById(R.id.mineButton_import_local_modpack);
 
@@ -364,7 +376,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
                     MojoApplication.sExecutorService.execute(() -> {
                         try {
                             git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary sum =
-                                    git.artdeell.mojo.content.ModrinthContentInstaller.installFpsBoostPack(
+                                    git.artdeell.mojo.content.ModrinthContentInstaller.installZeroLagFpsPack(
                                             inst, includeIris[0], null);
                             runOnUiThread(() -> {
                                 Toast.makeText(appCtx, sum.message, Toast.LENGTH_LONG).show();
@@ -458,11 +470,23 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         }
     }
 
+    private void syncProviderFallbackBanner() {
+        if (mProviderBannerView == null || mModItemAdapter == null) return;
+        String notice = mModItemAdapter.getActiveFallbackNotice();
+        if (notice != null && !notice.trim().isEmpty()) {
+            mProviderBannerView.setText(notice);
+            mProviderBannerView.setVisibility(View.VISIBLE);
+        } else {
+            mProviderBannerView.setVisibility(View.GONE);
+        }
+    }
+
     @Override
     public void onSearchFinished() {
         if (!isAdded()) return;
         mSearchProgressBar.setVisibility(View.GONE);
         mStatusTextView.setVisibility(View.GONE);
+        syncProviderFallbackBanner();
     }
 
     @Override
@@ -470,6 +494,7 @@ public class SearchModFragment extends Fragment implements ModItemAdapter.Search
         if (!isAdded()) return;
         mSearchProgressBar.setVisibility(View.GONE);
         mStatusTextView.setVisibility(View.VISIBLE);
+        syncProviderFallbackBanner();
         switch (error) {
             case ERROR_INTERNAL:
                 mStatusTextView.setTextColor(androidx.core.content.ContextCompat.getColor(

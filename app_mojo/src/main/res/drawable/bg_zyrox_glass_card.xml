@@ -1,29 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Zyrox Starlight Smoked-Crystal Glass Card -->
+<!-- Zyrox High-Contrast 2-Layer Liquid Glass Card (#660B0F17 Scrim + #4DFFFFFF->#0DFFFFFF Rim) -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Top-to-Bottom Specular Border Highlight (#4DFFFFFF -> #0DFFFFFF) -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:startColor="#6C0E1525"
-                android:endColor="#5A090F1D" />
+                android:startColor="#4DFFFFFF"
+                android:centerColor="#26E9F2FE"
+                android:endColor="#0DFFFFFF" />
             <corners android:radius="16dp" />
         </shape>
     </item>
-    <item>
+    <!-- High-Contrast Dark Scrim Layer (#660B0F17) ensuring crisp legibility over snow/shaders -->
+    <item
+        android:left="1.1dp"
+        android:top="1.1dp"
+        android:right="1.1dp"
+        android:bottom="1.1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#660B0F17" />
+            <corners android:radius="15dp" />
+        </shape>
+    </item>
+    <!-- Subtle Frosted Optical Lens Overlay -->
+    <item
+        android:left="1.1dp"
+        android:top="1.1dp"
+        android:right="1.1dp"
+        android:bottom="1.1dp">
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
                 android:startColor="#1EF2F8FF"
                 android:centerColor="#06FFFFFF"
                 android:endColor="#12D5E5F9" />
-            <stroke android:width="1.1dp" android:color="#A2E9F2FE" />
-            <corners android:radius="16dp" />
+            <corners android:radius="15dp" />
         </shape>
     </item>
-    <item android:left="18dp" android:top="2.2dp" android:right="18dp" android:height="1.2dp" android:gravity="top">
+    <!-- Razor-Fine Top Specular Light Catch -->
+    <item
+        android:left="18dp"
+        android:top="2dp"
+        android:right="18dp"
+        android:height="1.2dp"
+        android:gravity="top">
         <shape android:shape="rectangle">
-            <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#7CF5F9FF" android:endColor="#00FFFFFF" />
+            <gradient
+                android:angle="0"
+                android:startColor="#00FFFFFF"
+                android:centerColor="#7CF5F9FF"
+                android:endColor="#00FFFFFF" />
             <corners android:radius="1dp" />
         </shape>
     </item>

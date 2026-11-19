@@ -279,6 +279,7 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             Tools.runOnUiThread(() -> {
                 if (myFuture.isCancelled()) return;
                 mTaskInProgress = null;
+                mCurrentResult = result;
                 if (finalModItems == null) {
                     mSearchResultCallback.onSearchError(SearchResultCallback.ERROR_INTERNAL);
                 } else if (finalModItems.length == 0) {
@@ -292,7 +293,6 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 } else {
                     mSearchResultCallback.onSearchFinished();
                 }
-                mCurrentResult = result;
                 if (finalModItems == null) {
                     mModItems = MOD_ITEMS_EMPTY;
                     notifyDataSetChanged();
@@ -309,6 +309,11 @@ public class ModItemAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
                 }
             });
         }
+    }
+
+    @androidx.annotation.Nullable
+    public String getActiveFallbackNotice() {
+        return mCurrentResult != null ? mCurrentResult.fallbackNotice : null;
     }
 
     public interface SearchResultCallback {

@@ -75,21 +75,44 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
     private static final int RAM_MIN_MB = 256;
     private static final int RAM_STEP_MB = 64;
 
+    public static final int TAB_OVERVIEW = 0;
+    public static final int TAB_CONTENT = 1;
+    public static final int TAB_ENGINE = 2;
+    public static final int TAB_CONTROLS = 3;
+
     private Instance mInstance;
     private String mSelectedControlLayout;
     private Button mSaveButton, mDeleteButton, mStudioToolsButton, mControlSelectButton, mVersionSelectButton;
     private Spinner mDefaultRuntime, mDefaultRenderer;
-    private EditText mDefaultName, mDefaultJvmArgument;
+    private EditText mDefaultName, mDefaultJvmArgument, mEnvVarsEdit;
     private TextView mDefaultVersion, mDefaultControl, mRendererHint, mRamValueView;
     private SeekBar mRamSeekBar;
     private ImageView mInstanceIcon;
-    private CheckBox mSharedDataCheckbox;
+    private CheckBox mSharedDataCheckbox, mLockRuntimeCheckbox, mLockRendererCheckbox, mContextControlsCheckbox;
     private RecyclerView mInstanceListRecycler;
     private InstanceRailAdapter mRailAdapter;
+
+    // 4-Tab Simple / Pro Mode UI bindings
+    private TextView mTabOverview, mTabContent, mTabEngine, mTabControls;
+    private View mPanelOverview, mPanelContent, mPanelEngine, mPanelControls;
+    private TextView mChipPresetBattery, mChipPresetBalanced, mChipPresetMaxFps;
+    private TextView mChipScale75, mChipScale100, mOverviewControlQuick;
+    private TextView mContentSummaryView, mEngineSimpleSummaryView, mToggleProModeBtn;
+    private View mProModeContainer;
+    private int mActiveTab = TAB_OVERVIEW;
+    private boolean mProModeExpanded = false;
+    private String mSelectedPerfPreset = Instance.PRESET_BALANCED;
+    private int mSelectedResScale = 100;
+
     private int mRecommendedIconSize;
     private int mMaxSafeRamMb = 2048;
     private int mSelectedRamMb;
     private List<String> mRenderNames;
+
+    private final ActivityResultLauncher<String> mExportSetupBundleLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.CreateDocument("application/octet-stream"),
+                    this::onExportSetupBundleUri);
 
     private final ActivityResultLauncher<?> mCropperLauncher = CropperUtils.registerCropper(this, this);
     private final ActivityResultLauncher<String> mExportConfigLauncher =
@@ -191,6 +214,8 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
             if (mInstance != null) mInstance.sharedData = checked;
             mSharedDataCheckbox.setText(checked ? R.string.instance_shared_data_on : R.string.instance_shared_data_off);
         });
+
+        setupFourTabAndSimpleProUi(view, controlSelectListener);
 
         Instance selectedInstance = Instances.loadSelectedInstance();
         if (selectedInstance == null) {
@@ -660,10 +685,12 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
                             mSelectedControlLayout = null;
                             if (mInstance != null) mInstance.controlLayout = null;
                             mDefaultControl.setText("");
+                            syncOverviewControlQuickLabel("");
                         } else {
                             File chosen = saved.get(which - 1);
                             mSelectedControlLayout = chosen.getAbsolutePath();
                             mDefaultControl.setText(chosen.getName());
+                            syncOverviewControlQuickLabel(chosen.getName());
                         }
                     })
                     .setNeutralButton(R.string.zyrox_action_import,
@@ -679,6 +706,360 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
             if (mInstance != null) mInstance.versionId = id;
             updateRendererAndRuntimeHint(mDefaultRenderer.getSelectedItemPosition());
         });
+    }
+
+    private void setupFourTabAndSimpleProUi(@NonNull View view,
+                                            @NonNull View.OnClickListener controlSelectListener) {
+        if (mTabOverview != null) mTabOverview.setOnClickListener(v -> switchEditorTab(TAB_OVERVIEW));
+        if (mTabContent != null) mTabContent.setOnClickListener(v -> switchEditorTab(TAB_CONTENT));
+        if (mTabEngine != null) mTabEngine.setOnClickListener(v -> switchEditorTab(TAB_ENGINE));
+        if (mTabControls != null) mTabControls.setOnClickListener(v -> switchEditorTab(TAB_CONTROLS));
+
+        if (mChipPresetBattery != null) {
+            mChipPresetBattery.setOnClickListener(v -> selectPerformancePreset(Instance.PRESET_BATTERY));
+        }
+        if (mChipPresetBalanced != null) {
+            mChipPresetBalanced.setOnClickListener(v -> selectPerformancePreset(Instance.PRESET_BALANCED));
+        }
+        if (mChipPresetMaxFps != null) {
+            mChipPresetMaxFps.setOnClickListener(v -> selectPerformancePreset(Instance.PRESET_MAX_FPS));
+        }
+        if (mChipScale75 != null) {
+            mChipScale75.setOnClickListener(v -> selectResolutionScale(75));
+        }
+        if (mChipScale100 != null) {
+            mChipScale100.setOnClickListener(v -> selectResolutionScale(100));
+        }
+        if (mOverviewControlQuick != null) {
+            mOverviewControlQuick.setOnClickListener(controlSelectListener);
+        }
+
+        // Expandable Advanced / Pro Mode (starts collapsed in Simple Mode by default)
+        setProModeExpanded(LauncherPreferences.PREF_ZYROX_INSTANCE_PRO_MODE);
+        if (mToggleProModeBtn != null) {
+            mToggleProModeBtn.setOnClickListener(v -> {
+                boolean next = !mProModeExpanded;
+                setProModeExpanded(next);
+                LauncherPreferences.PREF_ZYROX_INSTANCE_PRO_MODE = next;
+                if (LauncherPreferences.DEFAULT_PREF != null) {
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putBoolean(LauncherPreferences.KEY_ZYROX_INSTANCE_PRO_MODE, next)
+                            .apply();
+                }
+            });
+        }
+
+        View autoCalBtn = view.findViewById(R.id.btn_engine_auto_calibrate);
+        if (autoCalBtn != null) {
+            autoCalBtn.setOnClickListener(v -> {
+                if (mInstance == null) return;
+                mInstance.runtimeLocked = false;
+                mInstance.rendererLocked = false;
+                if (mLockRuntimeCheckbox != null) mLockRuntimeCheckbox.setChecked(false);
+                if (mLockRendererCheckbox != null) mLockRendererCheckbox.setChecked(false);
+                applyAutoGpuPresetToInstance();
+            });
+        }
+
+        // Content Tab buttons
+        View fpsPackBtn = view.findViewById(R.id.btn_inst_install_fps_pack);
+        if (fpsPackBtn != null) {
+            fpsPackBtn.setOnClickListener(v -> runOneTapZeroLagFpsPack());
+        }
+        View manageModsBtn = view.findViewById(R.id.btn_inst_manage_mods);
+        if (manageModsBtn != null) {
+            manageModsBtn.setOnClickListener(v -> Tools.swapFragment(
+                    requireActivity(), ContentManagerFragment.class, ContentManagerFragment.TAG, null));
+        }
+        View browseStoreBtn = view.findViewById(R.id.btn_inst_browse_store);
+        if (browseStoreBtn != null) {
+            browseStoreBtn.setOnClickListener(v -> Tools.swapFragment(
+                    requireActivity(), SearchModFragment.class, SearchModFragment.TAG, null));
+        }
+        View manageWorldsBtn = view.findViewById(R.id.btn_inst_manage_worlds);
+        if (manageWorldsBtn != null) {
+            manageWorldsBtn.setOnClickListener(v -> Tools.swapFragment(
+                    requireActivity(), WorldManagerFragment.class, WorldManagerFragment.TAG, null));
+        }
+
+        // 1-Tap Pre-Mod Snapshot Rollback buttons (Overview & Content tabs)
+        View quickRollback = view.findViewById(R.id.btn_inst_quick_rollback);
+        if (quickRollback != null) {
+            quickRollback.setOnClickListener(v -> showPreModSnapshotRollbackDialog());
+        }
+        View contentRollback = view.findViewById(R.id.btn_inst_content_rollback);
+        if (contentRollback != null) {
+            contentRollback.setOnClickListener(v -> showPreModSnapshotRollbackDialog());
+        }
+
+        // Controls Tab: Context-aware inventory helpers + HUD Editor + Zyrox Setup Codes
+        if (mContextControlsCheckbox != null) {
+            mContextControlsCheckbox.setChecked(LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS);
+            mContextControlsCheckbox.setOnCheckedChangeListener((cb, checked) -> {
+                LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS = checked;
+                if (LauncherPreferences.DEFAULT_PREF != null) {
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putBoolean(LauncherPreferences.KEY_ZYROX_CONTEXT_CONTROLS, checked)
+                            .apply();
+                }
+            });
+        }
+        View hudEditorBtn = view.findViewById(R.id.btn_inst_open_hud_editor);
+        if (hudEditorBtn != null) {
+            hudEditorBtn.setOnClickListener(v -> startActivity(
+                    new android.content.Intent(requireContext(), git.artdeell.mojo.CustomControlsActivity.class)));
+        }
+        View exportSetupBtn = view.findViewById(R.id.btn_inst_export_setup_code);
+        if (exportSetupBtn != null) {
+            exportSetupBtn.setOnClickListener(v ->
+                    git.artdeell.mojo.input.ControlProfileManager.showZyroxSetupExportDialog(
+                            requireContext(), mInstance, suggestedName ->
+                                    mExportSetupBundleLauncher.launch(suggestedName)));
+        }
+        View importSetupBtn = view.findViewById(R.id.btn_inst_import_setup_code);
+        if (importSetupBtn != null) {
+            importSetupBtn.setOnClickListener(v ->
+                    git.artdeell.mojo.input.ControlProfileManager.showZyroxSetupImportDialog(
+                            requireContext(), mInstance, result -> {
+                                if (!isAdded()) return;
+                                if (result.controlFile != null) {
+                                    mSelectedControlLayout = result.controlFile.getAbsolutePath();
+                                    mDefaultControl.setText(result.controlFile.getName());
+                                    syncOverviewControlQuickLabel(result.controlFile.getName());
+                                }
+                                refreshContentAndSnapshotSummary();
+                            }));
+        }
+
+        switchEditorTab(TAB_OVERVIEW);
+    }
+
+    private void switchEditorTab(int tab) {
+        mActiveTab = tab;
+        if (mPanelOverview != null) mPanelOverview.setVisibility(tab == TAB_OVERVIEW ? View.VISIBLE : View.GONE);
+        if (mPanelContent != null) mPanelContent.setVisibility(tab == TAB_CONTENT ? View.VISIBLE : View.GONE);
+        if (mPanelEngine != null) mPanelEngine.setVisibility(tab == TAB_ENGINE ? View.VISIBLE : View.GONE);
+        if (mPanelControls != null) mPanelControls.setVisibility(tab == TAB_CONTROLS ? View.VISIBLE : View.GONE);
+
+        styleTabChip(mTabOverview, tab == TAB_OVERVIEW);
+        styleTabChip(mTabContent, tab == TAB_CONTENT);
+        styleTabChip(mTabEngine, tab == TAB_ENGINE);
+        styleTabChip(mTabControls, tab == TAB_CONTROLS);
+
+        if (tab == TAB_CONTENT) {
+            refreshContentAndSnapshotSummary();
+        }
+    }
+
+    private static void styleTabChip(@Nullable TextView chip, boolean selected) {
+        if (chip == null) return;
+        chip.setSelected(selected);
+        chip.setAlpha(selected ? 1.0f : 0.68f);
+    }
+
+    private void selectPerformancePreset(@NonNull String preset) {
+        mSelectedPerfPreset = preset;
+        styleTabChip(mChipPresetBattery, Instance.PRESET_BATTERY.equals(preset));
+        styleTabChip(mChipPresetBalanced, Instance.PRESET_BALANCED.equals(preset));
+        styleTabChip(mChipPresetMaxFps, Instance.PRESET_MAX_FPS.equals(preset));
+    }
+
+    private void selectResolutionScale(int percent) {
+        mSelectedResScale = percent <= 85 ? 75 : 100;
+        styleTabChip(mChipScale75, mSelectedResScale == 75);
+        styleTabChip(mChipScale100, mSelectedResScale == 100);
+    }
+
+    private void setProModeExpanded(boolean expanded) {
+        mProModeExpanded = expanded;
+        if (mProModeContainer != null) {
+            mProModeContainer.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        if (mToggleProModeBtn != null) {
+            mToggleProModeBtn.setText(expanded
+                    ? "▾ Hide Advanced / Pro Mode (Simple Mode Recommended)"
+                    : "▸ Advanced / Pro Mode (Renderer, Java, RAM Slider, JVM & Env Flags)");
+        }
+    }
+
+    private void syncOverviewControlQuickLabel(@Nullable String pathOrName) {
+        if (mOverviewControlQuick == null) return;
+        if (pathOrName == null || pathOrName.trim().isEmpty()) {
+            mOverviewControlQuick.setText("Global Default (Tap to change)");
+            return;
+        }
+        String name = new File(pathOrName).getName();
+        mOverviewControlQuick.setText(name);
+    }
+
+    private void refreshContentAndSnapshotSummary() {
+        final Instance target = mInstance;
+        if (target == null) return;
+        MojoApplication.sExecutorService.execute(() -> {
+            File gameDir = target.getGameDirectory();
+            int mods = countFiles(new File(gameDir, "mods"), ".jar");
+            int shaders = countFiles(new File(gameDir, "shaderpacks"), ".zip");
+            int packs = countFiles(new File(gameDir, "resourcepacks"), ".zip");
+            int snapshots = git.artdeell.mojo.instances.InstanceBackupService
+                    .listPreModSnapshots(target).size();
+            final String summary = mods + " active mods  •  " + shaders + " shader packs  •  "
+                    + packs + " resource packs  •  " + snapshots + "/3 pre-mod rollback snapshots";
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (mContentSummaryView != null) {
+                    mContentSummaryView.setText(summary);
+                }
+            });
+        });
+    }
+
+    private static int countFiles(@NonNull File dir, @NonNull String suffix) {
+        File[] list = dir.listFiles(f -> f.isFile()
+                && f.getName().toLowerCase(Locale.ROOT).endsWith(suffix));
+        return list != null ? list.length : 0;
+    }
+
+    private void runOneTapZeroLagFpsPack() {
+        if (mInstance == null || !isAdded()) return;
+        final Instance target = mInstance;
+        final Context appCtx = requireContext().getApplicationContext();
+        Toast.makeText(appCtx,
+                "Installing Zero-Lag FPS Pack (Sodium, Lithium, FerriteCore, ImmediatelyFast) + tuning options.txt…",
+                Toast.LENGTH_SHORT).show();
+        MojoApplication.sExecutorService.execute(() -> {
+            try {
+                git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                        target, "before-fps-pack");
+                git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary res =
+                        git.artdeell.mojo.content.ModrinthContentInstaller.installZeroLagFpsPack(
+                                target, false, null);
+                Tools.runOnUiThread(() -> {
+                    Toast.makeText(appCtx, res.message, Toast.LENGTH_LONG).show();
+                    if (isAdded()) refreshContentAndSnapshotSummary();
+                });
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "FPS Pack: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void showPreModSnapshotRollbackDialog() {
+        if (mInstance == null || !isAdded()) return;
+        final Instance target = mInstance;
+        final Context ctx = requireContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            final List<git.artdeell.mojo.instances.InstanceBackupService.SnapshotInfo> snaps =
+                    git.artdeell.mojo.instances.InstanceBackupService.listPreModSnapshots(target);
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (snaps.isEmpty()) {
+                    new AlertDialog.Builder(ctx)
+                            .setTitle("Pre-Mod Rollback Snapshots")
+                            .setMessage("No pre-mod snapshots yet. Zyrox automatically snapshots config/ and saves/ (retaining the last 3) before every mod install or removal.")
+                            .setPositiveButton("Create Snapshot Now", (d, w) ->
+                                    MojoApplication.sExecutorService.execute(() -> {
+                                        try {
+                                            git.artdeell.mojo.instances.InstanceBackupService
+                                                    .createPreModSnapshot(target, "manual-checkpoint");
+                                            Tools.runOnUiThread(() -> {
+                                                Toast.makeText(ctx.getApplicationContext(),
+                                                        "Saved rollback snapshot of config/ & saves/!",
+                                                        Toast.LENGTH_SHORT).show();
+                                                if (isAdded()) refreshContentAndSnapshotSummary();
+                                            });
+                                        } catch (Exception e) {
+                                            Tools.runOnUiThread(() -> Toast.makeText(
+                                                    ctx.getApplicationContext(),
+                                                    "Snapshot failed: " + e.getMessage(),
+                                                    Toast.LENGTH_LONG).show());
+                                        }
+                                    }))
+                            .setNegativeButton(android.R.string.ok, null)
+                            .show();
+                    return;
+                }
+                String[] labels = new String[snaps.size()];
+                for (int i = 0; i < snaps.size(); i++) {
+                    labels[i] = snaps.get(i).formatDisplayLabel();
+                }
+                new AlertDialog.Builder(ctx)
+                        .setTitle("1-Tap Rollback (config/ & worlds/)")
+                        .setItems(labels, (d, which) -> {
+                            final git.artdeell.mojo.instances.InstanceBackupService.SnapshotInfo chosen =
+                                    snaps.get(which);
+                            MojoApplication.sExecutorService.execute(() -> {
+                                try {
+                                    int restoredFiles = git.artdeell.mojo.instances.InstanceBackupService
+                                            .rollbackPreModSnapshot(target, chosen.archiveFile);
+                                    Tools.runOnUiThread(() -> {
+                                        Toast.makeText(ctx.getApplicationContext(),
+                                                "Rolled back " + restoredFiles
+                                                        + " config & world files cleanly!",
+                                                Toast.LENGTH_LONG).show();
+                                        if (isAdded()) refreshContentAndSnapshotSummary();
+                                    });
+                                } catch (Exception e) {
+                                    Tools.runOnUiThread(() -> Toast.makeText(
+                                            ctx.getApplicationContext(),
+                                            "Rollback failed: " + e.getMessage(),
+                                            Toast.LENGTH_LONG).show());
+                                }
+                            });
+                        })
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
+    }
+
+    private void onExportSetupBundleUri(@Nullable Uri uri) {
+        if (uri == null || !isAdded()) return;
+        final Instance inst = mInstance;
+        final Context appCtx = requireContext().getApplicationContext();
+        MojoApplication.sExecutorService.execute(() -> {
+            try (OutputStream out = appCtx.getContentResolver().openOutputStream(uri, "wt")) {
+                if (out == null) throw new IOException("Cannot open output file");
+                String code = git.artdeell.mojo.input.ControlProfileManager
+                        .exportZyroxSetupCode(inst);
+                out.write(code.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "Exported .zyrox Setup Bundle!", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) {
+                Tools.runOnUiThread(() -> Toast.makeText(
+                        appCtx, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    @NonNull
+    private static String formatEnvVars(@Nullable java.util.Map<String, String> map) {
+        if (map == null || map.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : map.entrySet()) {
+            if (e.getKey() == null || e.getKey().trim().isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(e.getKey().trim()).append('=').append(e.getValue() != null ? e.getValue() : "");
+        }
+        return sb.toString();
+    }
+
+    @Nullable
+    private static java.util.Map<String, String> parseEnvVars(@Nullable String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        java.util.LinkedHashMap<String, String> out = new java.util.LinkedHashMap<>();
+        String[] tokens = raw.trim().split("[,\\s]+");
+        for (String tok : tokens) {
+            int eq = tok.indexOf('=');
+            if (eq <= 0) continue;
+            String k = tok.substring(0, eq).trim();
+            String v = tok.substring(eq + 1).trim();
+            if (k.matches("[A-Za-z_][A-Za-z0-9_]{0,63}")) {
+                out.put(k, v);
+            }
+        }
+        return out.isEmpty() ? null : out;
     }
 
     private static String nullToEmpty(String in) {
@@ -716,11 +1097,26 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
 
         mDefaultVersion.setText(instance.versionId);
         mDefaultJvmArgument.setText(nullToEmpty(instance.jvmArgs));
+        if (mEnvVarsEdit != null) {
+            mEnvVarsEdit.setText(formatEnvVars(instance.envVars));
+        }
         mDefaultName.setText(nullToEmpty(instance.name));
-        mDefaultControl.setText(mSelectedControlLayout == null ? nullToEmpty(instance.controlLayout) : mSelectedControlLayout);
+        String ctrlLabel = mSelectedControlLayout == null
+                ? nullToEmpty(instance.controlLayout) : mSelectedControlLayout;
+        mDefaultControl.setText(ctrlLabel);
+        syncOverviewControlQuickLabel(ctrlLabel);
+        selectPerformancePreset(instance.getEffectivePerformancePreset());
+        selectResolutionScale(instance.getEffectiveResolutionScalePercent());
+        if (mLockRuntimeCheckbox != null) {
+            mLockRuntimeCheckbox.setChecked(instance.runtimeLocked);
+        }
+        if (mLockRendererCheckbox != null) {
+            mLockRendererCheckbox.setChecked(instance.rendererLocked);
+        }
         mSharedDataCheckbox.setChecked(instance.sharedData);
         mSharedDataCheckbox.setText(instance.sharedData ? R.string.instance_shared_data_on : R.string.instance_shared_data_off);
         updateRendererAndRuntimeHint(rendererIndex);
+        refreshContentAndSnapshotSummary();
     }
 
     private void bindViews(@NonNull View view) {
@@ -730,6 +1126,7 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mDefaultVersion = view.findViewById(R.id.vprof_editor_version_spinner);
         mDefaultName = view.findViewById(R.id.vprof_editor_instance_name);
         mDefaultJvmArgument = view.findViewById(R.id.vprof_editor_jre_args);
+        mEnvVarsEdit = view.findViewById(R.id.vprof_editor_env_vars);
         mSaveButton = view.findViewById(R.id.vprof_editor_save_button);
         mDeleteButton = view.findViewById(R.id.vprof_editor_delete_button);
         mStudioToolsButton = view.findViewById(R.id.vprof_editor_studio_tools_button);
@@ -737,10 +1134,32 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mVersionSelectButton = view.findViewById(R.id.vprof_editor_version_button);
         mInstanceIcon = view.findViewById(R.id.vprof_editor_instance_icon);
         mSharedDataCheckbox = view.findViewById(R.id.vprof_editor_data_checkbox_container);
+        mLockRuntimeCheckbox = view.findViewById(R.id.cb_lock_runtime);
+        mLockRendererCheckbox = view.findViewById(R.id.cb_lock_renderer);
+        mContextControlsCheckbox = view.findViewById(R.id.cb_inst_context_controls);
         mRendererHint = view.findViewById(R.id.tv_renderer_hint);
         mRamValueView = view.findViewById(R.id.tv_vprof_ram_value);
         mRamSeekBar = view.findViewById(R.id.vprof_ram_seekbar);
         mInstanceListRecycler = view.findViewById(R.id.zyrox_instance_list);
+
+        mTabOverview = view.findViewById(R.id.tab_inst_overview);
+        mTabContent = view.findViewById(R.id.tab_inst_content);
+        mTabEngine = view.findViewById(R.id.tab_inst_engine);
+        mTabControls = view.findViewById(R.id.tab_inst_controls);
+        mPanelOverview = view.findViewById(R.id.panel_inst_overview);
+        mPanelContent = view.findViewById(R.id.panel_inst_content);
+        mPanelEngine = view.findViewById(R.id.panel_inst_engine);
+        mPanelControls = view.findViewById(R.id.panel_inst_controls);
+        mChipPresetBattery = view.findViewById(R.id.chip_preset_battery);
+        mChipPresetBalanced = view.findViewById(R.id.chip_preset_balanced);
+        mChipPresetMaxFps = view.findViewById(R.id.chip_preset_max_fps);
+        mChipScale75 = view.findViewById(R.id.chip_scale_75);
+        mChipScale100 = view.findViewById(R.id.chip_scale_100);
+        mOverviewControlQuick = view.findViewById(R.id.tv_overview_control_quick);
+        mContentSummaryView = view.findViewById(R.id.tv_inst_content_summary);
+        mEngineSimpleSummaryView = view.findViewById(R.id.tv_engine_simple_summary);
+        mToggleProModeBtn = view.findViewById(R.id.btn_toggle_pro_mode);
+        mProModeContainer = view.findViewById(R.id.layout_engine_pro_mode);
     }
 
     private void save() {
@@ -748,6 +1167,21 @@ public class InstanceEditorFragment extends Fragment implements CropperUtils.Cro
         mInstance.versionId = mDefaultVersion.getText().toString();
         mInstance.controlLayout = mDefaultControl.getText().toString();
         mInstance.jvmArgs = mDefaultJvmArgument.getText().toString();
+        mInstance.performancePreset = mSelectedPerfPreset;
+        mInstance.resolutionScalePercent = mSelectedResScale;
+        mInstance.runtimeLocked = mLockRuntimeCheckbox != null && mLockRuntimeCheckbox.isChecked();
+        mInstance.rendererLocked = mLockRendererCheckbox != null && mLockRendererCheckbox.isChecked();
+        if (mEnvVarsEdit != null) {
+            mInstance.envVars = parseEnvVars(mEnvVarsEdit.getText().toString());
+        }
+
+        // Apply Simple Mode Resolution Scale seamlessly to active global surface scaler
+        if (LauncherPreferences.DEFAULT_PREF != null) {
+            LauncherPreferences.PREF_SCALE_FACTOR = mSelectedResScale / 100f;
+            LauncherPreferences.DEFAULT_PREF.edit()
+                    .putInt("resolutionRatio", mSelectedResScale)
+                    .apply();
+        }
 
         String newName = mDefaultName.getText().toString().trim();
         if (mInstance.controlLayout.isEmpty()) mInstance.controlLayout = null;

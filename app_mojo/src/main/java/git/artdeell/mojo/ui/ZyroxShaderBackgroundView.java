@@ -35,6 +35,43 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     public static final String CUSTOM_GIF_FILENAME = "zyrox_bg.gif";
     private static final long MAX_CUSTOM_GIF_BYTES = 32L * 1024L * 1024L;
 
+    private static final android.os.Handler MAIN_HANDLER =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final java.util.List<java.lang.ref.WeakReference<ZyroxShaderBackgroundView>> ACTIVE_BACKDROPS =
+            new java.util.ArrayList<>();
+
+    /**
+     * Strictly pauses, recycles bitmaps, aborts GIF decoders, and releases hardware MediaCodec /
+     * Surface buffers for every live launcher background view — invoked in {@code onStop()},
+     * {@code onTrimMemory()}, pre-launch handoff, and {@code GameService.onStartCommand()}.
+     */
+    public static void releaseAllForGameStart() {
+        ZyroxGifDecoder.cancelAllActiveDecodes();
+        ZyroxSeamlessGifView.purgeAllActiveInstances(false);
+        ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+        Runnable task = () -> {
+            java.util.List<ZyroxShaderBackgroundView> snapshot = new java.util.ArrayList<>();
+            synchronized (ACTIVE_BACKDROPS) {
+                for (int i = ACTIVE_BACKDROPS.size() - 1; i >= 0; i--) {
+                    ZyroxShaderBackgroundView bg = ACTIVE_BACKDROPS.get(i).get();
+                    if (bg == null) {
+                        ACTIVE_BACKDROPS.remove(i);
+                    } else {
+                        snapshot.add(bg);
+                    }
+                }
+            }
+            for (ZyroxShaderBackgroundView bg : snapshot) {
+                bg.onStop();
+            }
+        };
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            task.run();
+        } else {
+            MAIN_HANDLER.post(task);
+        }
+    }
+
     private ZyroxLoopingVideoView mHomeVideoView;
     @Nullable
     private ZyroxSeamlessGifView mCustomGifView;
@@ -69,9 +106,14 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
 
         // Layer 1: Full-HD 1080p hardware-accelerated Home screen.mp4 backdrop + instant poster
         mHomeVideoView = new ZyroxLoopingVideoView(context);
+        mHomeVideoView.setLauncherBackdropRole(true);
         mHomeVideoView.setPosterResource(R.drawable.bg_zyrox_shader_scene);
         mHomeVideoView.setPlaybackEnabled(false);
         addView(mHomeVideoView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+
+        synchronized (ACTIVE_BACKDROPS) {
+            ACTIVE_BACKDROPS.add(new java.lang.ref.WeakReference<>(this));
+        }
 
         // Layer 2: Subtle edge-only contrast rim (zero blur, 100% clear center so video shines)
         mContrastVeilView = new View(context);
@@ -209,20 +251,37 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         }
     }
 
-    /** Frees all hardware MediaCodec / GIF buffers when LauncherActivity is hidden (e.g. in-game). */
+    /**
+     * Strictly frees all hardware MediaCodec, Surface, poster Bitmap, and GIF frame buffers when
+     * {@code LauncherActivity} stops or {@code GameService} launches on 4 GB–6 GB RAM devices.
+     */
     public void onStop() {
         mResumed = false;
-        mHomeVideoView.trimDecoder();
+        ZyroxGifDecoder.cancelAllActiveDecodes();
+        mHomeVideoView.suspendForBackground(true);
         if (mCustomGifView != null) {
             mCustomGifView.trimFrames();
+            mCustomGifView.release();
+            removeView(mCustomGifView);
+            mCustomGifView = null;
         }
     }
 
     public void onDestroy() {
         mResumed = false;
+        synchronized (ACTIVE_BACKDROPS) {
+            for (int i = ACTIVE_BACKDROPS.size() - 1; i >= 0; i--) {
+                ZyroxShaderBackgroundView cur = ACTIVE_BACKDROPS.get(i).get();
+                if (cur == null || cur == this) {
+                    ACTIVE_BACKDROPS.remove(i);
+                }
+            }
+        }
+        ZyroxGifDecoder.cancelAllActiveDecodes();
         mHomeVideoView.release();
         if (mCustomGifView != null) {
             mCustomGifView.release();
+            removeView(mCustomGifView);
             mCustomGifView = null;
         }
     }

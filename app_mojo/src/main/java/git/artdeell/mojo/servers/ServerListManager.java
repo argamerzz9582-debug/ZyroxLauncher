@@ -69,6 +69,8 @@ public final class ServerListManager {
         @Nullable public transient String lastMotd;
         @Nullable public transient String lastPlayers;
         @Nullable public transient String lastVersion;
+        public transient int lastProtocol = -1;
+        @Nullable public transient String lastResolvedMcVersion;
         public transient boolean lastOnline;
 
         public ServerEntry(@NonNull String name, @NonNull String address) {
@@ -494,6 +496,42 @@ public final class ServerListManager {
     private static void skipExact(@NonNull DataInputStream in, int bytes, int max) throws IOException {
         if (bytes < 0 || bytes > max) throw new IOException("NBT array exceeds safe limit");
         in.skipBytes(bytes);
+    }
+
+    /**
+     * Resolves the active or most recently joined multiplayer server address from {@code options.txt}
+     * ({@code lastServer:}) or the instance's pinned favorite server so the in-game HUD can display
+     * live Ping latency without manual configuration.
+     */
+    @androidx.annotation.Nullable
+    public static String getLastActiveServerAddress(@androidx.annotation.Nullable File gameDir) {
+        if (gameDir == null) return null;
+        File optionsFile = new File(gameDir, "options.txt");
+        if (optionsFile.isFile() && optionsFile.length() <= 256 * 1024L) {
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new FileInputStream(optionsFile), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.startsWith("lastServer:")) {
+                        String addr = line.substring("lastServer:".length()).trim();
+                        if (!addr.isEmpty()) {
+                            return addr;
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            List<ServerEntry> list = loadServers(gameDir);
+            for (ServerEntry e : list) {
+                if (e != null && e.favorite && e.address != null && !e.address.trim().isEmpty()) {
+                    return e.address.trim();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     @NonNull

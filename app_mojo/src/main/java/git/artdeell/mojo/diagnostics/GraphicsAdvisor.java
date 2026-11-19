@@ -494,8 +494,8 @@ public final class GraphicsAdvisor {
         if (LauncherPreferences.DEFAULT_PREF != null) {
             android.content.SharedPreferences.Editor ed = LauncherPreferences.DEFAULT_PREF.edit()
                     .putInt("resolutionRatio", preset.recommendedScalePercent)
-                    .putBoolean("freedreno_sysmem", preset.enableFreedrenoSysmem)
-                    .putBoolean("ubwc_workaround", preset.enableUbwcWorkaround)
+                    .putBoolean("freedrenoSysmem", preset.enableFreedrenoSysmem)
+                    .putBoolean("ubwcWorkaround", preset.enableUbwcWorkaround)
                     .putBoolean("zinkPreferSystemDriver", preset.preferSystemVulkan);
             if (instance == null) {
                 LauncherPreferences.PREF_RENDERER = chosenRenderer;
@@ -564,6 +564,120 @@ public final class GraphicsAdvisor {
             return Renderers.GL4ES_RENDERER;
         }
         return Renderers.GL4ES_RENDERER;
+    }
+
+    /**
+     * Silent pre-flight GPU advisor invoked before launching {@code GameActivity}: inspects live
+     * device silicon via {@link GpuUtils} and selects the optimal renderer (Turnip + Zink/LTW on
+     * Adreno, LTW/ANGLE/GL4ES on ARM Mali &amp; PowerVR, Zink/LTW on Samsung Xclipse) without
+     * overwriting explicit Pro-Mode renderer locks or user wallpaper preferences.
+     */
+    @NonNull
+    public static RendererPreset ensureOptimalInstanceRenderer(@NonNull Context context,
+                                                               @NonNull Instance instance,
+                                                               @Nullable String resolvedVersionId) {
+        GpuUtils.GLInfo gl = GpuUtils.getGlInfo();
+        boolean vulkan = GpuUtils.checkVulkanSupport(context.getPackageManager());
+        boolean hasMesa = Build.VERSION.SDK_INT >= 29
+                && Tools.NATIVE_LIB_DIR != null
+                && new File(Tools.NATIVE_LIB_DIR, "libEGL_mesa.so").exists();
+
+        Driver activeDriver = DriverManager.resolveDriverForInstance(instance);
+        boolean hasTurnip = !(activeDriver instanceof BuiltinDriver)
+                || !DriverManager.getDriverPaths().isEmpty();
+
+        File gameDir = instance.getGameDirectory();
+        boolean hasShaders = false;
+        if (gameDir != null) {
+            File shaderDir = new File(gameDir, "shaderpacks");
+            File[] packs = shaderDir.listFiles(f -> f.isFile() && f.getName().endsWith(".zip"));
+            hasShaders = (packs != null && packs.length > 0)
+                    || git.artdeell.mojo.performance.GameOptimizer.hasShaderModInstalled(gameDir);
+        }
+
+        String effectiveVer = Tools.isValidString(resolvedVersionId) ? resolvedVersionId : instance.versionId;
+        boolean modernMc = !Tools.isValidString(effectiveVer)
+                || JavaRuntimeAdvisor.resolveRequiredJava(null, effectiveVer) >= 16;
+        int totalRam = Tools.getTotalDeviceMemory(context);
+
+        RendererPreset preset = computeOptimalPreset(
+                gl.architecture,
+                gl.renderer,
+                gl.glesMajorVersion,
+                vulkan,
+                hasMesa,
+                hasTurnip,
+                hasShaders,
+                modernMc,
+                totalRam);
+
+        // Apply low-level driver stability flags silently without mutating user UI wallpaper toggles
+        LauncherPreferences.PREF_FREEDRENO_SYSMEM = preset.enableFreedrenoSysmem;
+        LauncherPreferences.PREF_UBWC_WORKAROUND = preset.enableUbwcWorkaround;
+        if (!instance.rendererLocked) {
+            String chosen = preset.rendererId;
+            try {
+                RendererCache cache = RendererCache.getCompatibleRenderers(context);
+                if (cache != null && cache.rendererIds != null && !cache.rendererIds.contains(chosen)) {
+                    chosen = cache.rendererIds.contains(Renderers.LTW_RENDERER)
+                            ? Renderers.LTW_RENDERER : Renderers.GL4ES_RENDERER;
+                }
+            } catch (Throwable ignored) {
+            }
+
+            boolean dirty = false;
+            if (!Tools.isValidString(instance.renderer)) {
+                instance.renderer = chosen;
+                dirty = true;
+            }
+            // Auto-bind installed Adreno Turnip driver when Zink is chosen on Adreno 6xx/7xx/8xx
+            if (Renderers.ZINK_RENDERER.equals(instance.getLaunchRenderer())
+                    && gl.architecture.supportsTurnipDrivers()
+                    && !instance.hasCustomVulkanDriver()
+                    && !Tools.isValidString(LauncherPreferences.PREF_VULKAN_DRIVER)) {
+                java.util.List<String> drivers = DriverManager.getDriverPaths();
+                if (!drivers.isEmpty()) {
+                    instance.vulkanDriver = drivers.get(0);
+                    LauncherPreferences.PREF_ZINK_PREFER_SYSTEM_DRIVER = false;
+                    dirty = true;
+                }
+            }
+            if (dirty) {
+                instance.maybeWrite();
+            }
+        }
+        return preset;
+    }
+
+    /**
+     * Generates a friendly, beginner-readable single-sentence device calibration summary for the
+     * First-Time Onboarding Wizard and Simple-Mode Instance Studio.
+     */
+    @NonNull
+    public static String buildPlainEnglishCalibrationSummary(@NonNull GpuArchitecture arch,
+                                                             @NonNull String rendererId,
+                                                             int totalRamMb,
+                                                             int allocatedRamMb,
+                                                             int scalePercent,
+                                                             boolean turnipBound) {
+        String gpuLabel = arch.displayName;
+        String ramGb = totalRamMb > 0
+                ? String.format(Locale.ROOT, "%.1f GB RAM", totalRamMb / 1024.0)
+                : "Android RAM";
+        String allocGb = String.format(Locale.ROOT, "%.1f GB", allocatedRamMb / 1024.0);
+        String pipe;
+        if (Renderers.ZINK_RENDERER.equals(rendererId)) {
+            pipe = turnipBound ? "Turnip + Zink (GL 4.6)" : "Vulkan Zink (GL 4.6)";
+        } else if (Renderers.LTW_RENDERER.equals(rendererId)) {
+            pipe = arch.supportsTurnipDrivers() ? "Adreno LTW (GLES 3)" : "LTW / ANGLE (GLES 3)";
+        } else if (Renderers.FREEDRENO_RENDERER.equals(rendererId)) {
+            pipe = "Freedreno KGSL";
+        } else {
+            pipe = "GL4ES Compatible";
+        }
+        return gpuLabel + " & " + ramGb + " detected - Configured " + pipe
+                + ", " + allocGb + " game RAM (" + allocatedRamMb + " MB) & "
+                + scalePercent + "% render scale.";
     }
 
     @NonNull

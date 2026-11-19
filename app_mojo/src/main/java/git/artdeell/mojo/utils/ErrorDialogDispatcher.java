@@ -65,12 +65,7 @@ public final class ErrorDialogDispatcher {
                             showMore ? R.string.error_show_less : R.string.error_show_more,
                             (p1, p2) -> showError(ctx, titleId, rolledMessage, e, exitIfOk, !showMore))
                     .setNeutralButton(android.R.string.copy, (p1, p2) -> {
-                        ClipboardManager mgr = (ClipboardManager)
-                                ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                        if (mgr != null) {
-                            mgr.setPrimaryClip(ClipData.newPlainText(
-                                    "error", LogRedactor.redact(printStackTrace(e))));
-                        }
+                        LogRedactor.copyRedactedToClipboard(ctx, "error", printStackTrace(e));
                         finishIfRequested(ctx, exitIfOk);
                     })
                     .setCancelable(!exitIfOk)

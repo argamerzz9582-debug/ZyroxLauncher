@@ -51,6 +51,54 @@ public final class ZyroxGifDecoder {
     /** Target fraction of source frames overlapped across the loop boundary. */
     private static final float SEAMLESS_OVERLAP_RATIO = 0.36f;
 
+    /** Thread-safe weak registry of in-flight GIF decode cancellation tokens for instant OOM/game purge. */
+    private static final List<java.lang.ref.WeakReference<AtomicBoolean>> ACTIVE_DECODE_TOKENS =
+            new ArrayList<>();
+
+    /** Registers an active decode cancellation flag so {@link #cancelAllActiveDecodes()} aborts it immediately. */
+    public static void registerActiveDecode(@NonNull AtomicBoolean cancelFlag) {
+        synchronized (ACTIVE_DECODE_TOKENS) {
+            for (int i = ACTIVE_DECODE_TOKENS.size() - 1; i >= 0; i--) {
+                AtomicBoolean tok = ACTIVE_DECODE_TOKENS.get(i).get();
+                if (tok == null || tok.get()) {
+                    ACTIVE_DECODE_TOKENS.remove(i);
+                }
+            }
+            ACTIVE_DECODE_TOKENS.add(new java.lang.ref.WeakReference<>(cancelFlag));
+        }
+    }
+
+    /**
+     * Immediately aborts every in-flight {@link ZyroxGifDecoder} background pass and clears held
+     * token references so zero temporary ARGB_8888 / LZW frame arrays survive when entering gameplay.
+     */
+    public static int cancelAllActiveDecodes() {
+        int cancelled = 0;
+        synchronized (ACTIVE_DECODE_TOKENS) {
+            for (int i = ACTIVE_DECODE_TOKENS.size() - 1; i >= 0; i--) {
+                AtomicBoolean tok = ACTIVE_DECODE_TOKENS.get(i).get();
+                if (tok != null && tok.compareAndSet(false, true)) {
+                    cancelled++;
+                }
+            }
+            ACTIVE_DECODE_TOKENS.clear();
+        }
+        return cancelled;
+    }
+
+    /** Recycles every non-recycled {@link Bitmap} frame inside {@code sequence} and clears references. */
+    public static void recycleBitmapSequence(@Nullable SeamlessSequence<Bitmap> sequence) {
+        if (sequence == null) return;
+        for (Bitmap frame : sequence.frames) {
+            if (frame != null && !frame.isRecycled()) {
+                try {
+                    frame.recycle();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
     /** Full-fidelity 32-bit {@code ARGB_8888} frame constructor — never downsampled or quantized. */
     public interface FrameFactory<T> {
         @NonNull

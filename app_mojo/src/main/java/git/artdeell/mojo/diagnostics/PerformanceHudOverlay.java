@@ -131,7 +131,7 @@ public class PerformanceHudOverlay extends AppCompatTextView
     @Nullable
     private ObstacleProvider mObstacleProvider;
 
-    // Multi-state drag tracking
+    // Multi-state drag, single-tap (Quick Settings) & long-press (compact/hide cycle) tracking
     @NonNull
     private TouchState mTouchState = TouchState.IDLE;
     private int mActivePointerId = MotionEvent.INVALID_POINTER_ID;
@@ -139,6 +139,62 @@ public class PerformanceHudOverlay extends AppCompatTextView
     private float mDownRawY;
     private float mStartViewX;
     private float mStartViewY;
+    private boolean mLongPressConsumed = false;
+    @Nullable
+    private Runnable mOnQuickSettingsAction;
+    @Nullable
+    private Runnable mOnHudHiddenAction;
+
+    // Lightweight multiplayer server Ping telemetry (sampled off-thread only when server set)
+    @Nullable
+    private volatile String mPingTargetAddress;
+    private volatile int mLastServerPingMs = -1;
+    private long mLastPingProbeElapsedMs = 0L;
+    private volatile boolean mPingProbeInFlight = false;
+
+    private final Runnable mLongPressRunnable = () -> {
+        if (mTouchState == TouchState.PRESSED && !mLocked && getVisibility() == VISIBLE) {
+            mLongPressConsumed = true;
+            mTouchState = TouchState.IDLE;
+            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            cycleCompactOrHiddenOnLongPress();
+        }
+    };
+
+    /** Binds single-tap action (opens {@code QuickSettingSideDialog} in-game). */
+    public void setOnQuickSettingsAction(@Nullable Runnable action) {
+        mOnQuickSettingsAction = action;
+    }
+
+    /** Binds long-press hide callback so {@code GameHudCoordinator} stays synced with prefs. */
+    public void setOnHudHiddenAction(@Nullable Runnable action) {
+        mOnHudHiddenAction = action;
+    }
+
+    /** Configures an optional multiplayer host[:port] for live HUD Ping (ms) measurement. */
+    public void setPingTargetAddress(@Nullable String serverAddress) {
+        mPingTargetAddress = (serverAddress != null && !serverAddress.trim().isEmpty())
+                ? serverAddress.trim() : null;
+        mLastServerPingMs = -1;
+    }
+
+    /** Long-press cycle: Full HUD -> Compact Pill -> Hidden (restore anytime from side drawer). */
+    private void cycleCompactOrHiddenOnLongPress() {
+        if (!mCompactMode) {
+            setCompactMode(true, true);
+        } else {
+            setCompactMode(false, true);
+            if (mOnHudHiddenAction != null) {
+                mOnHudHiddenAction.run();
+            } else {
+                setHudEnabled(false);
+            }
+            android.widget.Toast.makeText(
+                    getContext().getApplicationContext(),
+                    "HUD hidden — re-enable anytime in Quick Settings",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
 
     // Live runtime metrics state
     private String mRendererLabel = "auto";
@@ -366,12 +422,16 @@ public class PerformanceHudOverlay extends AppCompatTextView
                 mDownRawY = event.getRawY();
                 mStartViewX = getX();
                 mStartViewY = getY();
+                mLongPressConsumed = false;
                 mTouchState = TouchState.PRESSED;
+                removeCallbacks(mLongPressRunnable);
+                postDelayed(mLongPressRunnable, ViewConfiguration.getLongPressTimeout());
                 parent.requestDisallowInterceptTouchEvent(true);
                 invalidate();
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
+                if (mLongPressConsumed) return true;
                 if (mTouchState != TouchState.PRESSED && mTouchState != TouchState.DRAGGING) {
                     return false;
                 }
@@ -381,6 +441,7 @@ public class PerformanceHudOverlay extends AppCompatTextView
                 float dy = event.getRawY() - mDownRawY;
                 if (mTouchState == TouchState.PRESSED
                         && Math.hypot(dx, dy) >= mTouchSlop) {
+                    removeCallbacks(mLongPressRunnable);
                     mTouchState = TouchState.DRAGGING;
                 }
                 if (mTouchState == TouchState.DRAGGING) {
@@ -401,13 +462,25 @@ public class PerformanceHudOverlay extends AppCompatTextView
             }
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL: {
+                removeCallbacks(mLongPressRunnable);
                 parent.requestDisallowInterceptTouchEvent(false);
+                if (mLongPressConsumed) {
+                    mLongPressConsumed = false;
+                    mActivePointerId = MotionEvent.INVALID_POINTER_ID;
+                    mTouchState = TouchState.IDLE;
+                    invalidate();
+                    return true;
+                }
                 TouchState prior = mTouchState;
                 mActivePointerId = MotionEvent.INVALID_POINTER_ID;
                 if (prior == TouchState.PRESSED && action == MotionEvent.ACTION_UP) {
-                    // Quick tap toggles Compact Mini-Pill <-> Full Telemetry + Graph mode
+                    // Single-tap opens QuickSettingSideDialog (or toggles compact pill as fallback)
                     mTouchState = TouchState.IDLE;
-                    setCompactMode(!mCompactMode, true);
+                    if (mOnQuickSettingsAction != null) {
+                        mOnQuickSettingsAction.run();
+                    } else {
+                        setCompactMode(!mCompactMode, true);
+                    }
                     invalidate();
                     return true;
                 }
@@ -800,6 +873,7 @@ public class PerformanceHudOverlay extends AppCompatTextView
     }
 
     public void stopMonitoring(boolean persistSummary) {
+        removeCallbacks(mLongPressRunnable);
         if (mMonitoring) {
             mMonitoring = false;
             Choreographer.getInstance().removeFrameCallback(this);
@@ -864,16 +938,26 @@ public class PerformanceHudOverlay extends AppCompatTextView
             mPeakNativeRssMb = rssMb;
         }
 
-        // System free RAM
+        // System free RAM & live RAM % utilization
         int freeMb = -1;
+        int ramUsedPct = -1;
         if (mActivityManager != null) {
             try {
                 mActivityManager.getMemoryInfo(mMemInfo);
                 freeMb = (int) (mMemInfo.availMem / (1024L * 1024L));
+                if (mMemInfo.totalMem > 0L) {
+                    long usedSys = Math.max(0L, mMemInfo.totalMem - mMemInfo.availMem);
+                    ramUsedPct = Math.max(0, Math.min(100,
+                            (int) Math.round((usedSys * 100.0) / mMemInfo.totalMem)));
+                }
                 if (freeMb > 0 && freeMb < mMinFreeRamMb) mMinFreeRamMb = freeMb;
             } catch (Throwable ignored) {
             }
         }
+
+        // Non-blocking multiplayer Ping sample (every 5s when connected to a server)
+        maybeScheduleServerPingProbe();
+        int pingMs = mLastServerPingMs;
 
         // Device thermal throttling & Celsius readout
         String thermal = queryThermalLabel();
@@ -881,29 +965,35 @@ public class PerformanceHudOverlay extends AppCompatTextView
 
         mTextBuilder.setLength(0);
         if (mCompactMode) {
-            mTextBuilder.append(String.format(Locale.ROOT,
-                    "%.0f FPS • 1%%L %.0f • %.1fms • RSS %dM",
-                    fps, onePctLow, avgMs, rssMb));
-            if (tempC > 5f && tempC < 95f) {
-                mTextBuilder.append(String.format(Locale.ROOT, " • %.0f°C", tempC));
-            } else if (!"N/A".equals(thermal)) {
-                mTextBuilder.append(" • ").append(thermal);
+            mTextBuilder.append(String.format(Locale.ROOT, "%.0f FPS", fps));
+            if (pingMs >= 0) {
+                mTextBuilder.append(" • ").append(pingMs).append("ms");
+            } else {
+                mTextBuilder.append(" • Ping --");
             }
+            if (ramUsedPct >= 0) {
+                mTextBuilder.append(" • RAM ").append(ramUsedPct).append('%');
+            }
+            mTextBuilder.append(" • Heap ").append(usedHeapMb).append('/').append(mConfiguredHeapMb).append('M');
         } else {
             int scalePct = Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f);
             long uptimeSec = Math.max(0L, (SystemClock.elapsedRealtime() - mSessionStartMs) / 1000L);
             mTextBuilder.append(String.format(Locale.ROOT,
-                    "FPS %.0f  1%%L %.0f  FT %.1f/%.0fms\n",
-                    fps, onePctLow, avgMs, worstMs));
-            mTextBuilder.append("JVM ").append(usedHeapMb).append('/').append(mConfiguredHeapMb)
-                    .append("M GC:").append(mRecentGcEvents);
-            if (mRecentGcPauseMs > 0L) {
-                mTextBuilder.append('(').append(mRecentGcPauseMs).append("ms)");
+                    "FPS %.0f  1%%L %.0f  FT %.1fms",
+                    fps, onePctLow, avgMs));
+            if (pingMs >= 0) {
+                mTextBuilder.append(" • Ping ").append(pingMs).append("ms");
+            }
+            mTextBuilder.append('\n');
+            mTextBuilder.append("Heap ").append(usedHeapMb).append('/').append(mConfiguredHeapMb)
+                    .append('M');
+            if (ramUsedPct >= 0) {
+                mTextBuilder.append(" • RAM ").append(ramUsedPct).append('%');
+            }
+            if (mRecentGcEvents > 0) {
+                mTextBuilder.append(" • GC:").append(mRecentGcEvents);
             }
             mTextBuilder.append(" • RSS ").append(rssMb).append('M');
-            if (freeMb > 0) {
-                mTextBuilder.append(" (Free ").append(freeMb).append("M)");
-            }
             mTextBuilder.append('\n');
             mTextBuilder.append("GPU ").append(mRendererLabel).append(" @").append(scalePct).append("% • THM ")
                     .append(thermal);
@@ -918,6 +1008,30 @@ public class PerformanceHudOverlay extends AppCompatTextView
         }
         setText(mTextBuilder.toString());
         invalidate();
+    }
+
+    private void maybeScheduleServerPingProbe() {
+        final String addr = mPingTargetAddress;
+        if (addr == null || mPingProbeInFlight) return;
+        long now = SystemClock.elapsedRealtime();
+        if (now - mLastPingProbeElapsedMs < 5000L) return;
+        mLastPingProbeElapsedMs = now;
+        mPingProbeInFlight = true;
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            try {
+                git.artdeell.mojo.servers.ServerListManager.ParsedHostPort hp =
+                        git.artdeell.mojo.servers.ServerListManager.parseAndValidateAddress(addr);
+                long t0 = System.nanoTime();
+                try (java.net.Socket s = new java.net.Socket()) {
+                    s.connect(new java.net.InetSocketAddress(hp.host, hp.port), 2200);
+                    mLastServerPingMs = (int) Math.max(1L, (System.nanoTime() - t0) / 1_000_000L);
+                }
+            } catch (Throwable ignored) {
+                mLastServerPingMs = -1;
+            } finally {
+                mPingProbeInFlight = false;
+            }
+        });
     }
 
     private void sampleGcActivity(long currentUsedHeapBytes) {

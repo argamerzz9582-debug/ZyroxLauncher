@@ -56,6 +56,71 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
         return t;
     });
 
+    private static final android.os.Handler MAIN_HANDLER =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final java.util.List<java.lang.ref.WeakReference<ZyroxLoopingVideoView>> ACTIVE_VIDEO_VIEWS =
+            new java.util.ArrayList<>();
+
+    private static void registerVideoView(@NonNull ZyroxLoopingVideoView view) {
+        synchronized (ACTIVE_VIDEO_VIEWS) {
+            for (int i = ACTIVE_VIDEO_VIEWS.size() - 1; i >= 0; i--) {
+                ZyroxLoopingVideoView cur = ACTIVE_VIDEO_VIEWS.get(i).get();
+                if (cur == null || cur == view || cur.mReleased) {
+                    ACTIVE_VIDEO_VIEWS.remove(i);
+                }
+            }
+            ACTIVE_VIDEO_VIEWS.add(new java.lang.ref.WeakReference<>(view));
+        }
+    }
+
+    private static void unregisterVideoView(@NonNull ZyroxLoopingVideoView view) {
+        synchronized (ACTIVE_VIDEO_VIEWS) {
+            for (int i = ACTIVE_VIDEO_VIEWS.size() - 1; i >= 0; i--) {
+                ZyroxLoopingVideoView cur = ACTIVE_VIDEO_VIEWS.get(i).get();
+                if (cur == null || cur == view) {
+                    ACTIVE_VIDEO_VIEWS.remove(i);
+                }
+            }
+        }
+    }
+
+    /**
+     * Immediately pauses and releases hardware {@link MediaPlayer} decoders, {@link Surface}s,
+     * and background poster bitmaps across all inactive (or launcher-scoped) video views to prevent
+     * Android LMK / OOM kills on 4 GB – 6 GB RAM devices when {@code GameService} starts.
+     */
+    public static void suspendInactiveDecoders(final boolean includeLauncherBackdrops) {
+        Runnable task = () -> {
+            java.util.List<ZyroxLoopingVideoView> targets = new java.util.ArrayList<>();
+            synchronized (ACTIVE_VIDEO_VIEWS) {
+                for (int i = ACTIVE_VIDEO_VIEWS.size() - 1; i >= 0; i--) {
+                    ZyroxLoopingVideoView cur = ACTIVE_VIDEO_VIEWS.get(i).get();
+                    if (cur == null || cur.mReleased) {
+                        ACTIVE_VIDEO_VIEWS.remove(i);
+                    } else if (!cur.isShown()
+                            || (includeLauncherBackdrops && cur.mLauncherBackdropRole)) {
+                        targets.add(cur);
+                    }
+                }
+            }
+            for (ZyroxLoopingVideoView v : targets) {
+                v.suspendForBackground(true);
+            }
+        };
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            task.run();
+        } else {
+            MAIN_HANDLER.post(task);
+        }
+    }
+
+    private boolean mLauncherBackdropRole = false;
+
+    /** Marks this video view as belonging to the launcher home shell for immediate game-start purge. */
+    public void setLauncherBackdropRole(boolean launcherBackdropRole) {
+        mLauncherBackdropRole = launcherBackdropRole;
+    }
+
     private ImageView mPosterView;
     private TextureView mTextureView;
     private final Matrix mCropMatrix = new Matrix();
@@ -128,6 +193,7 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
         mTextureView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         mTextureView.setSurfaceTextureListener(this);
         addView(mTextureView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        registerVideoView(this);
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
@@ -203,6 +269,10 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
     public void resumeAnimation() {
         if (mReleased) return;
         mPlaybackDesired = true;
+        if (!mFirstFrameShown && mPosterResId != 0
+                && mPosterView != null && mPosterView.getDrawable() == null) {
+            revealPoster();
+        }
         syncPlaybackState();
     }
 
@@ -221,18 +291,49 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
     }
 
     /**
-     * Releases the active hardware {@link MediaPlayer} decoder while keeping the poster ready so
-     * backgrounded Activities consume zero VPU/codec memory (e.g., while Minecraft is running).
+     * Releases the active hardware {@link MediaPlayer} decoder AND its bound {@link Surface} so
+     * backgrounded Activities hold zero VPU/GraphicBuffer memory (recreated cleanly on resume).
      */
     public void trimDecoder() {
+        suspendForBackground(false);
+    }
+
+    /**
+     * Strictly stops playback, releases both {@link MediaPlayer} and {@link Surface} off-thread,
+     * and optionally drops the cached poster {@link android.graphics.drawable.Drawable} so
+     * stopped Activities / game sessions consume zero background media RAM on 4 GB–6 GB devices.
+     */
+    public void suspendForBackground(boolean dropPosterBitmap) {
         mPlaybackDesired = false;
-        resetPlayerOnly(true);
+        mSessionToken++;
+        MediaPlayer mp = mMediaPlayer;
+        Surface surface = mRenderSurface;
+        mMediaPlayer = null;
+        mRenderSurface = null;
+        mPrepared = false;
+        mPreparing = false;
+        mFirstFrameShown = false;
+        mRenderedFrameCount = 0;
+        if (mTextureView != null) {
+            mTextureView.setAlpha(0f);
+        }
+        if (dropPosterBitmap) {
+            if (mPosterView != null) {
+                mPosterView.setImageDrawable(null);
+            }
+        } else {
+            revealPoster();
+        }
+        if (mp != null || surface != null) {
+            releaseMediaAsync(mp, surface);
+        }
     }
 
     /** Permanently releases decoder, surface, and poster bitmap references. */
     public void release() {
         mReleased = true;
         mPlaybackDesired = false;
+        unregisterVideoView(this);
         mSessionToken++;
         MediaPlayer mp = mMediaPlayer;
         Surface surface = mRenderSurface;

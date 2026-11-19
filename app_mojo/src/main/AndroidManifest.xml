@@ -113,6 +113,7 @@
                 <data android:mimeType="application/json" />
                 <data android:mimeType="text/json" />
                 <data android:mimeType="text/plain" />
+                <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
 

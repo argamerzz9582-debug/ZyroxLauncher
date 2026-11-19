@@ -417,11 +417,65 @@ public class ContentManagerFragment extends Fragment {
     }
 
     private void addEmptyHint(@NonNull Context ctx) {
+        LinearLayout guideCard = ZyroxStudioUi.createItemCard(ctx);
+        int pad = ZyroxStudioUi.dp(ctx, 14);
+        guideCard.setPadding(pad, pad, pad, pad);
+        guideCard.addView(ZyroxStudioUi.createTitle(ctx,
+                mActiveKind == TabKind.MODS
+                        ? "Supercharge Your FPS in One Tap"
+                        : "No Items Installed Yet"));
         TextView empty = ZyroxStudioUi.createSubtitle(ctx,
-                "No items found for this category.\nUse '+ Import' to safely import local files or 'Mod Store' to browse Modrinth & CurseForge.");
-        empty.setPadding(ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 20),
-                ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 20));
-        mListContainer.addView(empty);
+                mActiveKind == TabKind.MODS
+                        ? "Install our curated Zero-Lag FPS Pack (Sodium, Lithium, FerriteCore & ImmediatelyFast) "
+                        + "matched to your Minecraft version, browse Modrinth, or import a local .jar mod."
+                        : "Browse verified packs & shaders in the Modrinth Store, install essential FPS mods, or import a local .zip archive.");
+        empty.setPadding(0, ZyroxStudioUi.dp(ctx, 4), 0, ZyroxStudioUi.dp(ctx, 12));
+        guideCard.addView(empty);
+
+        LinearLayout actions = new LinearLayout(ctx);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button btnFps = ZyroxStudioUi.createPrimaryButton(ctx, "Install Essential FPS Mods");
+        btnFps.setOnClickListener(v -> {
+            if (mInstance == null) return;
+            final Instance target = mInstance;
+            final Context appCtx = ctx.getApplicationContext();
+            btnFps.setEnabled(false);
+            Toast.makeText(appCtx,
+                    "Downloading Sodium, Lithium, FerriteCore & ImmediatelyFast + tuning options.txt…",
+                    Toast.LENGTH_SHORT).show();
+            MojoApplication.sExecutorService.execute(() -> {
+                try {
+                    git.artdeell.mojo.instances.InstanceBackupService
+                            .createPreModSnapshotQuietly(target, "before-essential-fps");
+                    boolean wantIris = (mActiveKind == TabKind.SHADER_PACKS);
+                    git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary summary =
+                            git.artdeell.mojo.content.ModrinthContentInstaller
+                                    .installZeroLagFpsPack(target, wantIris, null);
+                    Tools.runOnUiThread(() -> {
+                        Toast.makeText(appCtx, summary.message, Toast.LENGTH_LONG).show();
+                        if (isAdded()) reloadActiveTab();
+                    });
+                } catch (Exception e) {
+                    Tools.runOnUiThread(() -> {
+                        btnFps.setEnabled(true);
+                        Toast.makeText(appCtx, "FPS Pack: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        });
+        actions.addView(btnFps, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36)));
+
+        Button btnStore = ZyroxStudioUi.createSecondaryButton(ctx, "Browse Modrinth", false);
+        btnStore.setOnClickListener(v -> Tools.swapFragment(
+                requireActivity(), SearchModFragment.class, SearchModFragment.TAG, null));
+        actions.addView(btnStore, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36), ZyroxStudioUi.dp(ctx, 8)));
+
+        guideCard.addView(actions);
+        mListContainer.addView(guideCard);
     }
 
     private void toggleFile(@NonNull File file, boolean enable) {
@@ -447,6 +501,10 @@ public class ContentManagerFragment extends Fragment {
                         + (isConfig ? "\nA .reset.bak backup will be preserved automatically." : ""))
                 .setPositiveButton(isConfig ? "Reset" : "Remove", (d, w) -> MojoApplication.sExecutorService.execute(() -> {
                     try {
+                        if (mActiveKind == TabKind.MODS && mInstance != null) {
+                            git.artdeell.mojo.instances.InstanceBackupService
+                                    .createPreModSnapshotQuietly(mInstance, "before-mod-remove");
+                        }
                         File safe = FileUtils.ensureInsideDirectory(mInstance.getGameDirectory(), file);
                         if (isConfig) {
                             InstanceContentManager.resetConfigToDefaultWithBackup(safe);
@@ -554,16 +612,24 @@ public class ContentManagerFragment extends Fragment {
                 targetDir = new File(mInstance.getGameDirectory(), "config");
                 break;
         }
+        final boolean snapshotBefore = (mActiveKind == TabKind.MODS || mActiveKind == TabKind.CONFIGS);
+        final Instance instSnap = mInstance;
         MojoApplication.sExecutorService.execute(() -> {
-            try (InputStream in = appCtx.getContentResolver().openInputStream(uri)) {
-                if (in == null) throw new IllegalStateException("Cannot open selected file");
-                File imported = InstanceContentManager.importFileFromStream(
-                        in, targetDir, fileName, MAX_IMPORT_BYTES);
-                Tools.runOnUiThread(() -> {
-                    if (!isAdded()) return;
-                    Toast.makeText(requireContext(), "Imported " + imported.getName(), Toast.LENGTH_SHORT).show();
-                    reloadActiveTab();
-                });
+            try {
+                if (snapshotBefore) {
+                    git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                            instSnap, "local-mod-import");
+                }
+                try (InputStream in = appCtx.getContentResolver().openInputStream(uri)) {
+                    if (in == null) throw new IllegalStateException("Cannot open selected file");
+                    File imported = InstanceContentManager.importFileFromStream(
+                            in, targetDir, fileName, MAX_IMPORT_BYTES);
+                    Tools.runOnUiThread(() -> {
+                        if (!isAdded()) return;
+                        Toast.makeText(requireContext(), "Imported " + imported.getName(), Toast.LENGTH_SHORT).show();
+                        reloadActiveTab();
+                    });
+                }
             } catch (Exception e) {
                 Tools.runOnUiThread(() -> {
                     if (isAdded()) Toast.makeText(requireContext(), "Import blocked: " + e.getMessage(), Toast.LENGTH_LONG).show();

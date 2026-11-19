@@ -87,8 +87,12 @@ public class WorldManagerFragment extends Fragment {
         bar.addView(btnShots, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
         Button btnImport = ZyroxStudioUi.createSecondaryButton(ctx, "Import ZIP", true);
-        btnImport.setOnClickListener(v -> mImportWorldLauncher.launch(new String[]{"application/zip", "application/octet-stream"}));
+        btnImport.setOnClickListener(v -> mImportWorldLauncher.launch(new String[]{"*/*"}));
         bar.addView(btnImport, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
+
+        Button btnLan = ZyroxStudioUi.createSecondaryButton(ctx, "Scan LAN", true);
+        btnLan.setOnClickListener(v -> scanAndJoinLocalLanWorld());
+        bar.addView(btnLan, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
         Button btnBackups = ZyroxStudioUi.createSecondaryButton(ctx, "Backups", true);
         btnBackups.setOnClickListener(v -> showBackupsDialog());
@@ -132,6 +136,47 @@ public class WorldManagerFragment extends Fragment {
         if (mInstance == null) return "Instance";
         return Tools.isValidString(mInstance.name) ? mInstance.name
                 : (Tools.isValidString(mInstance.versionId) ? mInstance.versionId : "Instance");
+    }
+
+    private void scanAndJoinLocalLanWorld() {
+        final Context ctx = requireContext();
+        Toast.makeText(ctx, "Scanning local Wi-Fi (224.0.2.60:4445) for LAN worlds…",
+                Toast.LENGTH_SHORT).show();
+        MojoApplication.sExecutorService.execute(() -> {
+            final List<git.artdeell.mojo.servers.ServerPinger.LanWorldEntry> found =
+                    git.artdeell.mojo.servers.ServerPinger.scanLocalLanWorlds(2200);
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                if (found.isEmpty()) {
+                    new AlertDialog.Builder(requireContext())
+                            .setTitle("No Local LAN Worlds Found")
+                            .setMessage("Open a Minecraft world on another device on the same Wi-Fi network and click Pause → Open to LAN, then scan again.")
+                            .setPositiveButton("Scan Again", (d, w) -> scanAndJoinLocalLanWorld())
+                            .setNegativeButton(android.R.string.ok, null)
+                            .show();
+                    return;
+                }
+                String[] items = new String[found.size()];
+                for (int i = 0; i < found.size(); i++) {
+                    git.artdeell.mojo.servers.ServerPinger.LanWorldEntry w = found.get(i);
+                    items[i] = w.motd + "  (" + w.address + ")";
+                }
+                new AlertDialog.Builder(requireContext())
+                        .setTitle("Join Local LAN World")
+                        .setItems(items, (d, which) -> {
+                            git.artdeell.mojo.servers.ServerPinger.LanWorldEntry picked = found.get(which);
+                            git.artdeell.mojo.servers.ServerListManager.setPendingQuickConnect(picked.address);
+                            Toast.makeText(requireContext(),
+                                    "Joining LAN world \"" + picked.motd + "\"…",
+                                    Toast.LENGTH_SHORT).show();
+                            Tools.backToMainMenu(requireActivity());
+                            git.artdeell.mojo.extra.ExtraCore.setValue(
+                                    git.artdeell.mojo.extra.ExtraConstants.LAUNCH_GAME, true);
+                        })
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
     }
 
     private void refreshWorlds() {
@@ -212,12 +257,40 @@ public class WorldManagerFragment extends Fragment {
                 + backupCount + " backup(s)" + sharedWarn);
 
         if (worlds.isEmpty()) {
+            LinearLayout guideCard = ZyroxStudioUi.createItemCard(ctx);
+            int pad = ZyroxStudioUi.dp(ctx, 14);
+            guideCard.setPadding(pad, pad, pad, pad);
+            guideCard.addView(ZyroxStudioUi.createTitle(ctx, "Start Your Next Adventure"));
             TextView empty = ZyroxStudioUi.createSubtitle(ctx,
-                    "No singleplayer worlds found yet in this instance's saves/ folder.\n"
-                            + "Create a world in Minecraft, import a world .zip, or restore from Backups.");
-            empty.setPadding(ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 24),
-                    ZyroxStudioUi.dp(ctx, 12), ZyroxStudioUi.dp(ctx, 24));
-            mListContainer.addView(empty);
+                    "No singleplayer worlds saved in this instance yet. Scan your Wi-Fi to jump straight into a friend's LAN world, import a world .zip, or launch Minecraft to generate a new world.");
+            empty.setPadding(0, ZyroxStudioUi.dp(ctx, 4), 0, ZyroxStudioUi.dp(ctx, 12));
+            guideCard.addView(empty);
+
+            LinearLayout actions = new LinearLayout(ctx);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setGravity(Gravity.CENTER_VERTICAL);
+
+            Button btnLan = ZyroxStudioUi.createPrimaryButton(ctx, "Scan Local LAN Worlds");
+            btnLan.setOnClickListener(v -> scanAndJoinLocalLanWorld());
+            actions.addView(btnLan, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36)));
+
+            Button btnImport = ZyroxStudioUi.createSecondaryButton(ctx, "Import World (.zip)", false);
+            btnImport.setOnClickListener(v -> mImportWorldLauncher.launch(new String[]{"*/*"}));
+            actions.addView(btnImport, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36), ZyroxStudioUi.dp(ctx, 8)));
+
+            Button btnPlay = ZyroxStudioUi.createSecondaryButton(ctx, "Launch Minecraft", false);
+            btnPlay.setOnClickListener(v -> {
+                Tools.backToMainMenu(requireActivity());
+                git.artdeell.mojo.extra.ExtraCore.setValue(
+                        git.artdeell.mojo.extra.ExtraConstants.LAUNCH_GAME, true);
+            });
+            actions.addView(btnPlay, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36), ZyroxStudioUi.dp(ctx, 8)));
+
+            guideCard.addView(actions);
+            mListContainer.addView(guideCard);
             return;
         }
 

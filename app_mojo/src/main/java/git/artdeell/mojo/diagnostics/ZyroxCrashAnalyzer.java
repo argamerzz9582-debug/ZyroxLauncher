@@ -70,8 +70,9 @@ public final class ZyroxCrashAnalyzer {
         NONE
     }
 
-    /** Concrete one-tap auto-fix operations surfaced on {@code ShowErrorActivity} &amp; {@code ExitActivity}. */
+    /** Concrete one-tap auto-fix operations surfaced on {@code ShowErrorActivity}, {@code FatalErrorActivity} &amp; {@code ExitActivity}. */
     public enum AutoFixType {
+        INSTALL_MISSING_DEPENDENCY,
         DISABLE_CRASHING_MOD,
         ADJUST_JVM_HEAP,
         SWITCH_JRE_VERSION,
@@ -335,18 +336,38 @@ public final class ZyroxCrashAnalyzer {
         if (lower.contains("missingmodsexception")
                 || lower.contains("mod resolution encountered an incompatible mod set")
                 || lower.contains("unmet dependency listing")
-                || (lower.contains("requires version") && lower.contains("modloadingexception"))) {
-            List<AutoFix> fixes = culpritMod != null
-                    ? Collections.singletonList(buildDisableModFix(culpritMod))
-                    : Collections.emptyList();
+                || (lower.contains("requires version") && lower.contains("modloadingexception"))
+                || (lower.contains("requires ") && lower.contains("which is missing"))) {
+            String missingSlug = extractMissingDependencySlug(safeText);
+            List<AutoFix> fixes = new ArrayList<>(2);
+            if (missingSlug != null) {
+                fixes.add(new AutoFix(
+                        AutoFixType.INSTALL_MISSING_DEPENDENCY,
+                        "Install " + shortenToken(missingSlug),
+                        missingSlug,
+                        -1,
+                        false));
+            }
+            if (culpritMod != null && (missingSlug == null
+                    || !culpritMod.equalsIgnoreCase(missingSlug))) {
+                fixes.add(buildDisableModFix(culpritMod));
+            }
+            String friendlyDesc = missingSlug != null
+                    ? "An enabled mod requires '" + missingSlug
+                    + "', which is not installed yet. Tap Fix & Relaunch to download it automatically from Modrinth."
+                    : "An enabled mod is missing a required dependency (such as Fabric API) or targets another Minecraft version.";
             return new Diagnosis(
                     Category.MISSING_MOD_DEPENDENCY,
                     Confidence.HIGH,
-                    "Missing or Incompatible Mod Dependency",
-                    "An enabled mod is missing a required dependency (such as Fabric API) or targets another Minecraft version.",
+                    missingSlug != null
+                            ? "Missing Mod Dependency (" + missingSlug + ")"
+                            : "Missing or Incompatible Mod Dependency",
+                    friendlyDesc,
                     findEvidence(lines, "incompatible mod set", "missingmodsexception", "requires ", "install ", "unmet dependency"),
                     Arrays.asList(
-                            "Install the required dependency listed below, or tap Disable Mod to launch immediately.",
+                            missingSlug != null
+                                    ? "Tap '1-Tap Fix & Relaunch' to install '" + missingSlug + "' automatically."
+                                    : "Install the required dependency listed below, or tap Disable Mod to launch immediately.",
                             "Open Mod Manager to verify all mods match your Minecraft version."
                     ),
                     SuggestedAction.OPEN_MOD_MANAGER,
@@ -542,6 +563,108 @@ public final class ZyroxCrashAnalyzer {
                 genericFixes);
     }
 
+    /** Simple alias result for callers like {@code LogInspectorFragment}. */
+    public static final class FixOutcome {
+        public final boolean applied;
+        @NonNull public final String message;
+
+        public FixOutcome(boolean applied, @NonNull String message) {
+            this.applied = applied;
+            this.message = message;
+        }
+    }
+
+    /** Returns {@code true} when {@code diagnosis} offers an executable 1-tap auto-fix remedy. */
+    public static boolean supportsOneTapFix(@Nullable Diagnosis diagnosis) {
+        return diagnosis != null && !diagnosis.autoFixes.isEmpty();
+    }
+
+    /** Returns a clear, beginner-friendly label for the primary 1-Tap Fix &amp; Relaunch button. */
+    @NonNull
+    public static String getOneTapFixButtonLabel(@Nullable Diagnosis diagnosis) {
+        if (diagnosis == null || diagnosis.autoFixes.isEmpty()) {
+            return "1-Tap Fix & Relaunch";
+        }
+        return "1-Tap Fix & Relaunch (" + diagnosis.autoFixes.get(0).buttonLabel + ")";
+    }
+
+    /** Executes the highest-confidence primary {@link AutoFix} for {@code diagnosis}. */
+    @NonNull
+    public static FixOutcome executeOneTapFix(@NonNull Context context,
+                                              @NonNull Diagnosis diagnosis) {
+        if (diagnosis.autoFixes.isEmpty()) {
+            return new FixOutcome(false, "No automatic fix available for this error.");
+        }
+        AutoFixResult res = executeAutoFix(context, diagnosis.autoFixes.get(0), null);
+        return new FixOutcome(res.applied, res.message);
+    }
+
+    /** Relaunches {@link git.artdeell.mojo.LauncherActivity} and immediately starts the fixed game. */
+    public static void relaunchFixedInstance(@NonNull android.app.Activity hostActivity) {
+        android.content.Intent intent = new android.content.Intent(
+                hostActivity, git.artdeell.mojo.LauncherActivity.class);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra(git.artdeell.mojo.LauncherActivity.EXTRA_AUTO_LAUNCH_ON_START, true);
+        hostActivity.startActivity(intent);
+        hostActivity.finishAndRemoveTask();
+    }
+
+    private static final Pattern MISSING_DEP_PATTERN = Pattern.compile(
+            "(?i)(?:requires\\s+(?:any\\s+version\\s+of\\s+|version\\s+[^\\s]+\\s+of\\s+)?['\"]?([a-z0-9_\\-]{3,40})['\"]?"
+                    + "|Install\\s+([a-z0-9_\\-]{3,40})(?:,|\\s+version|\\s+or)"
+                    + "|Mod\\s+ID:\\s*['\"]([a-z0-9_\\-]{3,40})['\"]"
+                    + "|Missing\\s+(?:mandatory\\s+)?dependency[:\\s]+['\"]?([a-z0-9_\\-]{3,40})['\"]?)");
+
+    /** Extracts and maps a missing mod ID from Fabric/Quilt/Forge/NeoForge logs to a Modrinth slug. */
+    @Nullable
+    public static String extractMissingDependencySlug(@Nullable String text) {
+        if (text == null || text.isEmpty()) return null;
+        Matcher m = MISSING_DEP_PATTERN.matcher(text);
+        while (m.find()) {
+            String raw = null;
+            for (int g = 1; g <= m.groupCount(); g++) {
+                if (m.group(g) != null) {
+                    raw = m.group(g);
+                    break;
+                }
+            }
+            if (raw == null) continue;
+            String id = raw.trim().toLowerCase(Locale.ROOT);
+            if ("minecraft".equals(id) || "java".equals(id) || "fabricloader".equals(id)
+                    || "forge".equals(id) || "neoforge".equals(id) || "quilt_loader".equals(id)
+                    || "version".equals(id) || "any".equals(id) || "mod".equals(id)) {
+                continue;
+            }
+            switch (id) {
+                case "fabric":
+                case "fabric-api":
+                case "fabric_api":
+                    return "fabric-api";
+                case "cloth-config":
+                case "cloth-config2":
+                case "cloth_config":
+                    return "cloth-config";
+                case "architectury":
+                case "architectury-api":
+                    return "architectury-api";
+                case "yet_another_config_lib_v3":
+                case "yet-another-config-lib":
+                case "yacl":
+                    return "yacl";
+                case "forgeconfigapiport":
+                case "forge-config-api-port":
+                    return "forge-config-api-port";
+                case "quilted_fabric_api":
+                case "qsl":
+                    return "qsl";
+                default:
+                    return id.replace('_', '-');
+            }
+        }
+        return null;
+    }
+
     /**
      * Executes a one-tap reversible {@link AutoFix} on {@code instance} (loading the currently
      * selected instance when {@code null}). Never permanently deletes user files.
@@ -559,10 +682,30 @@ public final class ZyroxCrashAnalyzer {
         }
 
         switch (fix.type) {
+            case INSTALL_MISSING_DEPENDENCY: {
+                if (target == null || fix.targetModToken == null || fix.targetModToken.isEmpty()) {
+                    return new AutoFixResult(false, false, "No active instance found for dependency install.");
+                }
+                try {
+                    git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                            target, "auto-fix-dep");
+                    git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary summary =
+                            git.artdeell.mojo.content.ModrinthContentInstaller.installModBySlug(
+                                    target, fix.targetModToken, null);
+                    return new AutoFixResult(summary.installedCount > 0, false, summary.message);
+                } catch (Exception e) {
+                    return new AutoFixResult(false, false,
+                            "Could not auto-install '" + fix.targetModToken + "': "
+                                    + LogRedactor.redact(e.getMessage()));
+                }
+            }
+
             case DISABLE_CRASHING_MOD: {
                 if (target == null || fix.targetModToken == null) {
                     return new AutoFixResult(false, false, "No active instance found for mod quarantine.");
                 }
+                git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
+                        target, "auto-fix-disable");
                 File disabled = disableMatchingModInDir(
                         new File(target.getGameDirectory(), "mods"), fix.targetModToken);
                 if (disabled != null) {
@@ -679,6 +822,7 @@ public final class ZyroxCrashAnalyzer {
     private static AutoFixResult applyGpuRecovery(@NonNull Context context,
                                                   @Nullable Instance target) {
         if (target != null) {
+            target.rendererLocked = false;
             // Clear any broken custom per-instance Turnip override
             target.vulkanDriver = null;
             if (InstanceManager.restoreLastKnownGoodRenderer(target)) {

@@ -88,15 +88,33 @@ public final class ZyroxStudioUi {
         outer.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
+        android.widget.FrameLayout glassShell = new android.widget.FrameLayout(ctx);
+        glassShell.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // Adaptive GPU Blur Underlay: real-time hardware RenderEffect on Android 12+ mid/high-tier
+        // Adreno/Xclipse devices; zero-overhead 2-layer frosted gradient (#660B0F17 + #4DFFFFFF)
+        // fallback on Android 11 or low-RAM / Mali devices.
+        if (ZyroxLiquidGlassDrawable.resolveDeviceGlassBlurTier(ctx)
+                == ZyroxLiquidGlassDrawable.GlassBlurTier.HARDWARE_RENDER_EFFECT) {
+            View frostedUnderlay = new View(ctx);
+            frostedUnderlay.setBackgroundResource(R.drawable.bg_zyrox_glass_surface);
+            frostedUnderlay.setAlpha(0.55f);
+            ZyroxLiquidGlassDrawable.applyAdaptiveRenderEffectBlur(frostedUnderlay, ctx, 12f);
+            glassShell.addView(frostedUnderlay, new android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
         LinearLayout card = new LinearLayout(ctx);
         card.setId(android.R.id.content);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundResource(R.drawable.bg_zyrox_glass_modal);
         int pad = dp(ctx, 12);
         card.setPadding(pad, dp(ctx, 10), pad, dp(ctx, 10));
-        card.setLayoutParams(new LinearLayout.LayoutParams(
+        card.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        outer.addView(card);
+        glassShell.addView(card);
+        outer.addView(glassShell);
         return outer;
     }
 
@@ -104,7 +122,7 @@ public final class ZyroxStudioUi {
     public static LinearLayout createItemCard(@NonNull Context ctx) {
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundResource(R.drawable.bg_zyrox_input);
+        card.setBackgroundResource(R.drawable.bg_zyrox_glass_surface);
         int pH = dp(ctx, 11);
         int pV = dp(ctx, 9);
         card.setPadding(pH, pV, pH, pV);

@@ -48,6 +48,8 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
     @Override
     public void executeWithActivity(Activity activity) {
         try {
+            // Strictly release all background GIF/MP4/Shader resources before GameActivity starts
+            git.artdeell.mojo.ui.ZyroxShaderBackgroundView.releaseAllForGameStart();
             Intent gameStartIntent = createGameStartIntent(activity);
             activity.startActivity(gameStartIntent);
             activity.finish();

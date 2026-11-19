@@ -67,9 +67,84 @@ import git.artdeell.mojo.utils.FileUtils;
 public final class ControlProfileManager {
     public static final float MIN_RECOMMENDED_TOUCH_TARGET_DP = 36f;
     public static final String SHARE_TOKEN_PREFIX = "ZYROXCTRL1:";
+    /** Phase 4.2 — Universal Control &amp; Settings Share Code prefix ({@code ZYROX://...}). */
+    public static final String SETUP_CODE_PREFIX = "ZYROX://";
+    /** Version marker inside {@code ZYROX://} bundles ({@code ZYROX://v1.<sha256_16>.<b64url>}). */
+    private static final String SETUP_CODE_HEADER = "ZYROX://v1.";
     /** Maximum payload characters encodable in a standard Version 40-L QR Code (~2,900 chars). */
     public static final int MAX_QR_PAYLOAD_CHARS = 2850;
     private static final int MAX_CONTROL_JSON_BYTES = 2 * 1024 * 1024; // 2 MiB zip-bomb ceiling
+
+    public interface SetupExportCallback {
+        void onSaveFileRequested(@NonNull String suggestedName);
+    }
+
+    public interface SetupImportCallback {
+        void onSetupImported(@NonNull SetupImportResult result);
+    }
+
+    /** Parsed universal Zyrox setup bundle (control layout + touch/gyro + renderer/scale). */
+    public static final class ZyroxSetupBundle {
+        @NonNull public final String profileName;
+        @NonNull public final String controlJson;
+        public final int buttonScalePct;
+        public final int mouseScalePct;
+        public final int mouseSpeedPct;
+        public final boolean gyroEnabled;
+        public final float gyroSensitivity;
+        public final boolean gyroInvertX;
+        public final boolean gyroInvertY;
+        @NonNull public final String rendererTag;
+        @NonNull public final String performancePreset;
+        public final int resolutionScalePct;
+        public final boolean contextAwareControls;
+
+        public ZyroxSetupBundle(@NonNull String profileName,
+                                @NonNull String controlJson,
+                                int buttonScalePct,
+                                int mouseScalePct,
+                                int mouseSpeedPct,
+                                boolean gyroEnabled,
+                                float gyroSensitivity,
+                                boolean gyroInvertX,
+                                boolean gyroInvertY,
+                                @NonNull String rendererTag,
+                                @NonNull String performancePreset,
+                                int resolutionScalePct,
+                                boolean contextAwareControls) {
+            this.profileName = profileName;
+            this.controlJson = controlJson;
+            this.buttonScalePct = buttonScalePct;
+            this.mouseScalePct = mouseScalePct;
+            this.mouseSpeedPct = mouseSpeedPct;
+            this.gyroEnabled = gyroEnabled;
+            this.gyroSensitivity = gyroSensitivity;
+            this.gyroInvertX = gyroInvertX;
+            this.gyroInvertY = gyroInvertY;
+            this.rendererTag = rendererTag;
+            this.performancePreset = performancePreset;
+            this.resolutionScalePct = resolutionScalePct;
+            this.contextAwareControls = contextAwareControls;
+        }
+    }
+
+    /** Result returned after importing and verifying a {@code ZYROX://} code or {@code .zyrox} file. */
+    public static final class SetupImportResult {
+        @NonNull public final String profileName;
+        @Nullable public final File controlFile;
+        @NonNull public final ZyroxSetupBundle bundle;
+        @NonNull public final String summary;
+
+        public SetupImportResult(@NonNull String profileName,
+                                 @Nullable File controlFile,
+                                 @NonNull ZyroxSetupBundle bundle,
+                                 @NonNull String summary) {
+            this.profileName = profileName;
+            this.controlFile = controlFile;
+            this.bundle = bundle;
+            this.summary = summary;
+        }
+    }
 
     public interface OnProfileImportedListener {
         void onProfileImported(@NonNull File profileFile);
@@ -676,6 +751,493 @@ public final class ControlProfileManager {
             }
         }
         return new LayoutAuditReport(list.size(), version, conflicts, smallTargets, badFormulas);
+    }
+
+    // =============================================================================================
+    // PHASE 4.2 — UNIVERSAL ZYROX:// CONTROL + TOUCH/GYRO + RENDERER SHARE CODES & .zyrox BUNDLES
+    // =============================================================================================
+
+    /** Returns {@code true} when {@code raw} starts with {@code ZYROX://} or legacy {@code ZYROXCTRL1:}. */
+    public static boolean isValidZyroxSetupCode(@Nullable String raw) {
+        if (raw == null) return false;
+        String trimmed = raw.trim();
+        return trimmed.startsWith(SETUP_CODE_PREFIX) || trimmed.startsWith(SHARE_TOKEN_PREFIX);
+    }
+
+    /**
+     * Pure deterministic encoder: serializes a {@link ZyroxSetupBundle}, compresses with max
+     * DEFLATE, computes a truncated 64-bit SHA-256 integrity tag, and formats a shareable
+     * {@code ZYROX://v1.<sha256_16>.<base64url>} code suitable for Discord/YouTube/QR/files.
+     */
+    @NonNull
+    public static String encodeZyroxSetupBundle(@NonNull ZyroxSetupBundle bundle) throws IOException {
+        JsonObject root = new JsonObject();
+        root.addProperty("schema", "zyrox-setup-v1");
+        root.addProperty("name", bundle.profileName);
+        root.addProperty("buttonScale", Math.max(40, Math.min(250, bundle.buttonScalePct)));
+        root.addProperty("mouseScale", Math.max(25, Math.min(300, bundle.mouseScalePct)));
+        root.addProperty("mouseSpeed", Math.max(25, Math.min(300, bundle.mouseSpeedPct)));
+        root.addProperty("gyroEnabled", bundle.gyroEnabled);
+        root.addProperty("gyroSensitivity", Math.max(0.1f, Math.min(5.0f, bundle.gyroSensitivity)));
+        root.addProperty("gyroInvertX", bundle.gyroInvertX);
+        root.addProperty("gyroInvertY", bundle.gyroInvertY);
+        root.addProperty("renderer", bundle.rendererTag);
+        root.addProperty("preset", bundle.performancePreset);
+        root.addProperty("resolutionScale", Math.max(25, Math.min(100, bundle.resolutionScalePct)));
+        root.addProperty("contextAwareControls", bundle.contextAwareControls);
+        if (!bundle.controlJson.trim().isEmpty()) {
+            JsonObject parsedLayout = new JsonParser().parse(bundle.controlJson).getAsJsonObject();
+            root.add("layout", parsedLayout);
+        }
+
+        byte[] utf8 = root.toString().getBytes(StandardCharsets.UTF_8);
+        if (utf8.length > MAX_CONTROL_JSON_BYTES) {
+            throw new IOException("Setup bundle exceeds safe 2 MiB size ceiling.");
+        }
+        String shaTag = sha256Prefix16(utf8);
+
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream(Math.max(256, utf8.length / 3));
+        Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
+        try (DeflaterOutputStream dos = new DeflaterOutputStream(compressed, deflater)) {
+            dos.write(utf8);
+        } finally {
+            deflater.end();
+        }
+        String b64 = toUrlSafeBase64(compressed.toByteArray());
+        return SETUP_CODE_HEADER + shaTag + "." + b64;
+    }
+
+    /**
+     * Pure deterministic decoder: validates format, bounds decompression at 2 MiB (zip-bomb safe),
+     * verifies SHA-256 checksum integrity, and reconstructs the {@link ZyroxSetupBundle}.
+     */
+    @NonNull
+    public static ZyroxSetupBundle decodeZyroxSetupBundle(@NonNull String rawCode) throws IOException {
+        String trimmed = rawCode.trim();
+        if (!trimmed.startsWith(SETUP_CODE_HEADER)) {
+            throw new IOException("Invalid setup code — expected ZYROX://v1.<checksum>.<payload>.");
+        }
+        String rest = trimmed.substring(SETUP_CODE_HEADER.length());
+        int dot = rest.indexOf('.');
+        if (dot != 16 || dot + 1 >= rest.length()) {
+            throw new IOException("Malformed ZYROX:// checksum header.");
+        }
+        String expectedSha = rest.substring(0, 16).toLowerCase(Locale.ROOT);
+        String b64 = rest.substring(dot + 1).replaceAll("\\s+", "");
+        byte[] compressed = fromUrlSafeBase64(b64);
+        if (compressed.length == 0 || compressed.length > MAX_CONTROL_JSON_BYTES) {
+            throw new IOException("Setup code payload out of bounds.");
+        }
+
+        byte[] utf8 = inflateRawBounded(compressed, MAX_CONTROL_JSON_BYTES);
+        String actualSha = sha256Prefix16(utf8);
+        if (!expectedSha.equals(actualSha)) {
+            throw new IOException("ZYROX:// checksum mismatch — code was truncated or modified.");
+        }
+
+        final JsonObject root;
+        try {
+            root = new JsonParser().parse(new String(utf8, StandardCharsets.UTF_8)).getAsJsonObject();
+        } catch (Exception e) {
+            throw new IOException("Corrupted setup bundle JSON.", e);
+        }
+        String name = root.has("name") && !root.get("name").isJsonNull()
+                ? root.get("name").getAsString().trim() : "Zyrox Shared Setup";
+        if (name.isEmpty()) name = "Zyrox Shared Setup";
+        String layoutJson = (root.has("layout") && root.get("layout").isJsonObject())
+                ? root.getAsJsonObject("layout").toString() : "";
+
+        return new ZyroxSetupBundle(
+                name,
+                layoutJson,
+                optClampedInt(root, "buttonScale", 100, 40, 250),
+                optClampedInt(root, "mouseScale", 100, 25, 300),
+                optClampedInt(root, "mouseSpeed", 100, 25, 300),
+                optBool(root, "gyroEnabled", false),
+                optClampedFloat(root, "gyroSensitivity", 1.0f, 0.1f, 5.0f),
+                optBool(root, "gyroInvertX", false),
+                optBool(root, "gyroInvertY", false),
+                optSafeString(root, "renderer", ""),
+                optSafeString(root, "preset", "balanced"),
+                optClampedInt(root, "resolutionScale", 100, 25, 100),
+                optBool(root, "contextAwareControls", true)
+        );
+    }
+
+    /** Builds a shareable {@code ZYROX://...} code from the active {@link git.artdeell.mojo.instances.Instance} &amp; prefs. */
+    @NonNull
+    public static String exportZyroxSetupCode(
+            @Nullable git.artdeell.mojo.instances.Instance instance) throws IOException {
+        File ctrlFile = null;
+        if (instance != null && Tools.isValidString(instance.controlLayout)) {
+            File direct = new File(instance.controlLayout);
+            File candidate = direct.isFile()
+                    ? direct : new File(Tools.CTRLMAP_PATH, instance.controlLayout);
+            if (candidate.isFile()) ctrlFile = candidate;
+        }
+        if (ctrlFile == null && Tools.isValidString(
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULTCTRL_PATH)) {
+            File def = new File(git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULTCTRL_PATH);
+            if (def.isFile()) ctrlFile = def;
+        }
+        String controlJson = "";
+        String profileName = (instance != null && Tools.isValidString(instance.name))
+                ? instance.name : "Zyrox Setup";
+        if (ctrlFile != null && ctrlFile.isFile() && ctrlFile.length() <= MAX_CONTROL_JSON_BYTES) {
+            try (FileInputStream in = new FileInputStream(ctrlFile)) {
+                controlJson = new String(
+                        ArchiveSecurity.readBytesBounded(in, MAX_CONTROL_JSON_BYTES),
+                        StandardCharsets.UTF_8);
+            }
+            if (!Tools.isValidString(profileName)) {
+                profileName = FileUtils.removeExtension(ctrlFile.getName());
+            }
+        }
+        int resScale = (instance != null && instance.resolutionScalePercent >= 50
+                && instance.resolutionScalePercent <= 100)
+                ? instance.resolutionScalePercent
+                : Math.round(git.artdeell.mojo.prefs.LauncherPreferences.PREF_SCALE_FACTOR * 100f);
+        String renderer = (instance != null && Tools.isValidString(instance.renderer))
+                ? instance.renderer
+                : (git.artdeell.mojo.prefs.LauncherPreferences.PREF_RENDERER != null
+                ? git.artdeell.mojo.prefs.LauncherPreferences.PREF_RENDERER : "");
+        String preset = (instance != null && Tools.isValidString(instance.performancePreset))
+                ? instance.performancePreset : "balanced";
+
+        ZyroxSetupBundle bundle = new ZyroxSetupBundle(
+                profileName,
+                controlJson,
+                Math.round(git.artdeell.mojo.prefs.LauncherPreferences.PREF_BUTTONSIZE),
+                Math.round(git.artdeell.mojo.prefs.LauncherPreferences.PREF_MOUSESCALE * 100f),
+                Math.round(git.artdeell.mojo.prefs.LauncherPreferences.PREF_MOUSESPEED * 100f),
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ENABLE_GYRO,
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_SENSITIVITY,
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_X,
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_Y,
+                renderer,
+                preset,
+                resScale,
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS
+        );
+        return encodeZyroxSetupBundle(bundle);
+    }
+
+    /**
+     * Verifies and imports a {@code ZYROX://} code (or legacy {@code ZYROXCTRL1:} token), writes
+     * the sanitized control layout JSON into {@code CTRLMAP_PATH}, and optionally applies touch,
+     * gyro, and resolution settings to {@code LauncherPreferences}.
+     */
+    @NonNull
+    public static SetupImportResult importZyroxSetupCode(@NonNull String payload,
+                                                         @Nullable String targetFileName,
+                                                         boolean applySettings) throws IOException {
+        String trimmed = payload.trim();
+        if (trimmed.startsWith(SHARE_TOKEN_PREFIX)) {
+            DecodedShareProfile legacy = decodeSharePayload(trimmed);
+            File saved = saveControlJsonAtomically(
+                    targetFileName != null ? targetFileName : legacy.profileName, legacy.jsonText);
+            ZyroxSetupBundle legacyBundle = new ZyroxSetupBundle(
+                    legacy.profileName, legacy.jsonText,
+                    100, 100, 100, false, 1.0f, false, false, "", "balanced", 100, true);
+            return new SetupImportResult(
+                    legacy.profileName, saved, legacyBundle,
+                    "Imported control profile '" + saved.getName() + "'.");
+        }
+
+        ZyroxSetupBundle bundle = decodeZyroxSetupBundle(trimmed);
+        File savedFile = null;
+        if (!bundle.controlJson.trim().isEmpty() && Tools.CTRLMAP_PATH != null) {
+            savedFile = saveControlJsonAtomically(
+                    targetFileName != null ? targetFileName : bundle.profileName,
+                    bundle.controlJson);
+        }
+
+        if (applySettings && git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF != null) {
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_BUTTONSIZE = bundle.buttonScalePct;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_MOUSESCALE = bundle.mouseScalePct / 100f;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_MOUSESPEED = bundle.mouseSpeedPct / 100f;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_ENABLE_GYRO = bundle.gyroEnabled;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_SENSITIVITY = bundle.gyroSensitivity;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_X = bundle.gyroInvertX;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_GYRO_INVERT_Y = bundle.gyroInvertY;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_SCALE_FACTOR = bundle.resolutionScalePct / 100f;
+            git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS =
+                    bundle.contextAwareControls;
+            android.content.SharedPreferences.Editor ed =
+                    git.artdeell.mojo.prefs.LauncherPreferences.DEFAULT_PREF.edit();
+            ed.putInt("buttonscale", bundle.buttonScalePct);
+            ed.putInt("mousescale", bundle.mouseScalePct);
+            ed.putInt("mousespeed", bundle.mouseSpeedPct);
+            ed.putBoolean("enableGyro", bundle.gyroEnabled);
+            ed.putInt("gyroSensitivity", Math.round(bundle.gyroSensitivity * 100f));
+            ed.putBoolean("gyroInvertX", bundle.gyroInvertX);
+            ed.putBoolean("gyroInvertY", bundle.gyroInvertY);
+            ed.putInt("resolutionRatio", bundle.resolutionScalePct);
+            ed.putBoolean(git.artdeell.mojo.prefs.LauncherPreferences.KEY_ZYROX_CONTEXT_CONTROLS,
+                    bundle.contextAwareControls);
+            if (savedFile != null) {
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_DEFAULTCTRL_PATH =
+                        savedFile.getAbsolutePath();
+                ed.putString("defaultCtrl", savedFile.getAbsolutePath());
+            }
+            ed.apply();
+        }
+
+        StringBuilder summary = new StringBuilder("Imported '").append(bundle.profileName).append('\'');
+        if (savedFile != null) {
+            summary.append(" • HUD: ").append(savedFile.getName());
+        }
+        summary.append(" • Scale ").append(bundle.resolutionScalePct).append('%');
+        if (bundle.gyroEnabled) {
+            summary.append(String.format(Locale.ROOT, " • Gyro %.1fx", bundle.gyroSensitivity));
+        }
+        return new SetupImportResult(bundle.profileName, savedFile, bundle, summary.toString());
+    }
+
+    /** Shows the interactive Share Zyrox Setup dialog (Copy {@code ZYROX://} code, QR preview, Save {@code .zyrox}). */
+    public static void showZyroxSetupExportDialog(
+            @NonNull Context ctx,
+            @Nullable git.artdeell.mojo.instances.Instance instance,
+            @Nullable SetupExportCallback exportCallback) {
+        final String code;
+        try {
+            code = exportZyroxSetupCode(instance);
+        } catch (Exception e) {
+            Toast.makeText(ctx, "Could not build setup code: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        LinearLayout body = new LinearLayout(ctx);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setGravity(Gravity.CENTER_HORIZONTAL);
+        int pad = ZyroxStudioUi.dp(ctx, 16);
+        body.setPadding(pad, ZyroxStudioUi.dp(ctx, 10), pad, ZyroxStudioUi.dp(ctx, 6));
+
+        TextView hint = new TextView(ctx);
+        hint.setText("Bundles your control layout, button scale, gyro sensitivity, renderer preset & resolution scale into a verified ZYROX:// code.");
+        hint.setTextColor(0xFFD6E4F8);
+        hint.setTextSize(12.5f);
+        body.addView(hint);
+
+        if (code.length() <= MAX_QR_PAYLOAD_CHARS) {
+            try {
+                Bitmap qr = renderQrBitmap(code, ZyroxStudioUi.dp(ctx, 180));
+                ImageView iv = new ImageView(ctx);
+                iv.setImageBitmap(qr);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ZyroxStudioUi.dp(ctx, 180), ZyroxStudioUi.dp(ctx, 180));
+                lp.topMargin = ZyroxStudioUi.dp(ctx, 10);
+                body.addView(iv, lp);
+            } catch (Exception ignored) {
+            }
+        }
+
+        TextView preview = new TextView(ctx);
+        String shortCode = code.length() > 84
+                ? (code.substring(0, 56) + "…" + code.substring(code.length() - 18))
+                : code;
+        preview.setText(shortCode + " (" + code.length() + " chars • SHA-256 verified)");
+        preview.setTextColor(0xFFA8E8FF);
+        preview.setTextSize(11f);
+        preview.setPadding(0, ZyroxStudioUi.dp(ctx, 8), 0, 0);
+        body.addView(preview);
+
+        String baseName = (instance != null && Tools.isValidString(instance.name))
+                ? FileUtils.escapeFileName(instance.name) : "zyrox-setup";
+        if (baseName.isEmpty()) baseName = "zyrox-setup";
+        final String suggestedFile = baseName + ".zyrox";
+
+        AlertDialog.Builder b = new AlertDialog.Builder(ctx)
+                .setTitle("Share Zyrox Setup (ZYROX://)")
+                .setView(body)
+                .setPositiveButton("Copy ZYROX:// Code", (d, w) -> {
+                    ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("Zyrox Setup Code", code));
+                    }
+                    Toast.makeText(ctx, "ZYROX:// setup code copied to clipboard!", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null);
+        if (exportCallback != null) {
+            b.setNeutralButton("Save .zyrox File", (d, w) ->
+                    exportCallback.onSaveFileRequested(suggestedFile));
+        }
+        b.show();
+    }
+
+    /** Shows the interactive Import {@code ZYROX://} Setup dialog (auto-prefills from clipboard). */
+    public static void showZyroxSetupImportDialog(
+            @NonNull Context ctx,
+            @Nullable git.artdeell.mojo.instances.Instance instance,
+            @Nullable SetupImportCallback callback) {
+        LinearLayout body = new LinearLayout(ctx);
+        body.setOrientation(LinearLayout.VERTICAL);
+        int pad = ZyroxStudioUi.dp(ctx, 16);
+        body.setPadding(pad, ZyroxStudioUi.dp(ctx, 10), pad, ZyroxStudioUi.dp(ctx, 6));
+
+        EditText input = ZyroxStudioUi.createGlassInput(ctx, "Paste ZYROX://v1... code");
+        input.setSingleLine(false);
+        input.setMaxLines(5);
+        try {
+            ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null
+                    && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence clip = cm.getPrimaryClip().getItemAt(0).getText();
+                if (clip != null && isValidZyroxSetupCode(clip.toString())) {
+                    input.setText(clip.toString().trim());
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        body.addView(input);
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Import Zyrox Setup Code")
+                .setView(body)
+                .setPositiveButton("Verify & Apply", (d, w) -> {
+                    String raw = input.getText().toString().trim();
+                    if (!isValidZyroxSetupCode(raw)) {
+                        Toast.makeText(ctx, "Paste a valid ZYROX:// setup code.", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    try {
+                        SetupImportResult res = importZyroxSetupCode(raw, null, true);
+                        if (instance != null) {
+                            if (res.controlFile != null) {
+                                instance.controlLayout = res.controlFile.getAbsolutePath();
+                            }
+                            if (!res.bundle.rendererTag.isEmpty()) {
+                                instance.renderer = res.bundle.rendererTag;
+                            }
+                            instance.performancePreset = res.bundle.performancePreset;
+                            instance.resolutionScalePercent =
+                                    Math.max(50, Math.min(100, res.bundle.resolutionScalePct));
+                            instance.maybeWrite();
+                        }
+                        Toast.makeText(ctx, res.summary, Toast.LENGTH_LONG).show();
+                        if (callback != null) callback.onSetupImported(res);
+                    } catch (Exception e) {
+                        Toast.makeText(ctx, "Import failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    @NonNull
+    private static File saveControlJsonAtomically(@NonNull String rawName,
+                                                  @NonNull String jsonText) throws IOException {
+        File dir = new File(Tools.CTRLMAP_PATH);
+        FileUtils.ensureDirectory(dir);
+        String clean = FileUtils.escapeFileName(FileUtils.removeExtension(rawName));
+        if (clean.isEmpty()) clean = "zyrox_imported";
+        if (clean.length() > 48) clean = clean.substring(0, 48);
+        File target = new File(dir, clean + ".json");
+        File tmp = new File(dir, clean + ".json.tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp, false)) {
+            out.write(jsonText.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        }
+        if (target.exists() && !target.delete()) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            throw new IOException("Could not replace " + target.getName());
+        }
+        if (!tmp.renameTo(target)) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            throw new IOException("Could not finalize " + target.getName());
+        }
+        return target;
+    }
+
+    @NonNull
+    private static byte[] inflateRawBounded(@NonNull byte[] compressed, int maxBytes) throws IOException {
+        java.util.zip.Inflater inflater = new java.util.zip.Inflater(true);
+        try (InflaterInputStream iis = new InflaterInputStream(
+                new ByteArrayInputStream(compressed), inflater)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(maxBytes, 8192));
+            byte[] buf = new byte[4096];
+            int total = 0;
+            int n;
+            while ((n = iis.read(buf)) != -1) {
+                total += n;
+                if (total > maxBytes) {
+                    throw new IOException("Setup bundle exceeds safe decompression limit.");
+                }
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("Corrupted compressed ZYROX:// stream.", e);
+        } finally {
+            inflater.end();
+        }
+    }
+
+    @NonNull
+    private static String sha256Prefix16(@NonNull byte[] data) throws IOException {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(data);
+            char[] hex = "0123456789abcdef".toCharArray();
+            char[] out = new char[16];
+            for (int i = 0; i < 8; i++) {
+                int v = digest[i] & 0xFF;
+                out[i * 2] = hex[v >>> 4];
+                out[i * 2 + 1] = hex[v & 0x0F];
+            }
+            return new String(out);
+        } catch (Exception e) {
+            throw new IOException("SHA-256 unavailable", e);
+        }
+    }
+
+    private static int optClampedInt(@NonNull JsonObject obj, @NonNull String key,
+                                     int def, int min, int max) {
+        try {
+            if (obj.has(key) && !obj.get(key).isJsonNull()) {
+                return Math.max(min, Math.min(max, obj.get(key).getAsInt()));
+            }
+        } catch (Throwable ignored) {
+        }
+        return def;
+    }
+
+    private static float optClampedFloat(@NonNull JsonObject obj, @NonNull String key,
+                                         float def, float min, float max) {
+        try {
+            if (obj.has(key) && !obj.get(key).isJsonNull()) {
+                float v = obj.get(key).getAsFloat();
+                if (!Float.isNaN(v) && !Float.isInfinite(v)) {
+                    return Math.max(min, Math.min(max, v));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return def;
+    }
+
+    private static boolean optBool(@NonNull JsonObject obj, @NonNull String key, boolean def) {
+        try {
+            if (obj.has(key) && !obj.get(key).isJsonNull()) {
+                return obj.get(key).getAsBoolean();
+            }
+        } catch (Throwable ignored) {
+        }
+        return def;
+    }
+
+    @NonNull
+    private static String optSafeString(@NonNull JsonObject obj, @NonNull String key, @NonNull String def) {
+        try {
+            if (obj.has(key) && !obj.get(key).isJsonNull()) {
+                return obj.get(key).getAsString().trim();
+            }
+        } catch (Throwable ignored) {
+        }
+        return def;
     }
 
     @NonNull

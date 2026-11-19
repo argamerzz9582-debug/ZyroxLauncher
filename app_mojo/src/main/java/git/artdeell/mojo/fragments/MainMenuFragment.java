@@ -77,6 +77,18 @@ public class MainMenuFragment extends Fragment {
         mPlayButton.setOnClickListener(v -> ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true));
         mEditProfileButton.setOnClickListener(v -> mVersionSpinner.openProfileEditor(requireActivity()));
 
+        // First-time beginner guided setup: trigger 3-Step Onboarding Wizard when no account exists
+        view.post(() -> {
+            if (!isAdded() || getActivity() == null) return;
+            if (OnboardingWizardFragment.shouldLaunchOnboarding()) {
+                Tools.swapFragment(
+                        requireActivity(),
+                        OnboardingWizardFragment.class,
+                        OnboardingWizardFragment.TAG,
+                        null);
+            }
+        });
+
         if (mModpacksButton != null) {
             mModpacksButton.setOnClickListener(v ->
                     Tools.swapFragment(requireActivity(), SearchModFragment.class, SearchModFragment.TAG, null));
