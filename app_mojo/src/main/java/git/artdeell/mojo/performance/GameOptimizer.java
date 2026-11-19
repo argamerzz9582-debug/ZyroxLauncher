@@ -708,7 +708,7 @@ public final class GameOptimizer {
             mLastTransitionElapsedMs = now;
             boolean cap60 = desired <= 0.80f || powerSave;
             String badge = formatThermalGovernorBadge(desired, mLastThermalStatus, tempC);
-            Log.i(TAG, "ThermalGovernor scale=" + desired
+            android.util.Log.i("GameOptimizer", "ThermalGovernor scale=" + desired
                     + " (thermalStatus=" + mLastThermalStatus + ", temp=" + tempC + "C)");
             mListener.onThermalScaleChanged(desired, cap60, badge);
         }

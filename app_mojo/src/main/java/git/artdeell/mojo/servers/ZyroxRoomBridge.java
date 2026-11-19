@@ -427,7 +427,7 @@ public final class ZyroxRoomBridge {
 
             String line = readAsciiLineBounded(peerIn, 64);
             String expected = TUNNEL_MAGIC + session.shortCode;
-            if (expected.equals(line + ":PING")) {
+            if ((expected + ":PING").equals(line)) {
                 peerOut.write(TUNNEL_OK.getBytes(StandardCharsets.US_ASCII));
                 peerOut.flush();
                 return;

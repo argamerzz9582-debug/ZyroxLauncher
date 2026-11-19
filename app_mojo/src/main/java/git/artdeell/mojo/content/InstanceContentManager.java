@@ -714,7 +714,7 @@ public final class InstanceContentManager {
                                                       @NonNull List<File> gameDirs)
             throws IOException {
         FileUtils.ensureDirectory(poolRoot);
-        Set<String> uniqueSeen = new HashSet<>();
+        java.util.Set<String> uniqueSeen = new java.util.HashSet<>();
         int deduped = 0;
         long savedBytes = 0L;
         boolean linkedAny = false;
@@ -763,10 +763,10 @@ public final class InstanceContentManager {
         File poolRoot = getDefaultSharedPoolRoot();
         if (poolRoot == null) return new PoolStats(0, 0, 0L, 0L, false);
         List<git.artdeell.mojo.instances.Instance> all =
-                git.artdeell.mojo.instances.Instances.loadInstances();
+                git.artdeell.mojo.instances.Instances.loadAllInstances();
         List<File> dirs = new ArrayList<>();
         if (all != null) {
-            Set<String> seen = new HashSet<>();
+            java.util.Set<String> seen = new java.util.HashSet<>();
             for (git.artdeell.mojo.instances.Instance inst : all) {
                 File d = inst.getGameDirectory();
                 if (seen.add(d.getAbsolutePath())) dirs.add(d);
@@ -808,7 +808,7 @@ public final class InstanceContentManager {
         quarantine.addAll(report.mcVersionMismatchFiles);
 
         int disabled = 0;
-        Set<String> seen = new HashSet<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
         for (File f : quarantine) {
             if (f == null || !f.exists() || !seen.add(f.getAbsolutePath())) continue;
             try {

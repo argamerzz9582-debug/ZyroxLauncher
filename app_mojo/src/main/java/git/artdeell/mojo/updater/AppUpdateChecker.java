@@ -759,7 +759,7 @@ public final class AppUpdateChecker {
                 SpeedCalculator speedCalc = new SpeedCalculator(24);
                 long downloaded = 0L;
                 try (okhttp3.Response res = ZyroxHttpClient.openDownloadResponse(
-                        release.apkDownloadUrl, null)) {
+                        release.apkDownloadUrl, 0L)) {
                     okhttp3.ResponseBody body = res.body();
                     if (!res.isSuccessful() || body == null) {
                         throw new IOException("APK download failed (HTTP " + res.code() + ")");
