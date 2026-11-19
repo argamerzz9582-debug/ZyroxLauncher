@@ -192,7 +192,7 @@ public class ZyroxV260RegressionTest {
     public void modrinthSearchFacets_enforceStrictVersionAndLoaderAndRelaxCleanly() {
         SearchFilters f = new SearchFilters();
         f.isModpack = false;
-        f.assetType = SearchFilters.ASSET_MOD;
+        f.projectTypeOverride = "mod";
         f.mcVersion = "fabric-loader-0.16.10-1.21.4";
         f.loader = "fabric";
         f.category = "optimization";
@@ -212,14 +212,14 @@ public class ZyroxV260RegressionTest {
         assertTrue(quiltFacets.contains("categories:fabric"));
 
         // Resource packs lock clean MC version without attaching a modloader facet
-        f.assetType = SearchFilters.ASSET_RESOURCEPACK;
+        f.projectTypeOverride = "resourcepack";
         String rpFacets = ModrinthProvider.buildSearchFacets(f);
         assertTrue(rpFacets.contains("[\"project_type:resourcepack\"]"));
         assertTrue(rpFacets.contains("[\"versions:1.21.4\"]"));
         assertFalse(rpFacets.contains("categories:quilt"));
 
         // Disabling Strict Compatibility removes version & loader locks while keeping type/category
-        f.assetType = SearchFilters.ASSET_MOD;
+        f.projectTypeOverride = "mod";
         f.strictCompatibility = false;
         String looseFacets = ModrinthProvider.buildSearchFacets(f);
         assertTrue(looseFacets.contains("[\"project_type:mod\"]"));
@@ -259,7 +259,7 @@ public class ZyroxV260RegressionTest {
 
         AppUpdateChecker.GitHubRateLimitException ex =
                 new AppUpdateChecker.GitHubRateLimitException(
-                        403, AppUpdateChecker.formatRateLimitMessage(403, "0", null));
+                        403, AppUpdateChecker.formatRateLimitMessage(403, "1800", null, 1_500_000L));
         assertEquals(403, ex.statusCode);
         assertTrue(AppUpdateChecker.classifyUpdateError(ex).contains("rate limit"));
         assertTrue(AppUpdateChecker.RELEASES_PAGE.startsWith("https://github.com/"));
