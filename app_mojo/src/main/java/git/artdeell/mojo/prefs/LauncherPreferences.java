@@ -117,6 +117,10 @@ public class LauncherPreferences {
     public static boolean PREF_ZYROX_INSTANCE_PRO_MODE = false;
     /** True once the default selected launcher profile has been initialized to Latest Stable Fabric. */
     public static boolean PREF_ZYROX_DEFAULT_FABRIC_READY = false;
+    /** Shows the floating hold-to-speak in-game Voice-to-Chat microphone overlay pill. */
+    public static boolean PREF_ZYROX_VOICE_CHAT_OVERLAY = false;
+    /** Enables real-time PowerManager thermal & battery dynamic resolution scaling in-game. */
+    public static boolean PREF_ZYROX_THERMAL_GOVERNOR = true;
 
     public static final String KEY_ZYROX_GIF_FILTER = "zyroxGifFilter";
     public static final String KEY_ZYROX_HUD_X = "zyroxHudPosX";
@@ -130,6 +134,8 @@ public class LauncherPreferences {
     public static final String KEY_ZYROX_CONTEXT_CONTROLS = "zyroxContextControls";
     public static final String KEY_ZYROX_INSTANCE_PRO_MODE = "zyroxInstanceProMode";
     public static final String KEY_ZYROX_DEFAULT_FABRIC_READY = "zyroxDefaultFabricReady";
+    public static final String KEY_ZYROX_VOICE_CHAT_OVERLAY = "zyroxVoiceChatOverlay";
+    public static final String KEY_ZYROX_THERMAL_GOVERNOR = "zyroxThermalGovernor";
 
     public static void loadPreferences(Context ctx) {
         //Required for CTRLDEF_FILE and MultiRT
@@ -208,6 +214,8 @@ public class LauncherPreferences {
         PREF_ZYROX_CONTEXT_CONTROLS = DEFAULT_PREF.getBoolean(KEY_ZYROX_CONTEXT_CONTROLS, true);
         PREF_ZYROX_INSTANCE_PRO_MODE = DEFAULT_PREF.getBoolean(KEY_ZYROX_INSTANCE_PRO_MODE, false);
         PREF_ZYROX_DEFAULT_FABRIC_READY = DEFAULT_PREF.getBoolean(KEY_ZYROX_DEFAULT_FABRIC_READY, false);
+        PREF_ZYROX_VOICE_CHAT_OVERLAY = DEFAULT_PREF.getBoolean(KEY_ZYROX_VOICE_CHAT_OVERLAY, false);
+        PREF_ZYROX_THERMAL_GOVERNOR = DEFAULT_PREF.getBoolean(KEY_ZYROX_THERMAL_GOVERNOR, true);
         git.artdeell.mojo.downloader.DownloadQueueManager.getInstance().setConcurrencyLimit(PREF_ZYROX_DOWNLOAD_THREADS);
 
         String argLwjglLibname = "-Dorg.lwjgl.opengl.libname=";

@@ -561,4 +561,174 @@
         android:buttonTint="@color/zyrox_amber"
         app:layout_constraintTop_toBottomOf="@+id/visibility_game_checkbox" />
 
+    <!-- SMART CLAW & PVP MULTI-GESTURE COMBO + PANIC MACRO SECTION -->
+    <TextView
+        android:id="@+id/editGestures_textView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="MULTI-GESTURE &amp; PANIC MACRO"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="10sp"
+        android:fontFamily="@font/minecraft_pixel"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintTop_toBottomOf="@+id/visibility_menu_checkbox"
+        tools:ignore="HardcodedText" />
+
+    <TextView
+        android:id="@+id/gesture_longpress_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="Hold Action"
+        android:textColor="@color/zyrox_text_muted"
+        android:textSize="10.5sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/editGestures_textView"
+        tools:ignore="HardcodedText" />
+
+    <Spinner
+        android:id="@+id/gesture_longpress_spinner"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="@+id/gesture_longpress_textview"
+        app:layout_constraintEnd_toEndOf="@+id/gesture_longpress_textview"
+        app:layout_constraintStart_toStartOf="@+id/gesture_longpress_textview"
+        app:layout_constraintTop_toTopOf="@+id/gesture_longpress_textview" />
+
+    <TextView
+        android:id="@+id/gesture_longpress_textview"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_zyrox_input"
+        android:ellipsize="marquee"
+        android:gravity="center"
+        android:paddingHorizontal="8dp"
+        android:singleLine="true"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="11.5sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_longpress_label"
+        tools:text="NONE" />
+
+    <TextView
+        android:id="@+id/gesture_swipeup_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="Swipe-Up Action"
+        android:textColor="@color/zyrox_text_muted"
+        android:textSize="10.5sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_longpress_textview"
+        tools:ignore="HardcodedText" />
+
+    <Spinner
+        android:id="@+id/gesture_swipeup_spinner"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="@+id/gesture_swipeup_textview"
+        app:layout_constraintEnd_toEndOf="@+id/gesture_swipeup_textview"
+        app:layout_constraintStart_toStartOf="@+id/gesture_swipeup_textview"
+        app:layout_constraintTop_toTopOf="@+id/gesture_swipeup_textview" />
+
+    <TextView
+        android:id="@+id/gesture_swipeup_textview"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_zyrox_input"
+        android:ellipsize="marquee"
+        android:gravity="center"
+        android:paddingHorizontal="8dp"
+        android:singleLine="true"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="11.5sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_swipeup_label"
+        tools:text="SPECIAL_PanicPearl" />
+
+    <TextView
+        android:id="@+id/gesture_swipedown_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="Swipe-Down Action"
+        android:textColor="@color/zyrox_text_muted"
+        android:textSize="10.5sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_swipeup_textview"
+        tools:ignore="HardcodedText" />
+
+    <Spinner
+        android:id="@+id/gesture_swipedown_spinner"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="invisible"
+        app:layout_constraintBottom_toBottomOf="@+id/gesture_swipedown_textview"
+        app:layout_constraintEnd_toEndOf="@+id/gesture_swipedown_textview"
+        app:layout_constraintStart_toStartOf="@+id/gesture_swipedown_textview"
+        app:layout_constraintTop_toTopOf="@+id/gesture_swipedown_textview" />
+
+    <TextView
+        android:id="@+id/gesture_swipedown_textview"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:layout_marginTop="2dp"
+        android:background="@drawable/bg_zyrox_input"
+        android:ellipsize="marquee"
+        android:gravity="center"
+        android:paddingHorizontal="8dp"
+        android:singleLine="true"
+        android:textColor="@color/zyrox_text_primary"
+        android:textSize="11.5sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_swipedown_label"
+        tools:text="SPECIAL_PanicTotem" />
+
+    <TextView
+        android:id="@+id/gesture_panicslot_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Panic Pearl/Totem Hotbar Slot"
+        android:textColor="@color/zyrox_text_muted"
+        android:textSize="10.5sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_swipedown_textview"
+        tools:ignore="HardcodedText" />
+
+    <TextView
+        android:id="@+id/gesture_panicslot_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/minecraft_pixel"
+        android:text="Slot 9"
+        android:textColor="@color/zyrox_amber"
+        android:textSize="10sp"
+        app:fontFamily="@font/minecraft_pixel"
+        app:layout_constraintBottom_toBottomOf="@+id/gesture_panicslot_label"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/gesture_panicslot_label"
+        tools:ignore="HardcodedText" />
+
+    <SeekBar
+        android:id="@+id/gesture_panicslot_seekbar"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:max="8"
+        android:progress="8"
+        android:progressBackgroundTint="@color/zyrox_glass_border"
+        android:progressTint="@color/zyrox_amber"
+        android:thumb="@drawable/bg_zyrox_seekbar_thumb"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/gesture_panicslot_label" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

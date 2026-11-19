@@ -448,6 +448,32 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/checkboxHudCompact" />
 
+    <!-- Hold-to-Speak Voice-to-Chat & Thermal/Battery Governor Toggles -->
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxVoiceChatOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="6dp"
+        android:text="Hold-to-Speak Voice Chat Mic"
+        android:textColor="@color/zyrox_text_primary"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:track="@drawable/bg_zyrox_switch_track"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/quickBtn_hudReset"
+        tools:ignore="HardcodedText" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxThermalGovernor"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:text="Thermal &amp; Battery Governor"
+        android:textColor="@color/zyrox_text_primary"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:track="@drawable/bg_zyrox_switch_track"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxVoiceChatOverlay"
+        tools:ignore="HardcodedText" />
+
     <!-- Instant Quick Screenshot (F2) & Macros Row -->
     <LinearLayout
         android:id="@+id/quickAction_row"
@@ -457,7 +483,7 @@
         android:orientation="horizontal"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/quickBtn_hudReset">
+        app:layout_constraintTop_toBottomOf="@id/checkboxThermalGovernor">
 
         <Button
             android:id="@+id/quickBtn_screenshot"

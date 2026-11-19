@@ -48,7 +48,7 @@ public final class ModrinthContentInstaller {
     public static final String TYPE_RESOURCEPACK = "resourcepack";
 
     private static final String MODRINTH_API = git.artdeell.mojo.metadata.ModPlatformRepository.MODRINTH_API_BASE;
-    private static final String USER_AGENT = "ZyroxLauncher/2.4.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
+    private static final String USER_AGENT = "ZyroxLauncher/2.5.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
     private static final String BACKUP_DIR_NAME = ".zyrox_mod_backup";
     private static final int CONNECT_TIMEOUT_MS = 12_000;
     private static final int READ_TIMEOUT_MS = 25_000;
@@ -623,6 +623,11 @@ public final class ModrinthContentInstaller {
                                          @Nullable String expectedSha1,
                                          @NonNull File targetFile) throws IOException {
         requireHttps(httpsUrl);
+        // Fast path: link directly from the Global SHA-1 Shared Mod Pool (.zyrox_pool/<sha1>/)
+        if (expectedSha1 != null && !expectedSha1.trim().isEmpty()
+                && InstanceContentManager.materializeFromSharedPool(expectedSha1, targetFile)) {
+            return;
+        }
         File tmp = new File(targetFile.getParentFile(), targetFile.getName() + ".part");
         HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -650,23 +655,15 @@ public final class ModrinthContentInstaller {
                 }
                 out.getFD().sync();
             }
-            if (expectedSha1 != null && !expectedSha1.trim().isEmpty()) {
-                String actual = toHex(sha1.digest());
-                if (!expectedSha1.trim().equalsIgnoreCase(actual)) {
-                    //noinspection ResultOfMethodCallIgnored
-                    tmp.delete();
-                    throw new IOException("SHA-1 verification failed for " + targetFile.getName());
-                }
-            }
-            if (targetFile.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                targetFile.delete();
-            }
-            if (!tmp.renameTo(targetFile)) {
-                copyFile(tmp, targetFile);
+            String actual = toHex(sha1.digest());
+            if (expectedSha1 != null && !expectedSha1.trim().isEmpty()
+                    && !expectedSha1.trim().equalsIgnoreCase(actual)) {
                 //noinspection ResultOfMethodCallIgnored
                 tmp.delete();
+                throw new IOException("SHA-1 verification failed for " + targetFile.getName());
             }
+            // Store verified artifact once in .zyrox_pool/<sha1>/ and hard-link across instances
+            InstanceContentManager.ingestIntoSharedPoolAndLink(tmp, targetFile, actual);
         } catch (IOException e) {
             //noinspection ResultOfMethodCallIgnored
             tmp.delete();

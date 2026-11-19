@@ -122,6 +122,11 @@ public class ContentManagerFragment extends Fragment {
                     if (isAdded()) reloadActiveTab();
                 }));
         tabRow.addView(btnFpsBoost, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
+        Button btnScanPool = ZyroxStudioUi.createSecondaryButton(ctx, "Scan & Pool", true);
+        btnScanPool.setOnClickListener(v -> runConflictScanAndPoolDedup());
+        tabRow.addView(btnScanPool, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
         Button btnOptCfg = ZyroxStudioUi.createSecondaryButton(ctx, "Optimize FPS", true);
@@ -652,5 +657,61 @@ public class ContentManagerFragment extends Fragment {
         }
         String last = uri.getLastPathSegment();
         return last != null ? last : "imported.jar";
+    }
+
+    /**
+     * Runs the static Pre-Launch Mod Conflict Simulator AND Global SHA-1 Shared Mod Pool
+     * ({@code .zyrox_pool/<sha1>/}) deduplication across all instances with 1-Tap Auto-Fix.
+     */
+    private void runConflictScanAndPoolDedup() {
+        final Instance inst = mInstance;
+        if (inst == null) return;
+        Toast.makeText(requireContext(),
+                "Scanning mod graph & deduplicating shared .zyrox_pool…",
+                Toast.LENGTH_SHORT).show();
+        MojoApplication.sExecutorService.execute(() -> {
+            final ModMetadataParser.SimulationReport sim =
+                    ModMetadataParser.simulatePreLaunch(inst.getGameDirectory(), inst.versionId);
+            InstanceContentManager.PoolStats poolStats;
+            try {
+                poolStats = InstanceContentManager.deduplicateAllInstances();
+            } catch (IOException ignored) {
+                poolStats = new InstanceContentManager.PoolStats(0, 0, 0L, 0L, false);
+            }
+            final InstanceContentManager.PoolStats finalPool = poolStats;
+            Tools.runOnUiThread(() -> {
+                if (!isAdded()) return;
+                String poolSummary = "\n\nGlobal Shared Mod Pool (.zyrox_pool):\n• "
+                        + finalPool.uniqueBlobs + " unique mod archive(s) ("
+                        + ZyroxStudioUi.formatBytes(finalPool.totalPoolBytes) + ")"
+                        + (finalPool.deduplicatedFiles > 0
+                            ? "\n• Deduplicated " + finalPool.deduplicatedFiles + " file(s) — saved "
+                                + ZyroxStudioUi.formatBytes(finalPool.savedBytes)
+                            : "\n• Zero duplicate copies wasting disk space.");
+                AlertDialog.Builder b = new AlertDialog.Builder(requireContext())
+                        .setTitle("Mod Simulator & Shared Pool")
+                        .setMessage(sim.buildHumanSummary() + poolSummary)
+                        .setNegativeButton(android.R.string.ok, null);
+                if (sim.canAutoFix()) {
+                    b.setPositiveButton("1-Tap Auto-Fix", (d, w) ->
+                            MojoApplication.sExecutorService.execute(() -> {
+                                String result;
+                                try {
+                                    result = InstanceContentManager.autoFixSimulationIssues(
+                                            inst, sim, null);
+                                } catch (Exception e) {
+                                    result = "Auto-fix error: " + e.getMessage();
+                                }
+                                final String msg = result;
+                                Tools.runOnUiThread(() -> {
+                                    if (!isAdded()) return;
+                                    Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show();
+                                    reloadActiveTab();
+                                });
+                            }));
+                }
+                b.show();
+            });
+        });
     }
 }

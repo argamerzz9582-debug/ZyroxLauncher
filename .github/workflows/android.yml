@@ -11,9 +11,9 @@ on:
         default: false
         type: boolean
       release_tag:
-        description: "Release tag to publish (e.g. v2.4.0)"
+        description: "Release tag to publish (e.g. v2.5.0)"
         required: false
-        default: "v2.4.0"
+        default: "v2.5.0"
         type: string
 
 # Default least-privilege token across all jobs; only publish-release escalates to contents:write.
@@ -244,7 +244,7 @@ jobs:
               fail(f"aapt2 dump badging failed: {badging_proc.stderr[:400]}")
           badging = badging_proc.stdout
           pkg_line = badging.splitlines()[0] if badging else "empty"
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.4.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.5.0'", "targetSdkVersion:'36'", "'arm64-v8a'"):
               if expected not in badging:
                   fail(f"Missing {expected} in badging ({pkg_line})")
           if "application-debuggable" in badging:
@@ -282,7 +282,7 @@ jobs:
               for chunk in iter(lambda: fh.read(1024 * 1024), b""):
                   h.update(chunk)
           sha = h.hexdigest()
-          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.4.0 abi=arm64-v8a targetSdk=36 debuggable=false mp4_stored={mp4_stored} size={size_mb:.1f}MB sha256={sha}")
+          print(f"::notice title=UnsignedApkVerified::pkg=com.zyrox.launcher ver=2.5.0 abi=arm64-v8a targetSdk=36 debuggable=false mp4_stored={mp4_stored} size={size_mb:.1f}MB sha256={sha}")
           PY
 
       - name: Upload Unsigned Release CI Artifact
@@ -449,7 +449,7 @@ jobs:
               fail(f"Continuity certificate SHA-256 mismatch: expected {expected_continuity}, got {cert_sha256}")
 
           badging = subprocess.run([aapt2, "dump", "badging", apk], capture_output=True, text=True, check=True).stdout
-          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.4.0'", "targetSdkVersion:'36'"):
+          for expected in ("package: name='com.zyrox.launcher'", "versionName='2.5.0'", "targetSdkVersion:'36'"):
               if expected not in badging:
                   fail(f"Missing {expected} in signed APK badging")
           if "application-debuggable" in badging or "application-testOnly" in badging:
@@ -463,14 +463,14 @@ jobs:
 
           with open("out/SIGNING_CERTIFICATE_SHA256.txt", "w") as cf:
               cf.write("Package: com.zyrox.launcher\n")
-              cf.write("Version: 2.4.0 (arm64-v8a)\n")
+              cf.write("Version: 2.5.0 (arm64-v8a)\n")
               cf.write("Signature Schemes: v1 + v2 + v3 (RSA-4096)\n")
               cf.write(f"Certificate DN: {cert_dn}\n")
               cf.write(f"Certificate SHA-256: {cert_sha256}\n")
               cf.write(f"APK SHA-256: {apk_sha}\n")
 
           size_mb = os.path.getsize(apk) / (1024 * 1024)
-          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.4.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
+          print(f"::notice title=SignedReleaseVerified::pkg=com.zyrox.launcher ver=2.5.0 abi=arm64-v8a sig=v1+v2+v3 size={size_mb:.1f}MB sha256={apk_sha} cert_sha256={cert_sha256}")
           PY
 
       - name: Upload Verified Signed Release Bundle
@@ -515,7 +515,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            TAG="${INPUT_TAG:-v2.4.0}"
+            TAG="${INPUT_TAG:-v2.5.0}"
           fi
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
             echo "::error title=InvalidReleaseTag::Refusing invalid tag format: $TAG"
@@ -523,20 +523,21 @@ jobs:
           fi
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
           {
-            echo "## Zyrox Launcher ${TAG} — Full-HD Live Video Backdrops, Official Zyrox Identity, Crisp Controls & 120Hz Smoothness"
+            echo "## Zyrox Launcher ${TAG} — In-App Auto-Updater, Mod Conflict Simulator, ZYX Room Bridge, Multi-Gesture PvP, Voice Chat & Thermal Governor"
             echo ""
-            echo "### What's New in 2.4.0"
-            echo "- **Full-HD 1080p Live Home & Loading MP4 Engine:** New hardware-accelerated \`ZyroxLoopingVideoView\` powers full-bleed 1080p30 seamless looping video backdrops on both the **Home Screen** and **Minecraft Loading Screen**, with uncompressed zero-copy APK streaming (\`+faststart\`), instant frame-0 WebP posters (zero black frames), distortion-free GPU center-crop across 16:9 to 21:9 & tablet displays, muted playback with zero audio-focus theft, foreground-only Liquid Glass isolation, and off-UI-thread decoder release so zero VPU/RAM stays allocated while in-game."
-            echo "- **Official Zyrox Launcher Brand & Adaptive Icon Suite:** Official faceted crystal **Z** logo deployed across all Android densities (\`mdpi\`–\`xxxhdpi\`) for Adaptive (\`ic_launcher_foreground\` + \`#071020\` background), Round (\`ic_launcher_round\`), Square (\`ic_launcher\`), Material You Monochrome (\`ic_launcher_monochrome\`), and in-app Home hero crest, sub-page header, Loading HUD, About/Security Center, and Crash Report screens."
-            echo "- **Arrow Buttons & Unclipped Button Labels Everywhere:** Added crisp directional vector arrow drawables (\`ic_zyrox_arrow_{up,down,left,right}\`), rebuilt the Java GUI installer pan pad into a clean inverted-T vector D-pad, upgraded in-game touch HUD directional arrows/glyphs with broader Unicode + variation-selector + unlabeled-key coverage and bold high-contrast etching, added automatic fallback labels + system-font glyph fallback on custom controls, replaced all missing-font UI glyphs, and fixed inherited AppCompat button \`minWidth\`/\`minHeight\`/vertical padding across every screen so zero button labels clip or disappear."
-            echo "- **120Hz/144Hz Full-Stack Launcher Smoothness:** Unlocked native high-refresh-rate UI modes (90/120/144/165 Hz) on Android 6+, cached process-wide display/headline \`Typeface\` instances with background pre-warming, added a compiled \`exp4j\` LRU cache for 10x faster HUD control positioning, eliminated redundant per-layout Liquid Glass shader rebuilds & \`GrabListener\` leaks, eliminated per-frame allocations in 3D Skin Preview, batched live console log flushes, added silky GPU-composited fragment transitions, and tuned RecyclerView pools."
-            echo "- **3-Step Onboarding, 4-Tab Instance Studio & 1-Tap Crash Doctor:** First-launch Liquid Glass setup wizard (Microsoft, Ely.by, or Offline with live procedural 3D skin head preview, automatic GPU/RAM calibration, and 1-tap *Vanilla Smooth* / *FPS Boosted* / *PvP Ready* presets), refactored 4-tab Instance Studio (Overview, Content, Engine, Controls) with Simple & expandable Pro modes, and Crash Doctor with missing-dependency auto-install + 1-tap *Fix & Relaunch*."
-            echo "- **6 High-Impact Community Features:** 1-Tap Zero-Lag FPS Boost Pack (auto-Fabric install + SHA-1 verified Sodium/Lithium/FerriteCore/EntityCulling/ImmediatelyFast + \`options.txt\` tuner), \`ZYROX://\` SHA-256 verified Control & Settings Share Codes + QR/\`.zyrox\` bundles, smart Minecraft server protocol version matcher with 1-tap *Switch/Create & Join* + Wi-Fi LAN scanner, Context-Aware Auto-Switching Inventory Helper Bar, customizable 8-slot Liquid Glass Radial Command Wheel, and rolling 3-snapshot auto-world/config pre-mod backups with 1-tap rollback."
-            echo "- **Unified Single-Login Setup, Instant Game Launch & Default Latest Fabric:** Eliminated duplicate first-launch auth prompts so setup runs in one clean guided step after initial asset extraction (with seamless Microsoft/Ely.by OAuth return to Step 2), fixed the \`GameService\`/\`GameView\` binder handshake and symbolic version/manifest sync so Minecraft launches immediately without stalling, and set the default selected profile to **Latest Stable Fabric** (auto-provisioned from official Fabric Meta v2 across \`1.21.x\` and \`26.x+\`)."
-            echo "- **High-Contrast 2-Layer Liquid Glass, Interactive HUD & Reliability Hardening:** \`#660B0F17\` WCAG contrast scrim + \`#4DFFFFFF\` specular border with adaptive Android 12+ \`RenderEffect\` GPU blur tiering, draggable HUD displaying FPS, Server Ping, RAM %, and Heap (tap for Quick Settings, long-press to compact/hide), silent Java 8/17/21/25 & Adreno Turnip pre-flight auto-selection, Android 14–16 Scoped Storage SAF fixes, CurseForge 403/429 backoff with Modrinth fallback, hardened OptiFine scraper, active background media memory reclamation, and full token/UUID/email log redaction."
+            echo "### What's New in 2.5.0"
+            echo "- **In-App GitHub Releases Auto-Updater:** Direct inside-the-launcher APK upgrade modal powered by HTTP/2 \`ETag\` caching, device ABI-aware asset matching, formatted Markdown changelogs, live streaming progress + MB/s speed, SHA-256 & \`PackageManager\` archive verification, non-exported \`FileProvider\` install handoff (Android 8.0+ unknown-sources auto-resume), plus **Skip Version** and **Snooze** controls."
+            echo "- **Pre-Launch Mod Conflict Simulator & 1-Tap Auto-Fix:** Inspects Fabric, Quilt, Forge, and NeoForge JAR metadata before Minecraft starts — evaluating SemVer, tilde/caret/wildcard, and Maven version ranges to catch duplicate mods, missing dependencies, explicit \`breaks\`/\`conflicts\`, loader mismatches, and incompatible MC versions, with **1-Tap Auto-Fix** to pull missing Modrinth dependencies and disable conflicting JARs (backed by automatic pre-change instance snapshots)."
+            echo "- **Global SHA-1 Shared Mod Pool (\`.zyrox_pool\`):** Content-addressed mod storage using POSIX hard links on Android 8+ (with safe atomic copy fallback) and a **Scan & Pool** action in Content Manager to deduplicate mods across all instances and reclaim storage."
+            echo "- **Smart Claw Multi-Gesture PvP Controls:** Per-button **Long-Press**, **Swipe-Up**, and **Swipe-Down** combo bindings with configurable hotbar slot targeting and four new special macros: **Panic Ender Pearl**, **Panic Offhand Totem**, **Hold-to-Speak Voice Chat**, and **Quick Macro Wheel**."
+            echo "- **Hold-to-Speak Voice-to-Chat Overlay:** Push-to-talk speech recognition directly into Minecraft multiplayer chat without opening the soft keyboard, complete with runtime mic permission flow, live partial transcript preview, and Minecraft formatting/control-character sanitization."
+            echo "- **\`ZYX-XXXX\` P2P / LAN Multiplayer Room Bridge:** **Host ZYX** and **Join ZYX** actions in Server Manager generate unambiguous \`ZYX-XXXX\` room codes and direct peer tokens over UDP discovery + verified full-duplex TCP loopback tunneling, with clipboard auto-prefill, live MOTD/ping/protocol inspection, and automatic protocol-matched instance switching."
+            echo "- **Adaptive Thermal & Battery Resolution Governor + Live Telemetry HUD:** Monitors Android thermal headroom and battery temperature/power-save state with smooth hysteresis scaling (\`1.00x\` / \`0.85x\` / \`0.80x\` / \`0.70x\`), optional 60 FPS eco pacing, Quick Settings toggles, and live \`°C\` / \`THM\` / \`ECO\` indicators on the draggable HUD."
+            echo "- **\`ZYROX://\` Setup Share Code Mod Sync:** SHA-256 tamper-verified \`ZYROX://v1.\` setup codes now bundle and round-trip enabled instance mod IDs alongside controls, gyro, renderer, and performance settings."
+            echo "- **Includes All v2.4.0 Foundations:** Full-HD 1080p seamless live video backdrops, official Zyrox adaptive icon suite, crisp vector controls, 120Hz/144Hz launcher smoothness, 3-step onboarding, 4-tab Instance Studio, 1-Tap FPS Boost Pack, and Crash Doctor."
             echo ""
             echo "### Download & Upgrade"
-            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.3.x\` / \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
+            echo "Download and install **[Zyrox Launcher.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Zyrox.Launcher.apk)** directly (signed with the persistent RSA-4096 \`v1 + v2 + v3\` publisher key for seamless in-place upgrade over \`v2.4.x\` / \`v2.3.x\` / \`v2.2.x\` / \`v2.1.x\` / \`v2.0.x\` / \`v1.0.x\`)."
             echo ""
             echo "### Signing & SHA-256 Verification"
             echo '```'

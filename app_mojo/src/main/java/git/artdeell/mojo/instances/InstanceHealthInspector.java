@@ -31,6 +31,20 @@ public final class InstanceHealthInspector {
     private InstanceHealthInspector() {
     }
 
+    /**
+     * Runs the fast (<1s) static Pre-Launch Mod Conflict &amp; Dependency Simulator across the
+     * instance's {@code mods/} folder using {@link git.artdeell.mojo.content.ModMetadataParser}.
+     */
+    @NonNull
+    public static git.artdeell.mojo.content.ModMetadataParser.SimulationReport simulateModConflicts(
+            @NonNull Instance instance,
+            @Nullable String resolvedVersionId) {
+        String version = Tools.isValidString(resolvedVersionId)
+                ? resolvedVersionId : instance.versionId;
+        return git.artdeell.mojo.content.ModMetadataParser.simulatePreLaunch(
+                instance.getGameDirectory(), version);
+    }
+
     @NonNull
     public static HealthReport checkHealth(@NonNull Instance instance,
                                            @Nullable File versionsDir,

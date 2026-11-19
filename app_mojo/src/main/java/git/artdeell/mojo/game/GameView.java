@@ -69,6 +69,8 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
     private TouchEventProcessor mCurrentTouchProcessor = mInGUIProcessor;
     private AndroidPointerCapture mPointerCapture;
     private boolean mLastGrabState = false;
+    private float mThermalScaleMultiplier = 1.0f;
+    private boolean mThermalCap60Hz = false;
     double cursorRatioX = 0;
     double cursorRatioY = 0;
 
@@ -343,6 +345,29 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         refreshSize(false);
     }
 
+    /**
+     * Applies dynamic resolution &amp; refresh-rate scaling issued by
+     * {@link git.artdeell.mojo.performance.GameOptimizer.ThermalGovernor}.
+     */
+    public void applyThermalGovernorScale(float multiplier, boolean capRefreshTo60Hz) {
+        float clamped = Math.max(0.50f, Math.min(1.0f, multiplier));
+        if (Math.abs(clamped - mThermalScaleMultiplier) < 0.01f
+                && capRefreshTo60Hz == mThermalCap60Hz) {
+            return;
+        }
+        mThermalScaleMultiplier = clamped;
+        mThermalCap60Hz = capRefreshTo60Hz;
+        if (mSurface != null && getWidth() > 0 && getHeight() > 0) {
+            refreshSize(false);
+        }
+    }
+
+    /** Returns the effective render scale factor after applying thermal/battery governor scaling. */
+    public float getEffectiveScaleFactor() {
+        return Math.max(0.25f,
+                Math.min(1.0f, LauncherPreferences.PREF_SCALE_FACTOR * mThermalScaleMultiplier));
+    }
+
     /** Same as refreshSize, but allows you to force an immediate size update **/
     public void refreshSize(boolean immediate) {
         if(isInLayout() && !immediate) {
@@ -352,8 +377,9 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
         // Use the width and height of the View instead of display dimensions to avoid
         // getting squiched/stretched due to inconsistencies between the layout and
         // screen dimensions.
-        int newWidth = Tools.getDisplayFriendlyRes(getWidth(), LauncherPreferences.PREF_SCALE_FACTOR);
-        int newHeight = Tools.getDisplayFriendlyRes(getHeight(), LauncherPreferences.PREF_SCALE_FACTOR);
+        float effectiveScale = getEffectiveScaleFactor();
+        int newWidth = Tools.getDisplayFriendlyRes(getWidth(), effectiveScale);
+        int newHeight = Tools.getDisplayFriendlyRes(getHeight(), effectiveScale);
         if (newHeight < 1 || newWidth < 1) {
             Log.e("MGLSurface", String.format("Impossible resolution : %dx%d", newWidth, newHeight));
             return;
@@ -370,7 +396,8 @@ public class GameView extends FrameLayout implements PlatformGrabListener, Surfa
             Log.w("MGLSurface", "Attempt to refresh size on null surface");
             return;
         }
-        windowRate = mSurface.getDisplay().getRefreshRate();
+        float displayRate = mSurface.getDisplay().getRefreshRate();
+        windowRate = mThermalCap60Hz ? Math.min(60f, displayRate) : displayRate;
         MojoExec.setDisplayParams(windowWidth, windowHeight, windowRate);
         mSurfaceProvider.updateSize();
     }

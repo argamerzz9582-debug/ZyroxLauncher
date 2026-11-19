@@ -174,4 +174,59 @@ public class TouchCharInput extends androidx.appcompat.widget.AppCompatEditText 
             if(editable.length() < 1) clear();
         }
     }
+
+    /** Sanitizes a spoken transcript into a safe single-line Minecraft chat string (<= 256 chars). */
+    public static String sanitizeVoiceChatText(String rawText) {
+        if (rawText == null) return "";
+        StringBuilder sb = new StringBuilder(Math.min(256, rawText.length()));
+        boolean prevSpace = true;
+        for (int i = 0; i < rawText.length() && sb.length() < 256; i++) {
+            char c = rawText.charAt(i);
+            if (c == '\u00A7') {
+                if (i + 1 < rawText.length()) {
+                    char fmt = Character.toLowerCase(rawText.charAt(i + 1));
+                    if ((fmt >= '0' && fmt <= '9') || (fmt >= 'a' && fmt <= 'f')
+                            || (fmt >= 'k' && fmt <= 'o') || fmt == 'r' || fmt == 'x') {
+                        i++;
+                    }
+                }
+                continue;
+            }
+            if (c < 0x20 || c == 0x7F) {
+                c = ' ';
+            }
+            if (Character.isWhitespace(c)) {
+                if (!prevSpace) {
+                    sb.append(' ');
+                    prevSpace = true;
+                }
+            } else {
+                sb.append(c);
+                prevSpace = false;
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * Dispatches a recognized Voice-to-Chat transcript straight into Minecraft multiplayer chat
+     * ({@code T} &rarr; typed Unicode string &rarr; {@code Enter}) without opening the soft keyboard.
+     */
+    public boolean dispatchVoiceChatMessage(String rawTranscript) {
+        final String clean = sanitizeVoiceChatText(rawTranscript);
+        if (clean.isEmpty()) return false;
+
+        final boolean openChatFirst = git.artdeell.mojo.game.platform.Platform.isGrabbing();
+        if (openChatFirst) {
+            CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_T);
+        }
+
+        // Allow Minecraft's ChatScreen to open and consume the opening 't' keystroke cleanly
+        long openDelayMs = openChatFirst ? 95L : 20L;
+        postDelayed(() -> {
+            PLATFORM.sendBulkUnicodeEvent(clean, 0);
+            postDelayed(() -> CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ENTER), 45L);
+        }, openDelayMs);
+        return true;
+    }
 }

@@ -530,4 +530,389 @@ public final class ModMetadataParser {
         }
         return sb.toString();
     }
+
+    // =========================================================================
+    // Pre-Launch Static Mod Conflict & Dependency Simulator (<1s zero-exec scan)
+    // =========================================================================
+
+    private static final Pattern MC_RELEASE_PATTERN = Pattern.compile(
+            "(?:^|[^0-9])((?:1\\.[0-9]+(?:\\.[0-9]+)?)|(?:[2-9][0-9]\\.[0-9]+(?:\\.[0-9]+)?))(?:[^0-9]|$)");
+
+    private static final Map<String, String> MODRINTH_SLUG_MAP;
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("fabric", "fabric-api");
+        m.put("fabric-api", "fabric-api");
+        m.put("fabric_api", "fabric-api");
+        m.put("quilted_fabric_api", "qsl");
+        m.put("cloth-config2", "cloth-config");
+        m.put("cloth_config", "cloth-config");
+        m.put("architectury", "architectury-api");
+        m.put("yet_another_config_lib_v3", "yacl");
+        m.put("yet-another-config-lib", "yacl");
+        m.put("ferritecore", "ferrite-core");
+        m.put("forgeconfigapiport", "forge-config-api-port");
+        m.put("puzzleslib", "puzzles-lib");
+        m.put("moonlight", "selene");
+        m.put("geckolib3", "geckolib");
+        m.put("kotlinforforge", "kotlin-for-forge");
+        m.put("cardinal-components-base", "cardinal-components-api");
+        m.put("owo", "owo-lib");
+        MODRINTH_SLUG_MAP = Collections.unmodifiableMap(m);
+    }
+
+    /** Actionable report returned by {@link #simulatePreLaunch(File, String)}. */
+    public static final class SimulationReport {
+        public final int scannedModCount;
+        public final long scanDurationMs;
+        @NonNull public final LoaderFamily expectedLoader;
+        @Nullable public final String expectedMcVersion;
+        @NonNull public final List<String> missingDependencies;
+        @NonNull public final List<File> duplicateFilesToDisable;
+        @NonNull public final List<File> loaderMismatchFiles;
+        @NonNull public final List<File> mcVersionMismatchFiles;
+        @NonNull public final List<File> corruptFiles;
+        @NonNull public final List<String> humanFindings;
+
+        public SimulationReport(int scannedModCount,
+                                long scanDurationMs,
+                                @NonNull LoaderFamily expectedLoader,
+                                @Nullable String expectedMcVersion,
+                                @NonNull List<String> missingDependencies,
+                                @NonNull List<File> duplicateFilesToDisable,
+                                @NonNull List<File> loaderMismatchFiles,
+                                @NonNull List<File> mcVersionMismatchFiles,
+                                @NonNull List<File> corruptFiles,
+                                @NonNull List<String> humanFindings) {
+            this.scannedModCount = scannedModCount;
+            this.scanDurationMs = scanDurationMs;
+            this.expectedLoader = expectedLoader;
+            this.expectedMcVersion = expectedMcVersion;
+            this.missingDependencies = Collections.unmodifiableList(missingDependencies);
+            this.duplicateFilesToDisable = Collections.unmodifiableList(duplicateFilesToDisable);
+            this.loaderMismatchFiles = Collections.unmodifiableList(loaderMismatchFiles);
+            this.mcVersionMismatchFiles = Collections.unmodifiableList(mcVersionMismatchFiles);
+            this.corruptFiles = Collections.unmodifiableList(corruptFiles);
+            this.humanFindings = Collections.unmodifiableList(humanFindings);
+        }
+
+        public boolean hasBlockingIssues() {
+            return !missingDependencies.isEmpty()
+                    || !duplicateFilesToDisable.isEmpty()
+                    || !loaderMismatchFiles.isEmpty()
+                    || !mcVersionMismatchFiles.isEmpty()
+                    || !corruptFiles.isEmpty();
+        }
+
+        public boolean canAutoFix() {
+            return hasBlockingIssues();
+        }
+
+        @NonNull
+        public String buildHumanSummary() {
+            if (humanFindings.isEmpty()) {
+                return "All " + scannedModCount + " active mod(s) passed static verification ("
+                        + Math.max(1L, scanDurationMs) + " ms).";
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Scanned ").append(scannedModCount).append(" mod(s) in ")
+                    .append(Math.max(1L, scanDurationMs)).append(" ms:\n\n");
+            int cap = Math.min(8, humanFindings.size());
+            for (int i = 0; i < cap; i++) {
+                sb.append("• ").append(humanFindings.get(i)).append('\n');
+            }
+            if (humanFindings.size() > cap) {
+                sb.append("• …and ").append(humanFindings.size() - cap)
+                        .append(" more issue(s).\n");
+            }
+            return sb.toString().trim();
+        }
+    }
+
+    /** Maps an internal mod dependency ID (e.g. {@code fabric}) to its Modrinth project slug. */
+    @NonNull
+    public static String resolveModrinthDependencySlug(@NonNull String modId) {
+        String key = modId.trim().toLowerCase(Locale.ROOT);
+        String mapped = MODRINTH_SLUG_MAP.get(key);
+        return mapped != null ? mapped : key.replace('_', '-');
+    }
+
+    /** Extracts a canonical Minecraft release number (e.g. {@code 1.21.4}, {@code 26.1}) from a versionId. */
+    @Nullable
+    public static String extractMinecraftVersion(@Nullable String versionId) {
+        if (versionId == null) return null;
+        String trimmed = versionId.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("latest-")
+                || trimmed.startsWith("zyrox-latest-")) {
+            return null;
+        }
+        int lastDash = trimmed.lastIndexOf('-');
+        if (lastDash >= 0 && lastDash + 1 < trimmed.length()) {
+            String tail = trimmed.substring(lastDash + 1);
+            if (tail.matches("(?:1\\.[0-9]+(?:\\.[0-9]+)?)|(?:[2-9][0-9]\\.[0-9]+(?:\\.[0-9]+)?)")) {
+                return tail;
+            }
+        }
+        Matcher m = MC_RELEASE_PATTERN.matcher(trimmed);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * Evaluates whether {@code targetMc} satisfies a Fabric/Quilt SemVer or Forge/NeoForge Maven
+     * version constraint (e.g. {@code >=1.21 <1.22}, {@code ~1.21.4}, {@code 1.21.x},
+     * {@code [1.20.1,1.21)}). Unrecognized snapshot/wildcard constraints fail open ({@code true}).
+     */
+    public static boolean isMinecraftVersionCompatible(@NonNull String targetMc,
+                                                       @Nullable String rawConstraint) {
+        if (rawConstraint == null) return true;
+        String expr = rawConstraint.trim();
+        if (expr.isEmpty() || "*".equals(expr) || "x".equalsIgnoreCase(expr)
+                || "any".equalsIgnoreCase(expr)) {
+            return true;
+        }
+        int[] target = parseMcTuple(targetMc);
+        if (target == null) return true;
+
+        if (expr.contains("|")) {
+            boolean checkedAny = false;
+            for (String branch : expr.split("\\|\\|?")) {
+                String sub = branch.trim();
+                if (sub.isEmpty()) continue;
+                checkedAny = true;
+                if (isMinecraftVersionCompatible(targetMc, sub)) return true;
+            }
+            return !checkedAny;
+        }
+
+        if ((expr.startsWith("[") || expr.startsWith("("))
+                && (expr.endsWith("]") || expr.endsWith(")"))) {
+            boolean minInc = expr.startsWith("[");
+            boolean maxInc = expr.endsWith("]");
+            String inner = expr.substring(1, expr.length() - 1).trim();
+            int comma = inner.indexOf(',');
+            if (comma < 0) {
+                int[] exact = parseMcTuple(inner);
+                return exact == null || compareTuple(target, exact) == 0;
+            }
+            int[] lo = parseMcTuple(inner.substring(0, comma).trim());
+            int[] hi = parseMcTuple(inner.substring(comma + 1).trim());
+            if (lo != null) {
+                int c = compareTuple(target, lo);
+                if (minInc ? c < 0 : c <= 0) return false;
+            }
+            if (hi != null) {
+                int c = compareTuple(target, hi);
+                if (maxInc ? c > 0 : c >= 0) return false;
+            }
+            return true;
+        }
+
+        for (String atom : expr.split("\\s+")) {
+            if (!evaluateSemVerAtom(target, atom.trim())) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Performs a fast static pre-launch mod scan over all enabled {@code .jar} mods inside
+     * {@code <gameDir>/mods}, detecting missing required dependencies, duplicate mod IDs,
+     * incompatible loaders, incompatible Minecraft versions, and corrupt archives.
+     */
+    @NonNull
+    public static SimulationReport simulatePreLaunch(@NonNull File gameDir,
+                                                     @Nullable String instanceVersionId) {
+        long startNs = System.nanoTime();
+        LoaderFamily instLoader = inferLoaderFromVersionId(instanceVersionId);
+        String instMc = extractMinecraftVersion(instanceVersionId);
+        File modsDir = new File(gameDir, "mods");
+        File[] jars = modsDir.isDirectory()
+                ? modsDir.listFiles(f -> f.isFile()
+                    && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar"))
+                : null;
+        if (jars == null || jars.length == 0) {
+            return new SimulationReport(0, 0L, instLoader, instMc,
+                    Collections.emptyList(), Collections.emptyList(),
+                    Collections.emptyList(), Collections.emptyList(),
+                    Collections.emptyList(), Collections.emptyList());
+        }
+        java.util.Arrays.sort(jars, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+
+        List<File> corrupt = new ArrayList<>();
+        List<File> duplicates = new ArrayList<>();
+        List<File> loaderBad = new ArrayList<>();
+        List<File> mcBad = new ArrayList<>();
+        List<String> findings = new ArrayList<>();
+
+        Map<String, ModInfo> primaryById = new java.util.LinkedHashMap<>();
+        Set<String> presentIds = new HashSet<>();
+
+        for (File jar : jars) {
+            ModInfo info = inspectModFile(jar);
+            if (info.corruptJar) {
+                corrupt.add(jar);
+                findings.add("Corrupt or unreadable archive: " + jar.getName());
+                continue;
+            }
+            if (instLoader != LoaderFamily.UNKNOWN && info.loader != LoaderFamily.UNKNOWN
+                    && !areLoadersCompatible(instLoader, info.loader)) {
+                loaderBad.add(jar);
+                findings.add(info.name + " requires " + info.loader.name()
+                        + ", incompatible with " + instLoader.name() + " instance.");
+                continue;
+            }
+            if (instMc != null && info.minecraftConstraint != null
+                    && !isMinecraftVersionCompatible(instMc, info.minecraftConstraint)) {
+                mcBad.add(jar);
+                findings.add(info.name + " (" + info.version + ") requires Minecraft "
+                        + info.minecraftConstraint + ", but instance is " + instMc + ".");
+                continue;
+            }
+
+            String idKey = info.modId.toLowerCase(Locale.ROOT);
+            presentIds.add(idKey);
+            for (String p : info.providedIds) {
+                presentIds.add(p.toLowerCase(Locale.ROOT));
+            }
+            if ("fabric-api".equals(idKey) || "fabric".equals(idKey)) {
+                presentIds.add("fabric");
+                presentIds.add("fabric-api");
+            } else if ("cloth-config".equals(idKey) || "cloth-config2".equals(idKey)) {
+                presentIds.add("cloth-config");
+                presentIds.add("cloth-config2");
+            }
+
+            ModInfo existing = primaryById.get(idKey);
+            if (existing != null) {
+                if (compareVersionNumbers(info.version, existing.version) > 0) {
+                    duplicates.add(existing.file);
+                    primaryById.put(idKey, info);
+                    findings.add("Duplicate mod \"" + info.name + "\": keeping v"
+                            + info.version + " and disabling " + existing.file.getName() + ".");
+                } else {
+                    duplicates.add(jar);
+                    findings.add("Duplicate mod \"" + info.name + "\": disabling redundant "
+                            + jar.getName() + ".");
+                }
+            } else {
+                primaryById.put(idKey, info);
+            }
+        }
+
+        Set<String> missingDeps = new LinkedHashSet<>();
+        for (ModInfo info : primaryById.values()) {
+            for (String dep : info.requiredDependencies) {
+                String depLow = dep.toLowerCase(Locale.ROOT);
+                if (BUILTIN_DEP_IDS.contains(depLow) || presentIds.contains(depLow)) continue;
+                if (depLow.startsWith("fabric-") && !"fabric-language-kotlin".equals(depLow)
+                        && presentIds.contains("fabric-api")) {
+                    continue;
+                }
+                if (depLow.startsWith("quilt_") && presentIds.contains("qsl")) continue;
+                if (missingDeps.add(depLow)) {
+                    findings.add(info.name + " is missing required dependency \"" + dep + "\".");
+                }
+            }
+        }
+
+        long elapsedMs = Math.max(0L, (System.nanoTime() - startNs) / 1_000_000L);
+        return new SimulationReport(
+                jars.length, elapsedMs, instLoader, instMc,
+                new ArrayList<>(missingDeps), duplicates, loaderBad, mcBad, corrupt, findings);
+    }
+
+    private static boolean areLoadersCompatible(@NonNull LoaderFamily instanceLoader,
+                                                @NonNull LoaderFamily modLoader) {
+        if (instanceLoader == modLoader) return true;
+        return instanceLoader == LoaderFamily.QUILT && modLoader == LoaderFamily.FABRIC;
+    }
+
+    private static boolean evaluateSemVerAtom(@NonNull int[] target, @NonNull String atom) {
+        if (atom.isEmpty() || "*".equals(atom) || "x".equalsIgnoreCase(atom)) return true;
+        if (atom.startsWith(">=")) {
+            int[] v = parseMcTuple(atom.substring(2));
+            return v == null || compareTuple(target, v) >= 0;
+        }
+        if (atom.startsWith("<=")) {
+            int[] v = parseMcTuple(atom.substring(2));
+            return v == null || compareTuple(target, v) <= 0;
+        }
+        if (atom.startsWith(">")) {
+            int[] v = parseMcTuple(atom.substring(1));
+            return v == null || compareTuple(target, v) > 0;
+        }
+        if (atom.startsWith("<")) {
+            int[] v = parseMcTuple(atom.substring(1));
+            return v == null || compareTuple(target, v) < 0;
+        }
+        if (atom.startsWith("~")) {
+            int[] v = parseMcTuple(atom.substring(1));
+            if (v == null) return true;
+            return compareTuple(target, v) >= 0
+                    && compareTuple(target, new int[]{v[0], v[1] + 1, 0}) < 0;
+        }
+        if (atom.startsWith("^")) {
+            int[] v = parseMcTuple(atom.substring(1));
+            if (v == null) return true;
+            return compareTuple(target, v) >= 0
+                    && compareTuple(target, new int[]{v[0] + 1, 0, 0}) < 0;
+        }
+        String clean = atom.startsWith("=") ? atom.substring(1).trim() : atom;
+        if (clean.endsWith(".x") || clean.endsWith(".X") || clean.endsWith(".*")) {
+            String[] p = clean.substring(0, clean.length() - 2).split("\\.");
+            try {
+                if (p.length == 1) return target[0] == Integer.parseInt(p[0]);
+                if (p.length >= 2) {
+                    return target[0] == Integer.parseInt(p[0])
+                            && target[1] == Integer.parseInt(p[1]);
+                }
+            } catch (NumberFormatException e) {
+                return true;
+            }
+        }
+        int[] exact = parseMcTuple(clean);
+        return exact == null || compareTuple(target, exact) == 0;
+    }
+
+    @Nullable
+    private static int[] parseMcTuple(@Nullable String raw) {
+        if (raw == null) return null;
+        String clean = raw.trim();
+        if (clean.isEmpty()) return null;
+        int dash = clean.indexOf('-');
+        if (dash >= 0) clean = clean.substring(0, dash);
+        if (!clean.matches("[0-9]+\\.[0-9]+(?:\\.[0-9]+)?")) return null;
+        String[] parts = clean.split("\\.");
+        try {
+            return new int[]{
+                    Integer.parseInt(parts[0]),
+                    Integer.parseInt(parts[1]),
+                    parts.length >= 3 ? Integer.parseInt(parts[2]) : 0
+            };
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int compareTuple(@NonNull int[] a, @NonNull int[] b) {
+        for (int i = 0; i < 3; i++) {
+            if (a[i] != b[i]) return Integer.compare(a[i], b[i]);
+        }
+        return 0;
+    }
+
+    private static int compareVersionNumbers(@Nullable String a, @Nullable String b) {
+        if (a == null) return b == null ? 0 : -1;
+        if (b == null) return 1;
+        String[] pa = a.split("[^0-9]+");
+        String[] pb = b.split("[^0-9]+");
+        int n = Math.min(4, Math.max(pa.length, pb.length));
+        for (int i = 0; i < n; i++) {
+            int va = (i < pa.length && !pa[i].isEmpty() && pa[i].length() <= 8)
+                    ? Integer.parseInt(pa[i]) : 0;
+            int vb = (i < pb.length && !pb[i].isEmpty() && pb[i].length() <= 8)
+                    ? Integer.parseInt(pb[i]) : 0;
+            if (va != vb) return Integer.compare(va, vb);
+        }
+        return 0;
+    }
 }

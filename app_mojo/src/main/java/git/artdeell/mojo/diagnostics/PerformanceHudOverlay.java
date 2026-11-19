@@ -221,6 +221,15 @@ public class PerformanceHudOverlay extends AppCompatTextView
     private int mPeakNativeRssMb = 0;
     private String mPeakThermalLabel = "OK";
     private int mPeakThermalRank = -1;
+    @Nullable private String mThermalGovernorBadge;
+
+    /** Updates the live Thermal &amp; Battery Governor status badge (e.g. {@code "THM 80%"}). */
+    public void setThermalGovernorBadge(@Nullable String badge) {
+        mThermalGovernorBadge = (badge != null && !badge.trim().isEmpty()) ? badge.trim() : null;
+        if (mMonitoring && getVisibility() == VISIBLE) {
+            invalidate();
+        }
+    }
 
     private final Runnable mSampleRunnable = new Runnable() {
         @Override
@@ -974,7 +983,12 @@ public class PerformanceHudOverlay extends AppCompatTextView
             if (ramUsedPct >= 0) {
                 mTextBuilder.append(" • RAM ").append(ramUsedPct).append('%');
             }
-            mTextBuilder.append(" • Heap ").append(usedHeapMb).append('/').append(mConfiguredHeapMb).append('M');
+            if (tempC > 5f && tempC < 95f) {
+                mTextBuilder.append(String.format(Locale.ROOT, " • %.0f°C", tempC));
+            }
+            if (mThermalGovernorBadge != null) {
+                mTextBuilder.append(" • ").append(mThermalGovernorBadge);
+            }
         } else {
             int scalePct = Math.round(LauncherPreferences.PREF_SCALE_FACTOR * 100f);
             long uptimeSec = Math.max(0L, (SystemClock.elapsedRealtime() - mSessionStartMs) / 1000L);
@@ -999,6 +1013,9 @@ public class PerformanceHudOverlay extends AppCompatTextView
                     .append(thermal);
             if (tempC > 5f && tempC < 95f) {
                 mTextBuilder.append(String.format(Locale.ROOT, " %.1f°C", tempC));
+            }
+            if (mThermalGovernorBadge != null) {
+                mTextBuilder.append(" [").append(mThermalGovernorBadge).append(']');
             }
             mTextBuilder.append(String.format(Locale.ROOT, " • %02d:%02d",
                     uptimeSec / 60L, uptimeSec % 60L));

@@ -31,6 +31,10 @@ public class ControlData {
     public static final int SPECIALBTN_SCROLLDOWN = -8;
     public static final int SPECIALBTN_MENU = -9;
     public static final int SPECIALBTN_KEYBOARDPAN = -10;
+    public static final int SPECIALBTN_PANIC_PEARL = -11;
+    public static final int SPECIALBTN_PANIC_TOTEM = -12;
+    public static final int SPECIALBTN_VOICE_CHAT = -13;
+    public static final int SPECIALBTN_RADIAL_MACRO = -14;
 
     private static ControlData[] SPECIAL_BUTTONS;
     private static List<String> SPECIAL_BUTTON_NAME_ARRAY;
@@ -74,6 +78,12 @@ public class ControlData {
     public boolean displayInGame;
     public boolean displayInMenu;
     public String bitmapTag;
+    /** Optional Smart Claw multi-gesture bindings (0 = disabled; backward-compatible default). */
+    public int longPressKeycode;
+    public int swipeUpKeycode;
+    public int swipeDownKeycode;
+    /** Target hotbar slot (1..9) used by {@link #SPECIALBTN_PANIC_PEARL} / {@link #SPECIALBTN_PANIC_TOTEM}. */
+    public int panicMacroSlot;
     private float width;         //Dp instead of Px now
     private float height;        //Dp instead of Px now
 
@@ -162,6 +172,22 @@ public class ControlData {
                 controlData.passThruEnabled,
                 controlData.bitmapTag
         );
+        this.longPressKeycode = controlData.longPressKeycode;
+        this.swipeUpKeycode = controlData.swipeUpKeycode;
+        this.swipeDownKeycode = controlData.swipeDownKeycode;
+        this.panicMacroSlot = controlData.panicMacroSlot;
+    }
+
+    /** Returns {@code true} if any Hold, Swipe-Up, or Swipe-Down multi-gesture combo is bound. */
+    public boolean hasGestureCombos() {
+        return longPressKeycode != KeyEvent.KEYCODE_UNKNOWN
+                || swipeUpKeycode != KeyEvent.KEYCODE_UNKNOWN
+                || swipeDownKeycode != KeyEvent.KEYCODE_UNKNOWN;
+    }
+
+    /** Returns the clamped 1..9 hotbar target slot for Smart Pearl/Totem panic macros (default 9). */
+    public int getEffectivePanicMacroSlot() {
+        return (panicMacroSlot >= 1 && panicMacroSlot <= 9) ? panicMacroSlot : 9;
     }
 
     public static ControlData[] getSpecialButtons() {
@@ -177,7 +203,11 @@ public class ControlData {
                     new ControlData("SCROLLUP", new int[]{SPECIALBTN_SCROLLUP}, "${margin}", "${margin}"),
                     new ControlData("SCROLLDOWN", new int[]{SPECIALBTN_SCROLLDOWN}, "${margin}", "${margin}"),
                     new ControlData("MENU", new int[]{SPECIALBTN_MENU}, "${margin}", "${margin}"),
-                    new ControlData("KeyboardPan", new int[]{SPECIALBTN_KEYBOARDPAN}, "${margin}", "${margin}")
+                    new ControlData("KeyboardPan", new int[]{SPECIALBTN_KEYBOARDPAN}, "${margin}", "${margin}"),
+                    new ControlData("PanicPearl", new int[]{SPECIALBTN_PANIC_PEARL}, "${margin}", "${margin}"),
+                    new ControlData("PanicTotem", new int[]{SPECIALBTN_PANIC_TOTEM}, "${margin}", "${margin}"),
+                    new ControlData("VoiceChat", new int[]{SPECIALBTN_VOICE_CHAT}, "${margin}", "${margin}"),
+                    new ControlData("MacroWheel", new int[]{SPECIALBTN_RADIAL_MACRO}, "${margin}", "${margin}")
             };
         }
 
