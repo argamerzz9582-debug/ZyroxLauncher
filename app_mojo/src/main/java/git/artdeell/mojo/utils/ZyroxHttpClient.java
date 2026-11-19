@@ -32,7 +32,7 @@ import okhttp3.ResponseBody;
 public final class ZyroxHttpClient {
     private static final String TAG = "ZyroxHttpClient";
 
-    public static final String USER_AGENT = "ZyroxLauncher/2.3.0 (Android; arm64-v8a)";
+    public static final String USER_AGENT = "ZyroxLauncher/2.5.0 (Android; arm64-v8a)";
     public static final int DEFAULT_CONNECT_TIMEOUT_MS = 12_000;
     public static final int DEFAULT_READ_TIMEOUT_MS = 30_000;
     public static final int MAX_IDLE_CONNECTIONS = 16;

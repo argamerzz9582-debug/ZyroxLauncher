@@ -12,12 +12,12 @@ static def getDateSeconds() {
     if (System.getenv("GITHUB_ACTIONS") == "true") {
         return Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER"))
     } else {
-        return 172006
+        return 172007
     }
 }
 
 def getVersionName = {
-    return "2.4.0"
+    return "2.5.0"
 }
 
 def getCFApiKey = {
