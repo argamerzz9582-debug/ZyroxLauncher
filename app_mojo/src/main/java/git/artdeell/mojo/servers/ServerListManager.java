@@ -38,6 +38,8 @@ public final class ServerListManager {
     public static final int DEFAULT_MC_PORT = 25565;
     private static final String SERVERS_DAT = "servers.dat";
     private static final String META_SIDECAR = "zyrox_servers_meta.json";
+    private static final String PENDING_QUICKCONNECT_FILE = ".zyrox_pending_quickconnect.json";
+    private static final long PENDING_QUICKCONNECT_TTL_MS = 10L * 60L * 1000L;
 
     // Standard Minecraft binary NBT tag IDs
     private static final byte TAG_END = 0;
@@ -55,6 +57,8 @@ public final class ServerListManager {
     private static final byte TAG_LONG_ARRAY = 12;
 
     private static volatile String sPendingQuickConnectAddress = null;
+    private static volatile String sPendingServerControlProfile = null;
+    private static volatile String sLastConsumedQuickConnectAddress = null;
 
     public static final class ServerEntry {
         @NonNull public String name;
@@ -64,6 +68,8 @@ public final class ServerListManager {
         public boolean hidden;
         public boolean favorite;
         @NonNull public String group;
+        /** Optional per-server control profile filename in {@code controlmap/} (e.g. {@code pvp.json}). */
+        @Nullable public String controlProfile;
         // Transient live-ping result fields (populated only when user checks status)
         public transient long lastPingMs = -1L;
         @Nullable public transient String lastMotd;
@@ -77,6 +83,7 @@ public final class ServerListManager {
             this.name = name.trim().isEmpty() ? "Minecraft Server" : name.trim();
             this.address = address.trim();
             this.group = "";
+            this.controlProfile = null;
         }
     }
 
@@ -95,16 +102,261 @@ public final class ServerListManager {
 
     /** Queues a one-shot quick-connect server target consumed on the very next game launch. */
     public static void setPendingQuickConnect(@Nullable String address) {
-        sPendingQuickConnectAddress = (address != null && !address.trim().isEmpty())
-                ? address.trim() : null;
+        setPendingQuickConnect(address, null);
+    }
+
+    /**
+     * Queues a one-shot quick-connect server target plus optional per-server control profile,
+     * persisted across the {@code :launcher} -&gt; {@code :game} process boundary with a 10-min TTL.
+     */
+    public static synchronized void setPendingQuickConnect(@Nullable String address,
+                                                           @Nullable String controlProfile) {
+        String cleanAddr = (address != null && !address.trim().isEmpty()) ? address.trim() : null;
+        String cleanCtrl = sanitizeControlProfileName(controlProfile);
+        sPendingQuickConnectAddress = cleanAddr;
+        sPendingServerControlProfile = cleanAddr != null ? cleanCtrl : null;
+        if (cleanAddr == null) {
+            sLastConsumedQuickConnectAddress = null;
+        }
+        if (Tools.DIR_CACHE == null) return;
+        File handoff = new File(Tools.DIR_CACHE, PENDING_QUICKCONNECT_FILE);
+        if (cleanAddr == null) {
+            //noinspection ResultOfMethodCallIgnored
+            handoff.delete();
+            return;
+        }
+        try {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("address", cleanAddr);
+            if (cleanCtrl != null) obj.addProperty("controlProfile", cleanCtrl);
+            obj.addProperty("savedAtMs", System.currentTimeMillis());
+            JSONUtils.writeToFileAtomic(handoff, obj, false);
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Atomically consumes and clears any pending quick-connect server address. */
     @Nullable
-    public static String consumePendingQuickConnect() {
+    public static synchronized String consumePendingQuickConnect() {
         String addr = sPendingQuickConnectAddress;
+        String ctrl = sPendingServerControlProfile;
         sPendingQuickConnectAddress = null;
-        return addr;
+        if (Tools.DIR_CACHE != null) {
+            File handoff = new File(Tools.DIR_CACHE, PENDING_QUICKCONNECT_FILE);
+            if (handoff.isFile()) {
+                try {
+                    JsonObject obj = JsonParser.parseString(
+                            Tools.read(handoff.getAbsolutePath())).getAsJsonObject();
+                    long savedAt = obj.has("savedAtMs") ? obj.get("savedAtMs").getAsLong() : 0L;
+                    if (addr == null && System.currentTimeMillis() - savedAt <= PENDING_QUICKCONNECT_TTL_MS
+                            && obj.has("address") && !obj.get("address").isJsonNull()) {
+                        addr = obj.get("address").getAsString().trim();
+                        if (obj.has("controlProfile") && !obj.get("controlProfile").isJsonNull()) {
+                            ctrl = sanitizeControlProfileName(obj.get("controlProfile").getAsString());
+                        }
+                    }
+                } catch (Throwable ignored) {
+                } finally {
+                    //noinspection ResultOfMethodCallIgnored
+                    handoff.delete();
+                }
+            }
+        }
+        if (addr != null && !addr.isEmpty()) {
+            sLastConsumedQuickConnectAddress = addr;
+            sPendingServerControlProfile = ctrl;
+            return addr;
+        }
+        return null;
+    }
+
+    /** Consumes the pending per-server control profile queued alongside quick-connect, if any. */
+    @Nullable
+    public static synchronized String consumePendingServerControlProfile() {
+        String ctrl = sPendingServerControlProfile;
+        sPendingServerControlProfile = null;
+        if (ctrl != null) return ctrl;
+        if (Tools.DIR_CACHE != null) {
+            File handoff = new File(Tools.DIR_CACHE, PENDING_QUICKCONNECT_FILE);
+            if (handoff.isFile()) {
+                try {
+                    JsonObject obj = JsonParser.parseString(
+                            Tools.read(handoff.getAbsolutePath())).getAsJsonObject();
+                    long savedAt = obj.has("savedAtMs") ? obj.get("savedAtMs").getAsLong() : 0L;
+                    if (System.currentTimeMillis() - savedAt <= PENDING_QUICKCONNECT_TTL_MS
+                            && obj.has("controlProfile") && !obj.get("controlProfile").isJsonNull()) {
+                        return sanitizeControlProfileName(obj.get("controlProfile").getAsString());
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Returns the most recently consumed quick-connect server address in the current process. */
+    @Nullable
+    public static String getLastQuickConnectAddress() {
+        return sLastConsumedQuickConnectAddress;
+    }
+
+    /** Returns {@code true} if a quick-connect target is currently queued for game launch. */
+    public static boolean hasPendingQuickConnect() {
+        if (sPendingQuickConnectAddress != null || sLastConsumedQuickConnectAddress != null) {
+            return true;
+        }
+        return Tools.DIR_CACHE != null
+                && new File(Tools.DIR_CACHE, PENDING_QUICKCONNECT_FILE).isFile();
+    }
+
+    /**
+     * Validates a control profile filename so only clean {@code <name>.json} basenames inside
+     * {@code controlmap/} are ever stored or loaded (blocks all path traversal).
+     */
+    @Nullable
+    public static String sanitizeControlProfileName(@Nullable String raw) {
+        if (raw == null) return null;
+        String clean = raw.trim();
+        if (clean.isEmpty()) return null;
+        // Accept full path by extracting its basename if it ends with .json
+        int slash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
+        if (slash >= 0) {
+            if (clean.contains("..")) return null;
+            clean = clean.substring(slash + 1).trim();
+        }
+        if (clean.isEmpty() || clean.length() > 120 || clean.contains("..")
+                || clean.startsWith(".")) {
+            return null;
+        }
+        for (int i = 0; i < clean.length(); i++) {
+            char c = clean.charAt(i);
+            if (c < 0x20 || c == '/' || c == '\\' || c == ':' || c == '*'
+                    || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+                return null;
+            }
+        }
+        if (!clean.toLowerCase(Locale.ROOT).endsWith(".json")) {
+            clean = clean + ".json";
+        }
+        return clean;
+    }
+
+    /** Normalizes any server address into canonical {@code lowercase-host:port} form. */
+    @Nullable
+    public static String normalizeServerEndpoint(@Nullable String address) {
+        if (address == null || address.trim().isEmpty()) return null;
+        String cleaned = address.trim().replace(".:", ":");
+        if (cleaned.endsWith(".")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 1);
+        }
+        try {
+            ParsedHostPort hp = parseAndValidateAddress(cleaned);
+            String host = hp.host.toLowerCase(Locale.ROOT);
+            if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+            return host + ":" + hp.port;
+        } catch (IllegalArgumentException e) {
+            return cleaned.toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /**
+     * Looks up the preferred per-server control profile assigned to {@code targetAddress} in
+     * {@code gameDir}'s server list metadata (returns {@code null} when using instance default).
+     */
+    @Nullable
+    public static String findControlProfileForServer(@Nullable File gameDir,
+                                                     @Nullable String targetAddress) {
+        if (gameDir == null || targetAddress == null || targetAddress.trim().isEmpty()) {
+            return null;
+        }
+        String wantedEndpoint = normalizeServerEndpoint(targetAddress);
+        String wantedHost = wantedEndpoint;
+        if (wantedEndpoint != null) {
+            int lastColon = wantedEndpoint.lastIndexOf(':');
+            if (lastColon > 0) wantedHost = wantedEndpoint.substring(0, lastColon);
+        }
+        Map<String, JsonObject> sidecar = readSidecar(new File(gameDir, META_SIDECAR));
+        String hostOnlyFallback = null;
+        for (Map.Entry<String, JsonObject> entry : sidecar.entrySet()) {
+            JsonObject meta = entry.getValue();
+            if (meta == null || !meta.has("controlProfile") || meta.get("controlProfile").isJsonNull()) {
+                continue;
+            }
+            String profile = sanitizeControlProfileName(meta.get("controlProfile").getAsString());
+            if (profile == null) continue;
+            String savedEndpoint = normalizeServerEndpoint(entry.getKey());
+            if (wantedEndpoint != null && wantedEndpoint.equals(savedEndpoint)) {
+                return profile;
+            }
+            if (savedEndpoint != null && wantedHost != null) {
+                int c = savedEndpoint.lastIndexOf(':');
+                String savedHost = c > 0 ? savedEndpoint.substring(0, c) : savedEndpoint;
+                if (wantedHost.equals(savedHost) && hostOnlyFallback == null) {
+                    hostOnlyFallback = profile;
+                }
+            }
+        }
+        return hostOnlyFallback;
+    }
+
+    /**
+     * Parses vanilla Minecraft client log line {@code Connecting to <host>, <port>} into
+     * canonical {@code host:port} for live per-server control switching and auto-reconnect.
+     */
+    @Nullable
+    public static String parseConnectingLogEndpoint(@Nullable String logLine) {
+        if (logLine == null) return null;
+        int idx = logLine.indexOf("Connecting to ");
+        if (idx < 0) return null;
+        String tail = logLine.substring(idx + "Connecting to ".length()).trim();
+        int comma = tail.indexOf(',');
+        if (comma <= 0) return null;
+        String host = tail.substring(0, comma).trim();
+        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
+        String rest = tail.substring(comma + 1).trim();
+        int end = 0;
+        while (end < rest.length() && Character.isDigit(rest.charAt(end))) {
+            end++;
+        }
+        if (end == 0) return null;
+        try {
+            int port = Integer.parseInt(rest.substring(0, end));
+            if (port < 1 || port > 65535) return null;
+            String candidate = host.contains(":") && !host.startsWith("[")
+                    ? ("[" + host + "]:" + port) : (host + ":" + port);
+            parseAndValidateAddress(candidate);
+            return candidate;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns {@code true} when a client log line reflects a transient timeout or dropped socket
+     * eligible for the 5-second Server Auto-Reconnect countdown (excludes kicks, bans, auth, and
+     * manual disconnects).
+     */
+    public static boolean isUnexpectedServerDisconnectLog(@Nullable String logLine) {
+        if (logLine == null || logLine.isEmpty()) return false;
+        String low = logLine.toLowerCase(Locale.ROOT);
+        // Never auto-reconnect on intentional exits, moderation, auth, or protocol mismatch
+        if (low.contains("quitting") || low.contains("stopping!")
+                || low.contains("banned") || low.contains("kicked")
+                || low.contains("whitelist") || low.contains("not white-listed")
+                || low.contains("outdated client") || low.contains("outdated server")
+                || low.contains("failed to login") || low.contains("invalid session")
+                || low.contains("multiplayer.disconnect.kicked")) {
+            return false;
+        }
+        return low.contains("readtimeoutexception")
+                || low.contains("disconnected: timed out")
+                || low.contains("lost connection: timed out")
+                || low.contains("lost connection: internal exception")
+                || low.contains("lost connection: disconnected")
+                || low.contains("connection reset")
+                || low.contains("remote host terminated the handshake")
+                || low.contains("multiplayer.disconnect.timeout")
+                || low.contains("server closed");
     }
 
     /**
@@ -198,13 +450,19 @@ public final class ServerListManager {
             }
         }
 
-        // Merge non-destructive favorites/group metadata
+        // Merge non-destructive favorites/group/per-server control profile metadata
         Map<String, JsonObject> sidecar = readSidecar(new File(gameDir, META_SIDECAR));
         for (ServerEntry entry : entries) {
             JsonObject meta = sidecar.get(entry.address.toLowerCase(Locale.ROOT));
             if (meta != null) {
                 if (meta.has("favorite")) entry.favorite = meta.get("favorite").getAsBoolean();
-                if (meta.has("group")) entry.group = meta.get("group").getAsString();
+                if (meta.has("group") && !meta.get("group").isJsonNull()) {
+                    entry.group = meta.get("group").getAsString();
+                }
+                if (meta.has("controlProfile") && !meta.get("controlProfile").isJsonNull()) {
+                    entry.controlProfile = sanitizeControlProfileName(
+                            meta.get("controlProfile").getAsString());
+                }
             }
         }
         return entries;
@@ -277,15 +535,20 @@ public final class ServerListManager {
             throw new IOException("Failed to finalize servers.dat");
         }
 
-        // Persist favorites/groups sidecar
+        // Persist favorites/groups/per-server control profile sidecar
         JsonObject sidecarRoot = new JsonObject();
         JsonArray arr = new JsonArray();
         for (ServerEntry s : servers) {
-            if (s.favorite || !s.group.isEmpty()) {
+            String cleanProfile = sanitizeControlProfileName(s.controlProfile);
+            s.controlProfile = cleanProfile;
+            if (s.favorite || !s.group.isEmpty() || cleanProfile != null) {
                 JsonObject m = new JsonObject();
                 m.addProperty("ip", s.address);
                 m.addProperty("favorite", s.favorite);
                 m.addProperty("group", s.group);
+                if (cleanProfile != null) {
+                    m.addProperty("controlProfile", cleanProfile);
+                }
                 arr.add(m);
             }
         }
@@ -307,6 +570,8 @@ public final class ServerListManager {
             o.addProperty("address", s.address);
             o.addProperty("favorite", s.favorite);
             if (!s.group.isEmpty()) o.addProperty("group", s.group);
+            String cleanProfile = sanitizeControlProfileName(s.controlProfile);
+            if (cleanProfile != null) o.addProperty("controlProfile", cleanProfile);
             if (s.acceptTextures) o.addProperty("acceptTextures", true);
             arr.add(o);
         }
@@ -333,7 +598,13 @@ public final class ServerListManager {
                 String name = o.has("name") ? o.get("name").getAsString() : addr;
                 ServerEntry entry = new ServerEntry(name, addr);
                 if (o.has("favorite")) entry.favorite = o.get("favorite").getAsBoolean();
-                if (o.has("group")) entry.group = o.get("group").getAsString();
+                if (o.has("group") && !o.get("group").isJsonNull()) {
+                    entry.group = o.get("group").getAsString();
+                }
+                if (o.has("controlProfile") && !o.get("controlProfile").isJsonNull()) {
+                    entry.controlProfile = sanitizeControlProfileName(
+                            o.get("controlProfile").getAsString());
+                }
                 if (o.has("acceptTextures")) entry.acceptTextures = o.get("acceptTextures").getAsBoolean();
                 out.add(entry);
             }

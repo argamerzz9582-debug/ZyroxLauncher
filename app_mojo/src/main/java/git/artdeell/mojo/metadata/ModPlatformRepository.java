@@ -158,42 +158,79 @@ public class ModPlatformRepository {
 
     @NonNull
     public static String buildModrinthFacets(@NonNull SearchFilters filters) {
-        String projectType = (filters.projectTypeOverride != null && !filters.projectTypeOverride.isEmpty())
-                ? filters.projectTypeOverride
-                : (filters.isModpack ? "modpack" : "mod");
-        StringBuilder facets = new StringBuilder(64);
-        facets.append("[[\"project_type:").append(sanitizeFacetValue(projectType)).append("\"]");
-        if (filters.category != null && !filters.category.isEmpty()) {
-            facets.append(",[\"categories:").append(sanitizeFacetValue(filters.category)).append("\"]");
-        }
-        if (filters.mcVersion != null && !filters.mcVersion.isEmpty()) {
-            facets.append(",[\"versions:").append(sanitizeFacetValue(filters.mcVersion)).append("\"]");
-        }
-        facets.append(']');
-        return facets.toString();
+        return ModrinthProvider.buildSearchFacets(filters);
     }
 
     @Nullable
     public ModDetail getModrinthDetails(@Nullable ModItem item) {
+        return getModrinthDetails(item, null, null, null, false);
+    }
+
+    /**
+     * Fetches and filters downloadable Modrinth versions for {@code item}. When
+     * {@code strictCompatibility} is enabled, passes exact {@code game_versions=["<cleanMc>"]} and
+     * {@code loaders=["<loader>"]} parameters and ranks the top stable release as Recommended.
+     */
+    @Nullable
+    public ModDetail getModrinthDetails(@Nullable ModItem item,
+                                        @Nullable String cleanMcVersion,
+                                        @Nullable String loader,
+                                        @Nullable String projectType,
+                                        boolean strictCompatibility) {
         if (item == null || item.id == null || item.id.trim().isEmpty()) return null;
-        JsonArray versions = getModrinthProjectVersions(item.id.trim(), null, null);
-        return mModrinthProvider.parseModDetails(item, versions);
+        String effectiveType = (projectType != null && !projectType.trim().isEmpty())
+                ? projectType.trim().toLowerCase(Locale.ROOT)
+                : (item.isModpack ? "modpack" : "mod");
+        boolean filterLoader = "mod".equals(effectiveType) || "modpack".equals(effectiveType);
+
+        String queryMc = strictCompatibility ? normalizeCleanMcParam(cleanMcVersion) : null;
+        String queryLoader = (strictCompatibility && filterLoader
+                && loader != null && !loader.trim().isEmpty()
+                && !"vanilla".equalsIgnoreCase(loader.trim()))
+                ? loader.trim().toLowerCase(Locale.ROOT) : null;
+
+        JsonArray versions = getModrinthProjectVersions(
+                item.id.trim(), queryMc, queryLoader, effectiveType);
+        return mModrinthProvider.parseModDetails(
+                item, versions, cleanMcVersion, queryLoader, effectiveType, strictCompatibility);
     }
 
     @Nullable
     public JsonArray getModrinthProjectVersions(@NonNull String projectId,
                                                 @Nullable String mcVersion,
                                                 @Nullable String loader) {
-        String safeId = encodePathSegment(projectId.trim());
-        LinkedHashMap<String, String> params = new LinkedHashMap<>();
-        if (mcVersion != null && !mcVersion.trim().isEmpty()) {
-            params.put("game_versions", "[\"" + sanitizeFacetValue(mcVersion.trim()) + "\"]");
+        return getModrinthProjectVersions(projectId, mcVersion, loader, "mod");
+    }
+
+    @Nullable
+    public JsonArray getModrinthProjectVersions(@NonNull String projectId,
+                                                @Nullable String mcVersion,
+                                                @Nullable String loader,
+                                                @Nullable String projectType) {
+        String cleanMc = normalizeCleanMcParam(mcVersion);
+        String[] loaders;
+        if (loader == null || loader.trim().isEmpty()
+                || "vanilla".equalsIgnoreCase(loader.trim())) {
+            loaders = new String[0];
+        } else {
+            String norm = loader.trim().toLowerCase(Locale.ROOT);
+            if ("quilt".equals(norm) && "mod".equalsIgnoreCase(projectType)) {
+                loaders = new String[]{"quilt", "fabric"};
+            } else {
+                loaders = new String[]{norm};
+            }
         }
-        if (loader != null && !loader.trim().isEmpty()) {
-            params.put("loaders", "[\"" + sanitizeFacetValue(loader.trim().toLowerCase(Locale.ROOT)) + "\"]");
-        }
-        String url = buildUrl(MODRINTH_API_BASE, "project/" + safeId + "/version", params);
+        String url = ZyroxHttpClient.buildModrinthProjectVersionsUrl(
+                MODRINTH_API_BASE, projectId.trim(), cleanMc, loaders);
         return fetchJsonCached(url, null, JsonArray.class);
+    }
+
+    @Nullable
+    private static String normalizeCleanMcParam(@Nullable String mcVersion) {
+        if (mcVersion == null || mcVersion.trim().isEmpty()) return null;
+        String clean = git.artdeell.mojo.instances.Instance
+                .extractCleanMinecraftVersion(mcVersion.trim());
+        return (clean != null && !clean.isEmpty()) ? clean : mcVersion.trim();
     }
 
     @Nullable
@@ -232,16 +269,34 @@ public class ModPlatformRepository {
         int safeOffset = Math.max(0, offset);
         int safePage = Math.max(1, Math.min(50, pageSize <= 0 ? DEFAULT_PAGE_SIZE : pageSize));
 
+        String projectType = (filters.projectTypeOverride != null && !filters.projectTypeOverride.isEmpty())
+                ? filters.projectTypeOverride.trim().toLowerCase(Locale.ROOT)
+                : (filters.isModpack ? "modpack" : "mod");
+        int classId;
+        switch (projectType) {
+            case "modpack": classId = CURSEFORGE_MODPACK_CLASS_ID; break;
+            case "resourcepack": classId = 12; break;
+            case "shader": classId = 6552; break;
+            case "mod":
+            default: classId = CURSEFORGE_MOD_CLASS_ID; break;
+        }
+
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         params.put("gameId", Integer.toString(CURSEFORGE_MC_GAME_ID));
-        params.put("classId", Integer.toString(
-                filters.isModpack ? CURSEFORGE_MODPACK_CLASS_ID : CURSEFORGE_MOD_CLASS_ID));
+        params.put("classId", Integer.toString(classId));
         params.put("searchFilter", filters.name != null ? filters.name : "");
         params.put("sortField", Integer.toString(CURSEFORGE_SORT_RELEVANCY));
         params.put("sortOrder", "desc");
         params.put("pageSize", Integer.toString(safePage));
-        if (filters.mcVersion != null && !filters.mcVersion.isEmpty()) {
-            params.put("gameVersion", filters.mcVersion);
+        String cleanMc = normalizeCleanMcParam(filters.mcVersion);
+        if (cleanMc != null && !cleanMc.isEmpty()) {
+            params.put("gameVersion", cleanMc);
+        }
+        if ("mod".equals(projectType) || "modpack".equals(projectType)) {
+            int loaderType = CurseForgeProvider.toModLoaderType(filters.loader);
+            if (loaderType > 0) {
+                params.put("modLoaderType", Integer.toString(loaderType));
+            }
         }
         if (safeOffset > 0) {
             params.put("index", Integer.toString(safeOffset));
@@ -262,18 +317,46 @@ public class ModPlatformRepository {
 
     @Nullable
     public ModDetail getCurseForgeDetails(@Nullable String apiKey, @Nullable ModItem item) {
+        return getCurseForgeDetails(apiKey, item, null, null, null, false);
+    }
+
+    /**
+     * Fetches and filters downloadable CurseForge versions for {@code item}, locking to
+     * {@code cleanMcVersion} and {@code loader} when {@code strictCompatibility} is enabled.
+     */
+    @Nullable
+    public ModDetail getCurseForgeDetails(@Nullable String apiKey,
+                                          @Nullable ModItem item,
+                                          @Nullable String cleanMcVersion,
+                                          @Nullable String loader,
+                                          @Nullable String projectType,
+                                          boolean strictCompatibility) {
         if (!CurseForgeProvider.canQueryCurseForge(apiKey)
                 || item == null || item.id == null || item.id.trim().isEmpty()) {
             return null;
         }
+        String effectiveType = (projectType != null && !projectType.trim().isEmpty())
+                ? projectType.trim().toLowerCase(Locale.ROOT)
+                : (item.isModpack ? "modpack" : "mod");
+        boolean filterLoader = "mod".equals(effectiveType) || "modpack".equals(effectiveType);
+        String queryMc = strictCompatibility ? normalizeCleanMcParam(cleanMcVersion) : null;
+        int loaderType = (strictCompatibility && filterLoader)
+                ? CurseForgeProvider.toModLoaderType(loader) : 0;
+
         String modId = encodePathSegment(item.id.trim());
         ArrayList<JsonObject> allFiles = new ArrayList<>();
         int index = 0;
-        int maxPages = 10; // Safety ceiling (up to 500 file entries)
+        int maxPages = strictCompatibility ? 4 : 10;
         for (int page = 0; page < maxPages; page++) {
             LinkedHashMap<String, String> params = new LinkedHashMap<>();
             params.put("index", Integer.toString(index));
             params.put("pageSize", Integer.toString(DEFAULT_PAGE_SIZE));
+            if (queryMc != null) {
+                params.put("gameVersion", queryMc);
+            }
+            if (loaderType > 0 && !"quilt".equalsIgnoreCase(loader)) {
+                params.put("modLoaderType", Integer.toString(loaderType));
+            }
             String url = buildUrl(CURSEFORGE_API_BASE, "mods/" + modId + "/files", params);
             JsonObject response = fetchCurseForgeJsonCached(url, apiKey, JsonObject.class);
             JsonArray data = GsonJsonUtils.getJsonArraySafe(response, "data");
@@ -285,7 +368,8 @@ public class ModPlatformRepository {
             if (data.size() < DEFAULT_PAGE_SIZE) break;
             index += data.size();
         }
-        return mCurseForgeProvider.parseModDetails(item, allFiles);
+        return mCurseForgeProvider.parseModDetails(
+                item, allFiles, queryMc, loader, effectiveType, strictCompatibility);
     }
 
     @Nullable

@@ -83,6 +83,11 @@ public final class ControlProfileManager {
         void onSetupImported(@NonNull SetupImportResult result);
     }
 
+    /** Callback for selecting a preferred per-server control profile filename. */
+    public interface ServerProfileCallback {
+        void onProfileSelected(@Nullable String profileFileName);
+    }
+
     /** Parsed universal Zyrox setup bundle (control layout + touch/gyro + renderer/scale). */
     public static final class ZyroxSetupBundle {
         @NonNull public final String profileName;
@@ -249,6 +254,87 @@ public final class ControlProfileManager {
         if (files == null || files.length == 0) return Collections.emptyList();
         Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
         return Arrays.asList(files);
+    }
+
+    /**
+     * Resolves a saved per-server control profile basename into an existing canonical {@code .json}
+     * file under {@link Tools#CTRLMAP_PATH}, or returns {@code null} when absent/default.
+     */
+    @Nullable
+    public static File resolveControlFileForProfile(@Nullable String profileFileName) {
+        if (Tools.CTRLMAP_PATH == null) return null;
+        String safeName = git.artdeell.mojo.servers.ServerListManager
+                .sanitizeControlProfileName(profileFileName);
+        if (safeName == null) return null;
+        try {
+            File root = new File(Tools.CTRLMAP_PATH).getCanonicalFile();
+            File candidate = new File(root, safeName).getCanonicalFile();
+            if (!candidate.getPath().startsWith(root.getPath() + File.separator)) {
+                return null;
+            }
+            return (candidate.isFile() && candidate.length() > 2L) ? candidate : null;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /** Formats a control profile filename as a concise human-readable label (strips {@code .json}). */
+    @NonNull
+    public static String formatProfileBadge(@Nullable String profileFileName) {
+        String safe = git.artdeell.mojo.servers.ServerListManager
+                .sanitizeControlProfileName(profileFileName);
+        if (safe == null) return "Instance Default";
+        return safe.toLowerCase(Locale.ROOT).endsWith(".json")
+                ? safe.substring(0, safe.length() - 5) : safe;
+    }
+
+    /**
+     * Shows a non-blocking picker dialog of all saved control layouts in {@link Tools#CTRLMAP_PATH}
+     * so a player can assign a dedicated layout (e.g. PvP vs. SMP) to an individual server entry.
+     */
+    public static void showServerControlProfilePicker(@NonNull Context ctx,
+                                                      @Nullable String currentProfile,
+                                                      @NonNull ServerProfileCallback callback) {
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            final List<File> files = listControlFiles();
+            final String cleanCurrent = git.artdeell.mojo.servers.ServerListManager
+                    .sanitizeControlProfileName(currentProfile);
+            Tools.runOnUiThread(() -> {
+                if (ctx instanceof android.app.Activity) {
+                    android.app.Activity a = (android.app.Activity) ctx;
+                    if (a.isFinishing() || a.isDestroyed()) return;
+                }
+                String[] labels = new String[files.size() + 1];
+                labels[0] = "Instance Default (No Override)";
+                int checked = 0;
+                for (int i = 0; i < files.size(); i++) {
+                    String fn = files.get(i).getName();
+                    labels[i + 1] = formatProfileBadge(fn) + "  (" + fn + ")";
+                    if (cleanCurrent != null && cleanCurrent.equalsIgnoreCase(fn)) {
+                        checked = i + 1;
+                    }
+                }
+                if (files.isEmpty()) {
+                    Toast.makeText(ctx,
+                            "Save a custom layout in the Controls Editor first to bind per-server profiles.",
+                            Toast.LENGTH_LONG).show();
+                    callback.onProfileSelected(null);
+                    return;
+                }
+                new AlertDialog.Builder(ctx)
+                        .setTitle("Per-Server Control Profile")
+                        .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                            dialog.dismiss();
+                            if (which <= 0) {
+                                callback.onProfileSelected(null);
+                            } else {
+                                callback.onProfileSelected(files.get(which - 1).getName());
+                            }
+                        })
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+            });
+        });
     }
 
     /**

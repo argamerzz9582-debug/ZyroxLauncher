@@ -183,16 +183,54 @@ public class CurseForgeProvider {
     }
 
     /**
-     * Converts paginated CurseForge file metadata objects into a clean {@link ModDetail}, safely
-     * handling {@code downloadUrl: null} entries (falling back to official HTTPS {@code edge.forgecdn.net}
-     * when {@code id} + {@code fileName} are available, and skipping unresolvable entries instead of crashing).
+     * Maps a canonical loader slug ({@code forge}, {@code fabric}, {@code quilt}, {@code neoforge})
+     * to CurseForge Core v1's {@code modLoaderType} query parameter (or {@code 0} for Any/Vanilla).
      */
+    public static int toModLoaderType(@Nullable String loader) {
+        if (loader == null) return 0;
+        switch (loader.trim().toLowerCase(Locale.ROOT)) {
+            case "forge": return 1;
+            case "fabric": return 4;
+            case "quilt": return 5;
+            case "neoforge": return 6;
+            default: return 0;
+        }
+    }
+
+    /** Parses CurseForge file entries without additional instance restriction. */
     @NonNull
     public ModDetail parseModDetails(@NonNull ModItem item, @NonNull List<JsonObject> rawFiles) {
+        return parseModDetails(item, rawFiles, null, null, null, false);
+    }
+
+    /**
+     * Converts paginated CurseForge file metadata objects into a strictly filtered, Recommended-
+     * ranked {@link ModDetail} matching the active instance's clean MC version and modloader.
+     */
+    @NonNull
+    public ModDetail parseModDetails(@NonNull ModItem item,
+                                     @NonNull List<JsonObject> rawFiles,
+                                     @Nullable String cleanMcVersion,
+                                     @Nullable String loader,
+                                     @Nullable String projectType,
+                                     boolean strictFilter) {
+        String targetMc = (cleanMcVersion != null && !cleanMcVersion.trim().isEmpty())
+                ? cleanMcVersion.trim() : null;
+        String effectiveType = (projectType != null && !projectType.trim().isEmpty())
+                ? projectType.trim().toLowerCase(Locale.ROOT)
+                : (item.isModpack ? "modpack" : "mod");
+        boolean filterLoader = "mod".equals(effectiveType) || "modpack".equals(effectiveType);
+        String targetLoader = (filterLoader && loader != null && !loader.trim().isEmpty()
+                && !"vanilla".equalsIgnoreCase(loader.trim()))
+                ? loader.trim().toLowerCase(Locale.ROOT) : null;
+
         List<String> versionNames = new ArrayList<>(rawFiles.size());
         List<String> mcVersionNames = new ArrayList<>(rawFiles.size());
         List<String> versionUrls = new ArrayList<>(rawFiles.size());
         List<String> hashes = new ArrayList<>(rawFiles.size());
+        List<String> versionIds = new ArrayList<>(rawFiles.size());
+        List<String> versionTypes = new ArrayList<>(rawFiles.size());
+        List<String> versionLoaders = new ArrayList<>(rawFiles.size());
         LinkedHashSet<String> seenUrls = new LinkedHashSet<>(rawFiles.size());
 
         for (JsonObject fileObj : rawFiles) {
@@ -202,12 +240,22 @@ public class CurseForgeProvider {
                 continue;
             }
 
+            JsonArray gvArr = GsonJsonUtils.getJsonArraySafe(fileObj, "gameVersions");
+            if (strictFilter && targetMc != null && !containsCurseGameVersion(gvArr, targetMc)) {
+                continue;
+            }
+            if (strictFilter && targetLoader != null
+                    && !matchesCurseLoaderTag(gvArr, targetLoader, effectiveType)) {
+                continue;
+            }
+
             String url = resolveFileDownloadUrl(fileObj);
             if (url == null || !ModrinthProvider.isHttpsUrl(url) || !seenUrls.add(url)) {
                 continue;
             }
 
-            String mcVersion = extractMinecraftVersion(GsonJsonUtils.getJsonArraySafe(fileObj, "gameVersions"));
+            String mcVersion = (targetMc != null && containsCurseGameVersion(gvArr, targetMc))
+                    ? targetMc : extractMinecraftVersion(gvArr);
             if (mcVersion == null) continue;
 
             String displayName = GsonJsonUtils.getStringSafe(fileObj, "displayName");
@@ -218,10 +266,33 @@ public class CurseForgeProvider {
                 displayName = mcVersion;
             }
 
+            String fileId = GsonJsonUtils.getStringSafe(fileObj, "id");
+            int relType = GsonJsonUtils.getIntSafe(fileObj, "releaseType", 1);
+            String channel = relType == 2 ? "beta" : (relType == 3 ? "alpha" : "release");
+            String loaderLabel = extractCurseLoaderBadge(gvArr);
+
             versionNames.add(displayName.trim());
             mcVersionNames.add(mcVersion);
             versionUrls.add(url);
             hashes.add(extractSha1(fileObj));
+            versionIds.add(fileId);
+            versionTypes.add(channel);
+            versionLoaders.add(loaderLabel);
+        }
+
+        int recIdx = ModDetail.computeRecommendedIndex(
+                versionTypes.toArray(new String[0]),
+                versionLoaders.toArray(new String[0]),
+                targetLoader);
+        if (recIdx > 0) {
+            versionNames.add(0, versionNames.remove(recIdx));
+            mcVersionNames.add(0, mcVersionNames.remove(recIdx));
+            versionUrls.add(0, versionUrls.remove(recIdx));
+            hashes.add(0, hashes.remove(recIdx));
+            versionIds.add(0, versionIds.remove(recIdx));
+            versionTypes.add(0, versionTypes.remove(recIdx));
+            versionLoaders.add(0, versionLoaders.remove(recIdx));
+            recIdx = 0;
         }
 
         return new ModDetail(
@@ -229,8 +300,70 @@ public class CurseForgeProvider {
                 versionNames.toArray(new String[0]),
                 mcVersionNames.toArray(new String[0]),
                 versionUrls.toArray(new String[0]),
-                hashes.toArray(new String[0])
+                hashes.toArray(new String[0]),
+                versionIds.toArray(new String[0]),
+                versionTypes.toArray(new String[0]),
+                versionLoaders.toArray(new String[0]),
+                recIdx
         );
+    }
+
+    private static boolean containsCurseGameVersion(@Nullable JsonArray gvArr,
+                                                    @NonNull String targetMc) {
+        if (gvArr == null) return false;
+        for (int i = 0; i < gvArr.size(); i++) {
+            JsonElement el = gvArr.get(i);
+            if (el != null && !el.isJsonNull()
+                    && targetMc.equalsIgnoreCase(el.getAsString().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesCurseLoaderTag(@Nullable JsonArray gvArr,
+                                                 @NonNull String targetLoader,
+                                                 @NonNull String effectiveType) {
+        if (gvArr == null || gvArr.size() == 0) return false;
+        boolean sawAnyExplicitLoader = false;
+        for (int i = 0; i < gvArr.size(); i++) {
+            JsonElement el = gvArr.get(i);
+            if (el == null || el.isJsonNull()) continue;
+            String tag = el.getAsString().trim().toLowerCase(Locale.ROOT);
+            if ("fabric".equals(tag) || "quilt".equals(tag)
+                    || "forge".equals(tag) || "neoforge".equals(tag)) {
+                sawAnyExplicitLoader = true;
+                if (targetLoader.equals(tag)) return true;
+                if ("quilt".equals(targetLoader) && "mod".equals(effectiveType)
+                        && "fabric".equals(tag)) {
+                    return true;
+                }
+            }
+        }
+        // Some older CurseForge modpack manifests omit explicit loader tags inside gameVersions[]
+        return !sawAnyExplicitLoader && "modpack".equals(effectiveType);
+    }
+
+    @NonNull
+    private static String extractCurseLoaderBadge(@Nullable JsonArray gvArr) {
+        if (gvArr == null) return "";
+        List<String> out = new ArrayList<>(2);
+        for (int i = 0; i < gvArr.size(); i++) {
+            JsonElement el = gvArr.get(i);
+            if (el == null || el.isJsonNull()) continue;
+            String tag = el.getAsString().trim().toLowerCase(Locale.ROOT);
+            String label = null;
+            if ("fabric".equals(tag)) label = "Fabric";
+            else if ("quilt".equals(tag)) label = "Quilt";
+            else if ("neoforge".equals(tag)) label = "NeoForge";
+            else if ("forge".equals(tag)) label = "Forge";
+            if (label != null && !out.contains(label)) {
+                out.add(label);
+                if (out.size() >= 2) break;
+            }
+        }
+        if (out.isEmpty()) return "";
+        return out.size() == 1 ? out.get(0) : (out.get(0) + "/" + out.get(1));
     }
 
     @Nullable

@@ -444,31 +444,9 @@ public class ContentManagerFragment extends Fragment {
         Button btnFps = ZyroxStudioUi.createPrimaryButton(ctx, "Install Essential FPS Mods");
         btnFps.setOnClickListener(v -> {
             if (mInstance == null) return;
-            final Instance target = mInstance;
-            final Context appCtx = ctx.getApplicationContext();
-            btnFps.setEnabled(false);
-            Toast.makeText(appCtx,
-                    "Downloading Sodium, Lithium, FerriteCore & ImmediatelyFast + tuning options.txt…",
-                    Toast.LENGTH_SHORT).show();
-            MojoApplication.sExecutorService.execute(() -> {
-                try {
-                    git.artdeell.mojo.instances.InstanceBackupService
-                            .createPreModSnapshotQuietly(target, "before-essential-fps");
-                    boolean wantIris = (mActiveKind == TabKind.SHADER_PACKS);
-                    git.artdeell.mojo.content.ModrinthContentInstaller.InstallSummary summary =
-                            git.artdeell.mojo.content.ModrinthContentInstaller
-                                    .installZeroLagFpsPack(target, wantIris, null);
-                    Tools.runOnUiThread(() -> {
-                        Toast.makeText(appCtx, summary.message, Toast.LENGTH_LONG).show();
-                        if (isAdded()) reloadActiveTab();
-                    });
-                } catch (Exception e) {
-                    Tools.runOnUiThread(() -> {
-                        btnFps.setEnabled(true);
-                        Toast.makeText(appCtx, "FPS Pack: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    });
-                }
-            });
+            boolean wantShaders = (mActiveKind == TabKind.SHADER_PACKS);
+            git.artdeell.mojo.content.ContentStudioActions.promptFpsBoostInstall(
+                    mActionsHost, mInstance, wantShaders);
         });
         actions.addView(btnFps, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 36)));

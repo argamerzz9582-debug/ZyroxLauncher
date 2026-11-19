@@ -474,6 +474,31 @@
         app:layout_constraintTop_toBottomOf="@id/checkboxVoiceChatOverlay"
         tools:ignore="HardcodedText" />
 
+    <!-- v2.6.0: Floating Coordinate/Death Waypoint Pill & 5s Server Auto-Reconnect -->
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxWaypointPill"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:text="Coordinate &amp; Death Waypoint Pill"
+        android:textColor="@color/zyrox_text_primary"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:track="@drawable/bg_zyrox_switch_track"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxThermalGovernor"
+        tools:ignore="HardcodedText" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxAutoReconnect"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:text="Server Auto-Reconnect (5s)"
+        android:textColor="@color/zyrox_text_primary"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:track="@drawable/bg_zyrox_switch_track"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxWaypointPill"
+        tools:ignore="HardcodedText" />
+
     <!-- Instant Quick Screenshot (F2) & Macros Row -->
     <LinearLayout
         android:id="@+id/quickAction_row"
@@ -483,7 +508,7 @@
         android:orientation="horizontal"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/checkboxThermalGovernor">
+        app:layout_constraintTop_toBottomOf="@id/checkboxAutoReconnect">
 
         <Button
             android:id="@+id/quickBtn_screenshot"

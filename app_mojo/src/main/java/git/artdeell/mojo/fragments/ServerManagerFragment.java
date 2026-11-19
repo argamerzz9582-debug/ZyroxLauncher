@@ -254,6 +254,11 @@ public class ServerManagerFragment extends Fragment {
             info.addView(ZyroxStudioUi.createTitle(ctx, title));
 
             android.text.SpannableStringBuilder richSub = new android.text.SpannableStringBuilder(s.address);
+            if (s.controlProfile != null && !s.controlProfile.isEmpty()) {
+                richSub.append(" • Controls: ")
+                        .append(git.artdeell.mojo.input.ControlProfileManager
+                                .formatProfileBadge(s.controlProfile));
+            }
             if (s.lastPingMs >= 0 && s.lastOnline) {
                 richSub.append(" • ONLINE ").append(String.valueOf(s.lastPingMs)).append("ms");
                 if (s.lastPlayers != null) richSub.append(" • ").append(s.lastPlayers).append(" players");
@@ -344,6 +349,26 @@ public class ServerManagerFragment extends Fragment {
         form.addView(etAddr, gap);
         form.addView(etGroup, gap);
 
+        // Per-Server Control Profile Auto-Switch selector
+        final String[] selectedControlProfile = new String[]{
+                existing != null ? existing.controlProfile : null
+        };
+        final Button btnCtrlProfile = ZyroxStudioUi.createSecondaryButton(
+                ctx, "Control Profile: " + git.artdeell.mojo.input.ControlProfileManager
+                        .formatProfileBadge(selectedControlProfile[0]), false);
+        LinearLayout.LayoutParams ctrlLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ZyroxStudioUi.dp(ctx, 38));
+        ctrlLp.topMargin = ZyroxStudioUi.dp(ctx, 8);
+        btnCtrlProfile.setOnClickListener(v ->
+                git.artdeell.mojo.input.ControlProfileManager.showServerControlProfilePicker(
+                        ctx, selectedControlProfile[0], chosen -> {
+                            selectedControlProfile[0] = chosen;
+                            btnCtrlProfile.setText("Control Profile: "
+                                    + git.artdeell.mojo.input.ControlProfileManager
+                                    .formatProfileBadge(chosen));
+                        }));
+        form.addView(btnCtrlProfile, ctrlLp);
+
         AlertDialog.Builder builder = new AlertDialog.Builder(ctx)
                 .setTitle(existing == null ? "Add Minecraft Server" : "Edit Server")
                 .setView(form)
@@ -361,11 +386,15 @@ public class ServerManagerFragment extends Fragment {
                         ServerListManager.ServerEntry entry = new ServerListManager.ServerEntry(
                                 rawName.isEmpty() ? rawAddr : rawName, rawAddr);
                         entry.group = rawGroup;
+                        entry.controlProfile = ServerListManager
+                                .sanitizeControlProfileName(selectedControlProfile[0]);
                         mServers.add(entry);
                     } else {
                         existing.name = rawName.isEmpty() ? rawAddr : rawName;
                         existing.address = rawAddr;
                         existing.group = rawGroup;
+                        existing.controlProfile = ServerListManager
+                                .sanitizeControlProfileName(selectedControlProfile[0]);
                     }
                     saveAndRender();
                 })
@@ -443,8 +472,7 @@ public class ServerManagerFragment extends Fragment {
                     + "\nDirect P2P Code:  " + active.fullShareCode
                     + "\nLocal LAN Port:  " + active.localMcPort
                     + "  ·  Connected Peers:  " + active.getConnectedPeerCount()
-                    + "\n\nFriends on the same Wi-Fi/Hotspot enter " + active.shortCode
-                    + ". Friends on routed/direct networks paste the full code.";
+                    + "\n\nNetwork Status: " + active.networkDiagnostic;
             new AlertDialog.Builder(ctx)
                     .setTitle("Zyrox Room Active • " + active.shortCode)
                     .setMessage(status)
@@ -576,6 +604,9 @@ public class ServerManagerFragment extends Fragment {
                         try {
                             git.artdeell.mojo.servers.ZyroxRoomBridge.ClientTunnel tunnel =
                                     git.artdeell.mojo.servers.ZyroxRoomBridge.connectToRoom(rawCode);
+                            // Persist cross-process handoff so :game binds its own 127.0.0.1 tunnel
+                            git.artdeell.mojo.servers.ZyroxRoomBridge
+                                    .persistPendingTunnelForGameLaunch(tunnel);
                             ServerListManager.ServerEntry entry = new ServerListManager.ServerEntry(
                                     tunnel.worldTitle, tunnel.getLoopbackAddress());
                             entry.group = "ZYX Room";
@@ -704,7 +735,7 @@ public class ServerManagerFragment extends Fragment {
                 Instances.setSelectedInstance(target);
                 ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
                 Tools.runOnUiThread(() -> {
-                    ServerListManager.setPendingQuickConnect(server.address);
+                    ServerListManager.setPendingQuickConnect(server.address, server.controlProfile);
                     Toast.makeText(appCtx,
                             "Switched to \"" + target.name + "\" & joining " + server.name + "…",
                             Toast.LENGTH_SHORT).show();
@@ -745,7 +776,7 @@ public class ServerManagerFragment extends Fragment {
                 ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
 
                 Tools.runOnUiThread(() -> {
-                    ServerListManager.setPendingQuickConnect(server.address);
+                    ServerListManager.setPendingQuickConnect(server.address, server.controlProfile);
                     Toast.makeText(appCtx,
                             "Created \"" + created.name + "\" — launching into " + server.name + "!",
                             Toast.LENGTH_LONG).show();
@@ -762,11 +793,20 @@ public class ServerManagerFragment extends Fragment {
     }
 
     private void quickJoin(@NonNull ServerListManager.ServerEntry server) {
-        ServerListManager.setPendingQuickConnect(server.address);
+        ServerListManager.setPendingQuickConnect(server.address, server.controlProfile);
         Toast.makeText(requireContext(), "Launching into " + server.name + " (" + server.address + ")...",
                 Toast.LENGTH_SHORT).show();
         Tools.backToMainMenu(requireActivity());
         ExtraCore.setValue(ExtraConstants.LAUNCH_GAME, true);
+    }
+
+    @Override
+    public void onDestroyView() {
+        // Release any unlaunched :launcher loopback tunnel if the user backed out without launching
+        if (!ServerListManager.hasPendingQuickConnect()) {
+            git.artdeell.mojo.servers.ZyroxRoomBridge.stopClientTunnel();
+        }
+        super.onDestroyView();
     }
 
     private void copyAddress(@NonNull String address) {

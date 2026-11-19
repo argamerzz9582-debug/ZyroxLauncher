@@ -114,21 +114,109 @@ public class ModrinthProvider {
     }
 
     /**
-     * Parses Modrinth {@code /project/{id}/version} responses safely:
+     * Builds exact Modrinth v2 search facet clauses for {@code filters}:
+     * {@code [["versions:<cleanVersion>"],["categories:<loader>"],["project_type:<type>"]]}.
+     *
      * <ul>
-     *   <li>Selects the official {@code "primary": true} file (defaulting to the first valid HTTPS file)</li>
-     *   <li>Filters out incompatible server-only/plugin-only modpack releases</li>
-     *   <li>Supports classic {@code 1.x.y}, year-based {@code 26.x+}, and snapshot Minecraft versions</li>
-     *   <li>Deduplicates version entries and preserves SHA-1 checksums for integrity verification</li>
+     *   <li>Applies {@code versions:<cleanVersion>} across mods, modpacks, resource packs, and shaders
+     *       whenever strict compatibility is active (or a version was explicitly specified).</li>
+     *   <li>Applies {@code categories:<loader>} strictly on {@code mod} and {@code modpack} queries
+     *       (expanding {@code quilt} on {@code mod} to {@code ["categories:quilt","categories:fabric"]}
+     *       since Quilt loads Fabric mods natively), while keeping {@code resourcepack} and
+     *       {@code shader} searches compatible with shader/pack loader tags.</li>
+     *   <li>Always appends {@code ["project_type:<type>"]}.</li>
      * </ul>
      */
+    @NonNull
+    public static String buildSearchFacets(@NonNull git.artdeell.mojo.modding.modpacks.models.SearchFilters filters) {
+        String projectType = (filters.projectTypeOverride != null && !filters.projectTypeOverride.trim().isEmpty())
+                ? filters.projectTypeOverride.trim().toLowerCase(Locale.ROOT)
+                : (filters.isModpack ? "modpack" : "mod");
+
+        StringBuilder sb = new StringBuilder("[");
+        boolean hasGroup = false;
+
+        // 1. Strict clean Minecraft version facet: ["versions:<cleanVersion>"]
+        if (filters.mcVersion != null && !filters.mcVersion.trim().isEmpty()) {
+            String cleanVer = git.artdeell.mojo.instances.Instance
+                    .extractCleanMinecraftVersion(filters.mcVersion.trim());
+            String verToken = (cleanVer != null && !cleanVer.isEmpty())
+                    ? cleanVer : filters.mcVersion.trim();
+            sb.append("[\"versions:").append(escapeFacet(verToken)).append("\"]");
+            hasGroup = true;
+        }
+
+        // 2. Loader facet: ["categories:<loader>"] for mod & modpack
+        boolean isCodeLoaded = "mod".equals(projectType) || "modpack".equals(projectType);
+        String normLoader = (filters.loader != null && !filters.loader.trim().isEmpty())
+                ? filters.loader.trim().toLowerCase(Locale.ROOT) : null;
+        if (isCodeLoaded && normLoader != null && !"vanilla".equals(normLoader)) {
+            if (hasGroup) sb.append(',');
+            if ("quilt".equals(normLoader) && "mod".equals(projectType)) {
+                sb.append("[\"categories:quilt\",\"categories:fabric\"]");
+            } else {
+                sb.append("[\"categories:").append(escapeFacet(normLoader)).append("\"]");
+            }
+            hasGroup = true;
+        }
+
+        // 3. Optional extra topic category (e.g. "optimization", "adventure")
+        if (filters.category != null && !filters.category.trim().isEmpty()) {
+            String normCat = filters.category.trim().toLowerCase(Locale.ROOT);
+            if (!normCat.equals(normLoader) && !"vanilla".equals(normCat)) {
+                if (hasGroup) sb.append(',');
+                sb.append("[\"categories:").append(escapeFacet(normCat)).append("\"]");
+                hasGroup = true;
+            }
+        }
+
+        // 4. Project type facet: ["project_type:<type>"]
+        if (hasGroup) sb.append(',');
+        sb.append("[\"project_type:").append(escapeFacet(projectType)).append("\"]]");
+        return sb.toString();
+    }
+
+    @NonNull
+    private static String escapeFacet(@NonNull String raw) {
+        return raw.replace("\\", "").replace("\"", "").trim();
+    }
+
+    /** Parses Modrinth {@code /project/{id}/version} entries with default compatibility settings. */
     @Nullable
     public ModDetail parseModDetails(@NonNull ModItem item, @Nullable JsonArray response) {
+        return parseModDetails(item, response, null, null, null, false);
+    }
+
+    /**
+     * Parses and strictly filters Modrinth {@code /project/{id}/version} entries for the active
+     * instance's clean Minecraft version and modloader, sorting the top stable {@code release}
+     * first and marking {@link ModDetail#recommendedIndex}.
+     */
+    @Nullable
+    public ModDetail parseModDetails(@NonNull ModItem item,
+                                     @Nullable JsonArray response,
+                                     @Nullable String cleanMcVersion,
+                                     @Nullable String loader,
+                                     @Nullable String projectType,
+                                     boolean strictFilter) {
         if (response == null) return null;
+        String targetMc = (cleanMcVersion != null && !cleanMcVersion.trim().isEmpty())
+                ? cleanMcVersion.trim() : null;
+        String effectiveType = (projectType != null && !projectType.trim().isEmpty())
+                ? projectType.trim().toLowerCase(Locale.ROOT)
+                : (item.isModpack ? "modpack" : "mod");
+        boolean filterByLoader = "mod".equals(effectiveType) || "modpack".equals(effectiveType);
+        String targetLoader = (filterByLoader && loader != null && !loader.trim().isEmpty()
+                && !"vanilla".equalsIgnoreCase(loader.trim()))
+                ? loader.trim().toLowerCase(Locale.ROOT) : null;
+
         List<String> names = new ArrayList<>(response.size());
         List<String> mcNames = new ArrayList<>(response.size());
         List<String> urls = new ArrayList<>(response.size());
         List<String> hashes = new ArrayList<>(response.size());
+        List<String> versionIds = new ArrayList<>(response.size());
+        List<String> versionTypes = new ArrayList<>(response.size());
+        List<String> versionLoaders = new ArrayList<>(response.size());
         LinkedHashSet<String> seenUrls = new LinkedHashSet<>(response.size());
 
         for (int i = 0; i < response.size(); i++) {
@@ -136,7 +224,16 @@ public class ModrinthProvider {
             if (el == null || !el.isJsonObject()) continue;
             JsonObject version = el.getAsJsonObject();
 
-            if (item.isModpack && !hasCompatibleClientLoader(version.getAsJsonArray("loaders"))) {
+            JsonArray loadersArr = version.getAsJsonArray("loaders");
+            if (item.isModpack && !hasCompatibleClientLoader(loadersArr)) {
+                continue;
+            }
+            if (strictFilter && targetLoader != null && !matchesRequestedLoader(loadersArr, targetLoader, effectiveType)) {
+                continue;
+            }
+
+            JsonArray gameVersionsArr = version.getAsJsonArray("game_versions");
+            if (strictFilter && targetMc != null && !containsGameVersion(gameVersionsArr, targetMc)) {
                 continue;
             }
 
@@ -145,7 +242,9 @@ public class ModrinthProvider {
             String url = getString(fileObj, "url");
             if (url == null || !isHttpsUrl(url) || !seenUrls.add(url)) continue;
 
-            String mcVersion = selectPrimaryGameVersion(version.getAsJsonArray("game_versions"));
+            String mcVersion = (targetMc != null && containsGameVersion(gameVersionsArr, targetMc))
+                    ? targetMc
+                    : selectPrimaryGameVersion(gameVersionsArr);
             if (mcVersion == null || mcVersion.isEmpty()) continue;
 
             String displayName = getString(version, "name");
@@ -164,10 +263,35 @@ public class ModrinthProvider {
                 }
             }
 
+            String verId = getString(version, "id");
+            String rawType = getString(version, "version_type");
+            String normType = (rawType != null && !rawType.trim().isEmpty())
+                    ? rawType.trim().toLowerCase(Locale.ROOT) : "release";
+            String loaderSummary = formatLoadersBadge(loadersArr, targetLoader);
+
             names.add(displayName);
             mcNames.add(mcVersion);
             urls.add(url);
             hashes.add(sha1);
+            versionIds.add(verId);
+            versionTypes.add(normType);
+            versionLoaders.add(loaderSummary);
+        }
+
+        // Promote the top stable Recommended release to index 0 so users see it first
+        int recIdx = ModDetail.computeRecommendedIndex(
+                versionTypes.toArray(new String[0]),
+                versionLoaders.toArray(new String[0]),
+                targetLoader);
+        if (recIdx > 0) {
+            names.add(0, names.remove(recIdx));
+            mcNames.add(0, mcNames.remove(recIdx));
+            urls.add(0, urls.remove(recIdx));
+            hashes.add(0, hashes.remove(recIdx));
+            versionIds.add(0, versionIds.remove(recIdx));
+            versionTypes.add(0, versionTypes.remove(recIdx));
+            versionLoaders.add(0, versionLoaders.remove(recIdx));
+            recIdx = 0;
         }
 
         return new ModDetail(
@@ -175,8 +299,86 @@ public class ModrinthProvider {
                 names.toArray(new String[0]),
                 mcNames.toArray(new String[0]),
                 urls.toArray(new String[0]),
-                hashes.toArray(new String[0])
+                hashes.toArray(new String[0]),
+                versionIds.toArray(new String[0]),
+                versionTypes.toArray(new String[0]),
+                versionLoaders.toArray(new String[0]),
+                recIdx
         );
+    }
+
+    private static boolean containsGameVersion(@Nullable JsonArray gameVersions,
+                                               @NonNull String targetMc) {
+        if (gameVersions == null) return false;
+        for (int i = 0; i < gameVersions.size(); i++) {
+            JsonElement el = gameVersions.get(i);
+            if (el != null && !el.isJsonNull()
+                    && targetMc.equalsIgnoreCase(el.getAsString().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesRequestedLoader(@Nullable JsonArray loaders,
+                                                  @NonNull String targetLoader,
+                                                  @NonNull String effectiveType) {
+        if (loaders == null || loaders.size() == 0) return false;
+        for (int i = 0; i < loaders.size(); i++) {
+            JsonElement el = loaders.get(i);
+            if (el == null || el.isJsonNull()) continue;
+            String cur = el.getAsString().trim().toLowerCase(Locale.ROOT);
+            if (targetLoader.equals(cur)) return true;
+            if ("quilt".equals(targetLoader) && "mod".equals(effectiveType) && "fabric".equals(cur)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @NonNull
+    private static String formatLoadersBadge(@Nullable JsonArray loaders,
+                                             @Nullable String preferredLoader) {
+        if (loaders == null || loaders.size() == 0) return "";
+        List<String> labels = new ArrayList<>(loaders.size());
+        for (int i = 0; i < loaders.size(); i++) {
+            JsonElement el = loaders.get(i);
+            if (el == null || el.isJsonNull()) continue;
+            String raw = el.getAsString().trim().toLowerCase(Locale.ROOT);
+            if (raw.isEmpty() || "minecraft".equals(raw)) continue;
+            String nice = capitalizeLoader(raw);
+            if (!labels.contains(nice)) {
+                if (preferredLoader != null && preferredLoader.equalsIgnoreCase(raw)) {
+                    labels.add(0, nice);
+                } else {
+                    labels.add(nice);
+                }
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        int cap = Math.min(2, labels.size());
+        for (int i = 0; i < cap; i++) {
+            if (i > 0) sb.append('/');
+            sb.append(labels.get(i));
+        }
+        return sb.toString();
+    }
+
+    @NonNull
+    private static String capitalizeLoader(@NonNull String raw) {
+        switch (raw) {
+            case "fabric": return "Fabric";
+            case "quilt": return "Quilt";
+            case "neoforge": return "NeoForge";
+            case "forge": return "Forge";
+            case "iris": return "Iris";
+            case "optifine": return "OptiFine";
+            case "canvas": return "Canvas";
+            case "datapack": return "Datapack";
+            case "vanilla": return "Vanilla";
+            default:
+                return raw.substring(0, 1).toUpperCase(Locale.ROOT) + raw.substring(1);
+        }
     }
 
     /**

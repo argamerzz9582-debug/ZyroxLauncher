@@ -124,6 +124,17 @@ public class GameActivity extends BaseActivity
     private long mSessionResumeRealtimeMs = 0L;
     boolean isInEditor;
 
+    // v2.6.0 — Per-Server Control Profile Auto-Switch & 5s Server Auto-Reconnect state
+    private static final int AUTO_RECONNECT_COUNTDOWN_SEC = 5;
+    private static final int MAX_AUTO_RECONNECT_ATTEMPTS = 5;
+    private volatile String mActiveServerAddress;
+    private String mActiveControlLayoutPath;
+    private boolean mAutoReconnectActive = false;
+    private int mAutoReconnectSecondsLeft = 0;
+    private int mAutoReconnectAttempts = 0;
+    private final Logger.eventLogListener mSessionLogListener = this::onLiveGameLogLine;
+    private final Runnable mAutoReconnectTickRunnable = this::tickAutoReconnectCountdown;
+
     Instance instance;
     Account account;
 
@@ -299,6 +310,7 @@ public class GameActivity extends BaseActivity
             if (mLoadingController != null) {
                 mLoadingController.attachLogger();
             }
+            Logger.addLogListener(mSessionLogListener);
 
             Intent activityIntent = getIntent();
             Bundle extras = Objects.requireNonNull(activityIntent.getExtras());
@@ -363,12 +375,45 @@ public class GameActivity extends BaseActivity
     }
 
     private void loadControls() {
+        String desiredLayout = instance.getLaunchControls();
+        // Auto-apply per-server control profile when launched via Server Manager quick-connect
+        String pendingProfile = git.artdeell.mojo.servers.ServerListManager
+                .consumePendingServerControlProfile();
+        String lastQuickAddr = git.artdeell.mojo.servers.ServerListManager
+                .getLastQuickConnectAddress();
+        if (lastQuickAddr != null && mActiveServerAddress == null) {
+            mActiveServerAddress = lastQuickAddr;
+            if (pendingProfile == null && instance != null) {
+                pendingProfile = git.artdeell.mojo.servers.ServerListManager
+                        .findControlProfileForServer(instance.getGameDirectory(), lastQuickAddr);
+            }
+        }
+        if (pendingProfile != null) {
+            File serverCtrl = ControlProfileManager.resolveControlFileForProfile(pendingProfile);
+            if (serverCtrl != null) {
+                desiredLayout = serverCtrl.getAbsolutePath();
+            }
+        }
+        applyControlLayoutFile(desiredLayout, pendingProfile != null
+                ? ControlProfileManager.formatProfileBadge(pendingProfile) : null);
+    }
+
+    private void applyControlLayoutFile(String layoutPath, String switchedToastBadge) {
+        if (mControlLayout == null || isInEditor || layoutPath == null) return;
+        if (layoutPath.equals(mActiveControlLayoutPath)) return;
         try {
-            mControlLayout.loadLayout(instance.getLaunchControls());
+            mControlLayout.loadLayout(layoutPath);
+            mActiveControlLayoutPath = layoutPath;
+            if (switchedToastBadge != null) {
+                Toast.makeText(this,
+                        "Switched Controls -> " + switchedToastBadge,
+                        Toast.LENGTH_SHORT).show();
+            }
         } catch (IOException e) {
             try {
                 Log.w("GameActivity", "Unable to load control layout, falling back to default", e);
                 mControlLayout.loadLayout(Tools.CTRLDEF_FILE);
+                mActiveControlLayoutPath = Tools.CTRLDEF_FILE;
             } catch (IOException ioException) {
                 Tools.showError(this, ioException);
             }
@@ -376,9 +421,177 @@ public class GameActivity extends BaseActivity
             Tools.showError(this, th);
         }
         mDrawerPullButton.setVisibility(mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+        if (!mControlLayout.isShown()) {
+            mControlLayout.setVisibility(View.VISIBLE);
+        }
         mControlLayout.toggleControlVisible();
         if (mHudCoordinator != null) {
             mHudCoordinator.onControlsLayoutChanged();
+        }
+    }
+
+    private void onLiveGameLogLine(String line) {
+        if (line == null || line.isEmpty()) return;
+        if (mHudCoordinator != null) {
+            mHudCoordinator.onGameLogLine(line);
+        }
+        String connectingTarget =
+                git.artdeell.mojo.servers.ServerListManager.parseConnectingLogEndpoint(line);
+        if (connectingTarget != null) {
+            mActiveServerAddress = connectingTarget;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                cancelAutoReconnectCountdown(false);
+                mAutoReconnectAttempts = 0;
+                if (mHudCoordinator != null) {
+                    mHudCoordinator.setPingTargetAddress(connectingTarget);
+                }
+                applyPerServerControlProfileAsync(connectingTarget);
+            });
+            return;
+        }
+        if (LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT
+                && mActiveServerAddress != null
+                && git.artdeell.mojo.servers.ServerListManager.isUnexpectedServerDisconnectLog(line)) {
+            final String target = mActiveServerAddress;
+            runOnUiThread(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    scheduleAutoReconnectCountdown(target);
+                }
+            });
+        }
+    }
+
+    private void applyPerServerControlProfileAsync(final String serverEndpoint) {
+        if (instance == null || isInEditor) return;
+        final File gameDir = instance.getGameDirectory();
+        final String fallbackPath = instance.getLaunchControls();
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            String serverProfile = git.artdeell.mojo.servers.ServerListManager
+                    .findControlProfileForServer(gameDir, serverEndpoint);
+            File resolved = serverProfile != null
+                    ? ControlProfileManager.resolveControlFileForProfile(serverProfile) : null;
+            final String targetPath = resolved != null ? resolved.getAbsolutePath() : fallbackPath;
+            final String badge = resolved != null
+                    ? ControlProfileManager.formatProfileBadge(serverProfile)
+                    : (mActiveControlLayoutPath != null && !mActiveControlLayoutPath.equals(fallbackPath)
+                    ? "Instance Default" : null);
+            if (targetPath != null && !targetPath.equals(mActiveControlLayoutPath)) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed() && mControlLayout != null && !isInEditor) {
+                        try {
+                            mControlLayout.loadLayout(targetPath);
+                            mActiveControlLayoutPath = targetPath;
+                            mControlLayout.setControlVisible(true);
+                            mDrawerPullButton.setVisibility(
+                                    mControlLayout.hasMenuButton() ? View.GONE : View.VISIBLE);
+                            if (mHudCoordinator != null) {
+                                mHudCoordinator.onControlsLayoutChanged();
+                            }
+                            if (badge != null) {
+                                Toast.makeText(GameActivity.this,
+                                        "Controls auto-switched: " + badge,
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (Throwable t) {
+                            Log.w("GameActivity", "Per-server control auto-switch skipped", t);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    private void scheduleAutoReconnectCountdown(String targetServer) {
+        if (mAutoReconnectActive || !LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT) return;
+        if (mAutoReconnectAttempts >= MAX_AUTO_RECONNECT_ATTEMPTS) {
+            if (mHudCoordinator != null) {
+                mHudCoordinator.showAutoReconnectCountdown(
+                        "Auto-reconnect paused after " + MAX_AUTO_RECONNECT_ATTEMPTS + " retries",
+                        () -> cancelAutoReconnectCountdown(true));
+            }
+            return;
+        }
+        mAutoReconnectActive = true;
+        mAutoReconnectSecondsLeft = AUTO_RECONNECT_COUNTDOWN_SEC;
+        Tools.MAIN_HANDLER.removeCallbacks(mAutoReconnectTickRunnable);
+        tickAutoReconnectCountdown();
+    }
+
+    private void tickAutoReconnectCountdown() {
+        if (!mAutoReconnectActive || isFinishing() || isDestroyed()
+                || !LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT
+                || Platform.isGrabbing()) {
+            cancelAutoReconnectCountdown(false);
+            return;
+        }
+        final String target = mActiveServerAddress;
+        if (target == null) {
+            cancelAutoReconnectCountdown(false);
+            return;
+        }
+        if (mAutoReconnectSecondsLeft > 0) {
+            if (mHudCoordinator != null) {
+                mHudCoordinator.showAutoReconnectCountdown(
+                        "⚡ Reconnecting to " + target + " in " + mAutoReconnectSecondsLeft + "s…",
+                        () -> cancelAutoReconnectCountdown(true));
+            }
+            mAutoReconnectSecondsLeft--;
+            Tools.MAIN_HANDLER.postDelayed(mAutoReconnectTickRunnable, 1000L);
+            return;
+        }
+        mAutoReconnectActive = false;
+        mAutoReconnectAttempts++;
+        if (mHudCoordinator != null) {
+            mHudCoordinator.showAutoReconnectCountdown(
+                    "⚡ Reconnecting to " + target + " (attempt "
+                            + mAutoReconnectAttempts + "/" + MAX_AUTO_RECONNECT_ATTEMPTS + ")…",
+                    () -> cancelAutoReconnectCountdown(true));
+        }
+        git.artdeell.mojo.MojoApplication.sExecutorService.execute(() -> {
+            // Re-verify any P2P loopback bridge and ping the server before triggering GUI rejoin
+            String resolved = git.artdeell.mojo.servers.ZyroxRoomBridge
+                    .ensurePendingTunnelInGameProcess(target);
+            mActiveServerAddress = resolved;
+            git.artdeell.mojo.servers.ServerPinger.PingResult ping =
+                    git.artdeell.mojo.servers.ServerPinger.ping(resolved);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()
+                        || !LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT
+                        || Platform.isGrabbing()) {
+                    cancelAutoReconnectCountdown(false);
+                    return;
+                }
+                if (!ping.online) {
+                    scheduleAutoReconnectCountdown(resolved);
+                    return;
+                }
+                // Server responded online: step back from DisconnectedScreen & rejoin selected server
+                CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_TAB);
+                Tools.MAIN_HANDLER.postDelayed(() -> {
+                    if (Platform.isGrabbing() || isFinishing()) return;
+                    CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ENTER);
+                    Tools.MAIN_HANDLER.postDelayed(() -> {
+                        if (Platform.isGrabbing() || isFinishing()) return;
+                        CallbackBridge.sendKeyPress(KeyEvent.KEYCODE_ENTER);
+                        if (mHudCoordinator != null) {
+                            mHudCoordinator.hideAutoReconnectCountdown();
+                        }
+                    }, 420L);
+                }, 140L);
+            });
+        });
+    }
+
+    private void cancelAutoReconnectCountdown(boolean resetAttempts) {
+        mAutoReconnectActive = false;
+        mAutoReconnectSecondsLeft = 0;
+        if (resetAttempts) {
+            mAutoReconnectAttempts = 0;
+        }
+        Tools.MAIN_HANDLER.removeCallbacks(mAutoReconnectTickRunnable);
+        if (mHudCoordinator != null) {
+            mHudCoordinator.hideAutoReconnectCountdown();
         }
     }
 
@@ -423,6 +636,9 @@ public class GameActivity extends BaseActivity
                     this::openQuickSettings,
                     git.artdeell.mojo.servers.ServerListManager.getLastActiveServerAddress(
                             instance.getGameDirectory()));
+            mHudCoordinator.configureWaypointSession(
+                    instance.getGameDirectory(),
+                    account != null ? account.username : null);
         }
     }
 
@@ -452,6 +668,8 @@ public class GameActivity extends BaseActivity
         if (mLoadingController != null) {
             mLoadingController.hideSmoothly();
         }
+        Tools.MAIN_HANDLER.postDelayed(
+                () -> GameService.reclaimLauncherMediaMemory(true), 600L);
     }
 
     @Override
@@ -467,6 +685,7 @@ public class GameActivity extends BaseActivity
 
     @Override
     protected void onPause() {
+        cancelAutoReconnectCountdown(false);
         flushPlaytimeSession();
         ContextExecutor.clearActivity();
         if (mGyroControl != null) mGyroControl.disable();
@@ -506,6 +725,9 @@ public class GameActivity extends BaseActivity
 
     @Override
     protected void onDestroy() {
+        cancelAutoReconnectCountdown(true);
+        Logger.removeLogListener(mSessionLogListener);
+        git.artdeell.mojo.servers.ZyroxRoomBridge.stopClientTunnel();
         flushPlaytimeSession();
         if (mThermalGovernor != null) {
             mThermalGovernor.stop();
@@ -550,8 +772,22 @@ public class GameActivity extends BaseActivity
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (mHudCoordinator != null) {
+            mHudCoordinator.onRequestPermissionsResult(requestCode, grantResults);
+        }
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (mHudCoordinator != null
+                && mHudCoordinator.onActivityResult(requestCode, resultCode, data)) {
+            return;
+        }
         if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
             if (!Tools.checkStorageRoot(this)) return;
             LauncherPreferences.loadPreferences(getApplicationContext());
@@ -628,6 +864,9 @@ public class GameActivity extends BaseActivity
                 public void onHudPreferencesChanged() {
                     if (mHudCoordinator != null) {
                         mHudCoordinator.syncPreferencesLive();
+                    }
+                    if (!LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT) {
+                        cancelAutoReconnectCountdown(true);
                     }
                     if (mThermalGovernor != null) {
                         mThermalGovernor.setEnabled(

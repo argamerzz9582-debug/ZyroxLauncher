@@ -3,7 +3,7 @@
     <!-- Global Zyrox 2.2 Starlight Firefly Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">STARLIGHT  •  LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX LAUNCHER v2.5.0</string>
+    <string name="zyrox_engine_watermark">ZYROX LAUNCHER v2.6.0</string>
     <string name="zyrox_action_import">Import JSON…</string>
     <string name="mcl_option_import_control">Import Control JSON…</string>
     <string name="zyrox_pref_turnip_store_title">Turnip Driver &amp; Java Runtime Store</string>

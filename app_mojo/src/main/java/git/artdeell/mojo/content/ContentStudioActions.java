@@ -103,12 +103,15 @@ public final class ContentStudioActions {
                 Toast.LENGTH_SHORT).show();
 
         final List<ModMetadataParser.ModInfo> snap = new ArrayList<>(loadedMods);
-        final String mcVer = instance.versionId != null ? instance.versionId : "";
+        final String rawVersionId = instance.versionId != null ? instance.versionId : "";
         final ModMetadataParser.LoaderFamily instLoader =
-                ModMetadataParser.inferLoaderFromVersionId(mcVer);
+                ModMetadataParser.inferLoaderFromVersionId(rawVersionId);
 
         MojoApplication.sExecutorService.execute(() -> {
             try {
+                final String resolvedMc = ModrinthContentInstaller.resolveCleanMinecraftVersionOnline(instance);
+                final String mcVer = (resolvedMc != null && !resolvedMc.isEmpty())
+                        ? resolvedMc : rawVersionId;
                 final List<String> lines = new ArrayList<>();
                 int limit = Math.min(25, snap.size());
                 for (int i = 0; i < limit; i++) {
@@ -238,6 +241,106 @@ public final class ContentStudioActions {
                         "Rollback failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
             }
         });
+    }
+
+    /**
+     * Unified 1-Tap FPS Boost Pack dialog and background installer. Detects the instance's clean
+     * Minecraft base version and active modloader, offers seamless 1-tap Fabric Loader installation
+     * when the instance is Vanilla (MC 1.14+), downloads loader-appropriate optimization mods plus
+     * required dependencies, applies safe {@code options.txt} tuning, and presents a clear
+     * installed-vs-skipped breakdown dialog.
+     */
+    public static void promptFpsBoostInstall(@NonNull UiHost host,
+                                             @NonNull Instance instance,
+                                             boolean includeShaderMod) {
+        Context ctx = host.getHostContext();
+        if (ctx == null) return;
+
+        final String cleanMc = instance.getCleanMinecraftVersion();
+        final String loader = instance.getDetectedModLoader();
+        final boolean isVanilla = Instance.LOADER_VANILLA.equals(loader);
+        final boolean isSymbolic = Instance.isSymbolicVersionId(instance.versionId);
+        final boolean canAutoFabric = isSymbolic
+                || (cleanMc != null && Instance.supportsFabricLoader(cleanMc));
+
+        String displayMc = cleanMc != null ? cleanMc
+                : (isSymbolic ? "Latest Release" : String.valueOf(instance.versionId));
+        String displayLoader = Instance.formatLoaderDisplayName(loader);
+        String targetLoader = isVanilla ? Instance.LOADER_FABRIC : loader;
+
+        List<ModrinthContentInstaller.FpsModSlot> slots =
+                ModrinthContentInstaller.getFpsBoostCatalog(targetLoader, includeShaderMod);
+        StringBuilder modList = new StringBuilder();
+        for (ModrinthContentInstaller.FpsModSlot slot : slots) {
+            modList.append("• ").append(slot.displayName).append('\n');
+        }
+        if (Instance.LOADER_FABRIC.equals(targetLoader)) {
+            modList.append("• Fabric API (auto-resolved dependency)\n");
+        }
+
+        String dialogMessage;
+        String positiveLabel;
+        if (isVanilla && canAutoFabric) {
+            dialogMessage = "Detected Vanilla profile (Minecraft " + displayMc + ").\n\n"
+                    + "Zyrox will automatically install the latest compatible Fabric Loader, "
+                    + "download verified FPS mods + required dependencies:\n\n"
+                    + modList
+                    + "\nPlus low-latency options.txt tweaks (Render Distance 8, Entity Shadows OFF, "
+                    + "Particles Low, VSync OFF).";
+            positiveLabel = "Install Fabric + FPS Pack";
+        } else if (isVanilla) {
+            dialogMessage = "Minecraft " + displayMc + " predates Fabric Loader (requires MC 1.14+).\n\n"
+                    + "Zyrox can apply safe low-latency options.txt optimizations now "
+                    + "(Render Distance 8, Entity Shadows OFF, Particles Low, VSync OFF). "
+                    + "To install Forge performance mods, switch this instance to Forge first.";
+            positiveLabel = "Optimize options.txt";
+        } else {
+            dialogMessage = "Install verified " + displayLoader + " FPS optimization mods for "
+                    + "Minecraft " + displayMc + " into \"" + instance.name + "\"?\n\n"
+                    + modList
+                    + "\nAll artifacts are SHA-1 verified, required dependencies are installed "
+                    + "automatically, and options.txt is tuned for smooth high FPS.";
+            positiveLabel = "Install FPS Pack";
+        }
+
+        final Context appCtx = ctx.getApplicationContext();
+        new AlertDialog.Builder(ctx)
+                .setTitle("1-Tap FPS Boost Pack")
+                .setMessage(dialogMessage)
+                .setPositiveButton(positiveLabel, (d, w) -> {
+                    Toast.makeText(appCtx,
+                            "Preparing 1-Tap FPS Boost for Minecraft " + displayMc + "…",
+                            Toast.LENGTH_SHORT).show();
+                    MojoApplication.sExecutorService.execute(() -> {
+                        try {
+                            ModrinthContentInstaller.InstallSummary sum =
+                                    ModrinthContentInstaller.installZeroLagFpsPack(
+                                            instance, includeShaderMod, status -> {
+                                                // Keep background resolution smooth and non-blocking
+                                            });
+                            Tools.runOnUiThread(() -> {
+                                Context activeCtx = host.isHostActive() ? host.getHostContext() : null;
+                                if (activeCtx != null) {
+                                    host.onContentMutated();
+                                    new AlertDialog.Builder(activeCtx)
+                                            .setTitle("1-Tap FPS Boost Complete")
+                                            .setMessage(sum.buildDetailedReport())
+                                            .setPositiveButton(android.R.string.ok, null)
+                                            .show();
+                                } else {
+                                    Toast.makeText(appCtx, sum.message, Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        } catch (Exception e) {
+                            Tools.runOnUiThread(() -> Toast.makeText(
+                                    appCtx,
+                                    "FPS Boost: " + (e.getMessage() != null ? e.getMessage() : "network error"),
+                                    Toast.LENGTH_LONG).show());
+                        }
+                    });
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     public static void showGameOptimizerDialog(@NonNull Context ctx, @NonNull Instance instance) {

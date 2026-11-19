@@ -1,9 +1,9 @@
 # Zyrox Launcher
 
-**Zyrox Launcher** (`com.zyrox.launcher`, v`2.3.0` — `arm64-v8a`) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, 120/144 Hz unbuffered touch & gyro aiming, AdrenoTools Turnip (`.adpkg`) + Mesa Zink/Freedreno rendering, Android 15/16 `16 KB` page alignment, lossless hardware-decoded animated backdrops, a draggable Pro Telemetry HUD, and a cohesive **Starlight Firefly × Liquid Glass** UI.
+**Zyrox Launcher** (`com.zyrox.launcher`, v`2.6.0` — `arm64-v8a`) is an open-source Android launcher for **Minecraft: Java Edition**, engineered for security transparency, data safety, 120/144 Hz unbuffered touch & gyro aiming, AdrenoTools Turnip (`.adpkg`) + Mesa Zink/Freedreno rendering, Android 15/16 `16 KB` page alignment, lossless hardware-decoded animated backdrops, a draggable Pro Telemetry HUD, and a cohesive **Starlight Firefly × Liquid Glass** UI.
 
-> **Direct Signed APK Download (`v2.3.0`, `arm64-v8a`):** [**Zyrox Launcher.apk**](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.3.0/Zyrox.Launcher.apk) ([Always Latest APK](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/Zyrox.Launcher.apk))  
-> **Official Release Page:** <https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/tag/v2.3.0>  
+> **Direct Signed APK Download (`v2.6.0`, `arm64-v8a`):** [**Zyrox Launcher.apk**](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.6.0/Zyrox.Launcher.apk) ([Always Latest APK](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/latest/download/Zyrox.Launcher.apk))  
+> **Official Release Page:** <https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/tag/v2.6.0>  
 > **Official Repository:** <https://github.com/argamerzz9582-debug/ZyroxLauncher>  
 > **License:** LGPL-3.0 (see [`LICENSE`](LICENSE))  
 > **Disclaimer:** Not an official Minecraft product. Not approved by or associated with Mojang AB or Microsoft Corporation.
@@ -28,7 +28,7 @@
 
 ## Safe Installation & APK Verification
 
-1. Download **[Zyrox Launcher.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.3.0/Zyrox.Launcher.apk)** **only** from [Official GitHub Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases).
+1. Download **[Zyrox Launcher.apk](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases/download/v2.6.0/Zyrox.Launcher.apk)** **only** from [Official GitHub Releases](https://github.com/argamerzz9582-debug/ZyroxLauncher/releases).
 2. Verify the downloaded APK SHA-256 against the digest published in the release notes:
    ```bash
    sha256sum Zyrox.Launcher.apk

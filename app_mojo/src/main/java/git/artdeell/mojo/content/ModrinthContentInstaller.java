@@ -9,36 +9,51 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.net.URLDecoder;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import git.artdeell.mojo.BuildConfig;
+import git.artdeell.mojo.JVersionList;
+import git.artdeell.mojo.extra.ExtraConstants;
+import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.instances.Instance;
+import git.artdeell.mojo.instances.InstanceBackupService;
+import git.artdeell.mojo.metadata.ModPlatformRepository;
+import git.artdeell.mojo.metadata.MojangVersionProvider;
+import git.artdeell.mojo.metadata.VersionMetadataRepository;
+import git.artdeell.mojo.modding.fabric.FabriclikeUtils;
+import git.artdeell.mojo.utils.FileUtils;
+import git.artdeell.mojo.utils.GameOptionsUtils;
+import git.artdeell.mojo.utils.ZyroxHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
- * Verified Modrinth v2 direct content installer, automatic required-dependency resolver,
- * 1-Click FPS Boost Pack installer, and 1-Tap Batch Mod Updater (with atomic rollback backup).
+ * Verified Modrinth v2 direct content installer, automatic {@code required}-dependency resolver,
+ * loader-aware 1-Tap FPS Boost Pack installer (with automatic Fabric Loader upgrade for Vanilla
+ * MC 1.14+), and 1-Tap Batch Mod Updater (with atomic rollback backup).
  *
- * <p>Security invariants: strictly {@code https://} connections, SHA-1 digest verification on every
- * downloaded artifact, path-traversal-proof filename sanitization, and bounded payload sizes.
+ * <p>Security invariants: strictly {@code https://} connections on trusted CDN hosts, pooled
+ * {@link ZyroxHttpClient} transport, mandatory SHA-1 digest verification when supplied,
+ * path-traversal-proof filename sanitization, and bounded payload sizes.
  */
 public final class ModrinthContentInstaller {
 
@@ -47,27 +62,69 @@ public final class ModrinthContentInstaller {
     public static final String TYPE_SHADER = "shader";
     public static final String TYPE_RESOURCEPACK = "resourcepack";
 
-    private static final String MODRINTH_API = git.artdeell.mojo.metadata.ModPlatformRepository.MODRINTH_API_BASE;
-    private static final String USER_AGENT = "ZyroxLauncher/2.5.0 (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
+    public static final String MODRINTH_API = ModPlatformRepository.MODRINTH_API_BASE;
+    private static final String USER_AGENT = "ZyroxLauncher/" + BuildConfig.VERSION_NAME
+            + " (Android; https://github.com/argamerzz9582-debug/ZyroxLauncher)";
     private static final String BACKUP_DIR_NAME = ".zyrox_mod_backup";
-    private static final int CONNECT_TIMEOUT_MS = 12_000;
-    private static final int READ_TIMEOUT_MS = 25_000;
     private static final long MAX_ARTIFACT_BYTES = 256L * 1024L * 1024L;
-    private static final int MAX_AUTO_DEPS = 8;
+    private static final int MAX_DEPENDENCY_DEPTH = 3;
+    private static final int MAX_AUTO_DEPS = 10;
 
-    /** Matches both classic {@code 1.x(.y)} and year-based {@code 26.x(.y)} Minecraft releases. */
-    private static final Pattern MC_VERSION_PATTERN =
-            Pattern.compile("(?:^|[^0-9])((?:1\\.\\d{1,2}|[2-9]\\d\\.\\d{1,2})(?:\\.\\d{1,2})?)(?=$|[^0-9])");
+    private static final String[] TRUSTED_CDN_SUFFIXES = {
+            "modrinth.com",
+            "github.com",
+            "githubusercontent.com",
+            "forgecdn.net",
+            "curseforge.com"
+    };
+
+    private static final Map<String, String> API_HEADERS = createApiHeaders();
+
+    @NonNull
+    private static Map<String, String> createApiHeaders() {
+        Map<String, String> h = new HashMap<>();
+        h.put("User-Agent", USER_AGENT);
+        h.put("Accept", "application/json");
+        return Collections.unmodifiableMap(h);
+    }
 
     public interface ProgressCallback {
         void onProgress(@NonNull String status);
     }
 
+    /**
+     * Represents one logical performance mod slot in the 1-Tap FPS Boost catalog. Ordered fallback
+     * slugs guarantee conflict-free installs (e.g. {@code sodium} falling back to {@code embeddium}
+     * on NeoForge without ever installing both).
+     */
+    public static final class FpsModSlot {
+        @NonNull public final String displayName;
+        @NonNull public final String[] candidateSlugs;
+        @NonNull public final String[] alreadyPresentTokens;
+
+        public FpsModSlot(@NonNull String displayName,
+                          @NonNull String[] candidateSlugs,
+                          @NonNull String[] alreadyPresentTokens) {
+            this.displayName = displayName;
+            this.candidateSlugs = candidateSlugs;
+            this.alreadyPresentTokens = alreadyPresentTokens;
+        }
+    }
+
+    /** Detailed, user-friendly report returned by all Modrinth install &amp; update operations. */
     public static final class InstallSummary {
         public final int installedCount;
         public final int dependencyCount;
         public final int skippedCount;
         @NonNull public final List<String> installedFiles;
+        @NonNull public final List<String> installedLabels;
+        @NonNull public final List<String> alreadyPresentLabels;
+        @NonNull public final List<String> dependencyLabels;
+        @NonNull public final List<String> skippedLabels;
+        @Nullable public final String cleanMinecraftVersion;
+        @Nullable public final String resolvedLoader;
+        @Nullable public final String autoInstalledLoaderId;
+        public final boolean optionsOptimized;
         @NonNull public final String message;
 
         public InstallSummary(int installedCount,
@@ -75,57 +132,155 @@ public final class ModrinthContentInstaller {
                               int skippedCount,
                               @NonNull List<String> installedFiles,
                               @NonNull String message) {
+            this(installedCount, dependencyCount, skippedCount, installedFiles,
+                    Collections.emptyList(), Collections.emptyList(),
+                    Collections.emptyList(), Collections.emptyList(),
+                    null, null, null, false, message);
+        }
+
+        public InstallSummary(int installedCount,
+                              int dependencyCount,
+                              int skippedCount,
+                              @NonNull List<String> installedFiles,
+                              @NonNull List<String> installedLabels,
+                              @NonNull List<String> alreadyPresentLabels,
+                              @NonNull List<String> dependencyLabels,
+                              @NonNull List<String> skippedLabels,
+                              @Nullable String cleanMinecraftVersion,
+                              @Nullable String resolvedLoader,
+                              @Nullable String autoInstalledLoaderId,
+                              boolean optionsOptimized,
+                              @NonNull String message) {
             this.installedCount = installedCount;
             this.dependencyCount = dependencyCount;
             this.skippedCount = skippedCount;
-            this.installedFiles = installedFiles;
+            this.installedFiles = Collections.unmodifiableList(new ArrayList<>(installedFiles));
+            this.installedLabels = Collections.unmodifiableList(new ArrayList<>(installedLabels));
+            this.alreadyPresentLabels = Collections.unmodifiableList(new ArrayList<>(alreadyPresentLabels));
+            this.dependencyLabels = Collections.unmodifiableList(new ArrayList<>(dependencyLabels));
+            this.skippedLabels = Collections.unmodifiableList(new ArrayList<>(skippedLabels));
+            this.cleanMinecraftVersion = cleanMinecraftVersion;
+            this.resolvedLoader = resolvedLoader;
+            this.autoInstalledLoaderId = autoInstalledLoaderId;
+            this.optionsOptimized = optionsOptimized;
             this.message = message;
+        }
+
+        /** Multi-line report suitable for a completion dialog showing installed vs. skipped mods. */
+        @NonNull
+        public String buildDetailedReport() {
+            if (cleanMinecraftVersion == null) {
+                return message;
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Target: Minecraft ").append(cleanMinecraftVersion);
+            if (resolvedLoader != null) {
+                sb.append(" • ").append(Instance.formatLoaderDisplayName(resolvedLoader));
+            }
+            if (autoInstalledLoaderId != null && !autoInstalledLoaderId.isEmpty()) {
+                sb.append("\n\n✓ Auto-installed Fabric Loader:\n  ").append(autoInstalledLoaderId);
+            }
+            if (!installedLabels.isEmpty()) {
+                sb.append("\n\n✓ Installed (").append(installedLabels.size()).append("): ")
+                        .append(joinComma(installedLabels));
+            }
+            if (!dependencyLabels.isEmpty()) {
+                sb.append("\n✓ Required Dependencies (").append(dependencyLabels.size()).append("): ")
+                        .append(joinComma(dependencyLabels));
+            }
+            if (!alreadyPresentLabels.isEmpty()) {
+                sb.append("\n• Already Installed (").append(alreadyPresentLabels.size()).append("): ")
+                        .append(joinComma(alreadyPresentLabels));
+            }
+            if (!skippedLabels.isEmpty()) {
+                sb.append("\n• Skipped (").append(skippedLabels.size()).append("): ")
+                        .append(joinComma(skippedLabels));
+            }
+            if (optionsOptimized) {
+                sb.append("\n\n✓ Optimized options.txt: renderDistance=8, entityShadows=false, particles=1, enableVsync=false");
+            }
+            return sb.toString();
         }
     }
 
-    private ModrinthContentInstaller() {}
+    private ModrinthContentInstaller() {
+    }
 
-    /** Extracts canonical Minecraft release string (e.g. {@code 1.21.4}) from an instance versionId. */
+    /**
+     * Resolves the clean base Mojang Minecraft release (e.g. {@code "1.21.4"}, {@code "1.20.1"},
+     * {@code "26.1.2"}) from an instance {@code versionId}, checking symbolic channels, on-disk
+     * {@code inheritsFrom} metadata, and loader-aware version extraction.
+     */
     @Nullable
     public static String extractMinecraftVersion(@Nullable String versionId) {
-        if (versionId == null || versionId.isEmpty()) return null;
-        Matcher m = MC_VERSION_PATTERN.matcher(versionId);
-        return m.find() ? m.group(1) : null;
+        return Instance.resolveCleanMinecraftVersion(versionId);
     }
 
-    /** Detects canonical Modrinth loader slug ({@code fabric}, {@code quilt}, {@code neoforge}, {@code forge}). */
+    /**
+     * Detects canonical Modrinth loader slug ({@code fabric}, {@code quilt}, {@code neoforge},
+     * {@code forge}), or {@code null} when the version is plain Vanilla.
+     */
     @Nullable
     public static String extractModLoader(@Nullable String versionId) {
-        if (versionId == null || versionId.isEmpty()) return null;
-        String lower = versionId.toLowerCase(Locale.ROOT);
-        if (lower.contains("fabric")) return "fabric";
-        if (lower.contains("quilt")) return "quilt";
-        if (lower.contains("neoforge")) return "neoforge";
-        if (lower.contains("forge")) return "forge";
-        return null;
+        String detected = Instance.detectModLoader(versionId);
+        return Instance.LOADER_VANILLA.equals(detected) ? null : detected;
     }
 
-    /** Detects canonical loader for an {@link Instance}, defaulting to {@code fabric} when unspecified. */
+    /** Detects canonical loader for an {@link Instance}, defaulting to {@code fabric} when vanilla. */
     @NonNull
     public static String detectInstanceLoader(@Nullable Instance instance) {
-        if (instance == null) return "fabric";
-        String detected = extractModLoader(instance.versionId);
-        return detected != null ? detected : "fabric";
+        if (instance == null) return Instance.LOADER_FABRIC;
+        String detected = instance.getDetectedModLoader();
+        return Instance.LOADER_VANILLA.equals(detected) ? Instance.LOADER_FABRIC : detected;
+    }
+
+    /**
+     * Resolves an instance's clean Minecraft version on a background thread, syncing official
+     * Mojang metadata if a symbolic alias ({@code latest_release}, {@code latest_snapshot},
+     * {@code latest_fabric}) is encountered before the catalog is warm.
+     */
+    @Nullable
+    public static String resolveCleanMinecraftVersionOnline(@NonNull Instance instance) {
+        String clean = instance.getCleanMinecraftVersion();
+        if (clean != null && !clean.isEmpty()) {
+            return clean;
+        }
+        String raw = instance.versionId;
+        if (Instance.isSymbolicVersionId(raw)) {
+            try {
+                VersionMetadataRepository repo = VersionMetadataRepository.getInstance();
+                JVersionList catalog = repo.getCurrentCatalog();
+                if (catalog == null) {
+                    catalog = repo.getMojangProvider().syncManifest(false).data;
+                }
+                if (catalog != null) {
+                    String type = Instance.isLatestSnapshotId(raw)
+                            ? MojangVersionProvider.TYPE_SNAPSHOT
+                            : MojangVersionProvider.TYPE_RELEASE;
+                    String found = MojangVersionProvider.findLatestByType(catalog, type);
+                    if (found != null && !found.trim().isEmpty()) {
+                        String extracted = Instance.extractCleanMinecraftVersion(found.trim());
+                        return extracted != null ? extracted : found.trim();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
     }
 
     /**
      * Resolves a modern Modrinth-compatible Minecraft release dynamically from {@code versionId}
-     * or the synced official Mojang / Fabric release catalogs.
+     * or the synced official Mojang release catalog.
      */
     @NonNull
     public static String resolveModernGameVersion(@Nullable String versionId) {
         String mc = extractMinecraftVersion(versionId);
         if (mc != null) return mc;
         try {
-            git.artdeell.mojo.JVersionList catalog =
-                    git.artdeell.mojo.metadata.VersionMetadataRepository.getInstance().getCurrentCatalog();
-            String latestRelease = git.artdeell.mojo.metadata.MojangVersionProvider.findLatestByType(
-                    catalog, git.artdeell.mojo.metadata.MojangVersionProvider.TYPE_RELEASE);
+            JVersionList catalog = VersionMetadataRepository.getInstance().getCurrentCatalog();
+            String latestRelease = MojangVersionProvider.findLatestByType(
+                    catalog, MojangVersionProvider.TYPE_RELEASE);
             if (latestRelease != null && !latestRelease.trim().isEmpty()) {
                 return latestRelease.trim();
             }
@@ -135,58 +290,389 @@ public final class ModrinthContentInstaller {
     }
 
     /**
-     * Phase 4.1 — 1-Tap "Zero-Lag" FPS Boost Pack:
+     * Returns the curated, loader-aware FPS Boost mod slots for {@code loader}:
+     * <ul>
+     *   <li><b>Fabric / Quilt</b>: Sodium, Lithium, FerriteCore, ImmediatelyFast, Entity Culling (+ Iris)</li>
+     *   <li><b>NeoForge</b>: Sodium (fallback Embeddium), Lithium, FerriteCore, ImmediatelyFast, Entity Culling (+ Iris/Oculus)</li>
+     *   <li><b>Forge</b>: Embeddium (fallback Rubidium), FerriteCore, ImmediatelyFast, Entity Culling (+ Oculus)</li>
+     * </ul>
+     * Direct {@code required} dependencies (including {@code fabric-api}) are automatically
+     * resolved and downloaded from Modrinth's dependency metadata.
+     */
+    @NonNull
+    public static List<FpsModSlot> getFpsBoostCatalog(@NonNull String loader,
+                                                      boolean includeShadersMod) {
+        String norm = loader.trim().toLowerCase(Locale.ROOT);
+        List<FpsModSlot> slots = new ArrayList<>();
+        if (Instance.LOADER_FORGE.equals(norm)) {
+            slots.add(new FpsModSlot("Embeddium",
+                    new String[]{"embeddium", "rubidium"},
+                    new String[]{"embeddium", "rubidium", "sodium"}));
+            slots.add(new FpsModSlot("FerriteCore",
+                    new String[]{"ferrite-core"},
+                    new String[]{"ferritecore", "ferrite-core"}));
+            slots.add(new FpsModSlot("ImmediatelyFast",
+                    new String[]{"immediatelyfast"},
+                    new String[]{"immediatelyfast"}));
+            slots.add(new FpsModSlot("Entity Culling",
+                    new String[]{"entityculling"},
+                    new String[]{"entityculling"}));
+            if (includeShadersMod) {
+                slots.add(new FpsModSlot("Oculus",
+                        new String[]{"oculus"},
+                        new String[]{"oculus", "iris"}));
+            }
+        } else if (Instance.LOADER_NEOFORGE.equals(norm)) {
+            // Sodium 0.6+ publishes official NeoForge builds on MC 1.21+; Embeddium covers 1.20.x–1.21.1
+            slots.add(new FpsModSlot("Sodium / Embeddium",
+                    new String[]{"sodium", "embeddium"},
+                    new String[]{"sodium", "embeddium", "rubidium"}));
+            slots.add(new FpsModSlot("Lithium",
+                    new String[]{"lithium"},
+                    new String[]{"lithium", "radium", "canary"}));
+            slots.add(new FpsModSlot("FerriteCore",
+                    new String[]{"ferrite-core"},
+                    new String[]{"ferritecore", "ferrite-core"}));
+            slots.add(new FpsModSlot("ImmediatelyFast",
+                    new String[]{"immediatelyfast"},
+                    new String[]{"immediatelyfast"}));
+            slots.add(new FpsModSlot("Entity Culling",
+                    new String[]{"entityculling"},
+                    new String[]{"entityculling"}));
+            if (includeShadersMod) {
+                slots.add(new FpsModSlot("Iris / Oculus",
+                        new String[]{"iris", "oculus"},
+                        new String[]{"iris", "oculus"}));
+            }
+        } else {
+            // Fabric & Quilt
+            slots.add(new FpsModSlot("Sodium",
+                    new String[]{"sodium"},
+                    new String[]{"sodium"}));
+            slots.add(new FpsModSlot("Lithium",
+                    new String[]{"lithium"},
+                    new String[]{"lithium"}));
+            slots.add(new FpsModSlot("FerriteCore",
+                    new String[]{"ferrite-core"},
+                    new String[]{"ferritecore", "ferrite-core"}));
+            slots.add(new FpsModSlot("ImmediatelyFast",
+                    new String[]{"immediatelyfast"},
+                    new String[]{"immediatelyfast"}));
+            slots.add(new FpsModSlot("Entity Culling",
+                    new String[]{"entityculling"},
+                    new String[]{"entityculling"}));
+            if (includeShadersMod) {
+                slots.add(new FpsModSlot("Iris Shaders",
+                        new String[]{"iris"},
+                        new String[]{"iris"}));
+            }
+        }
+        return slots;
+    }
+
+    /** Returns the Modrinth {@code loaders} query array (Quilt accepts native Quilt + Fabric mods). */
+    @NonNull
+    public static String[] getQueryLoadersForLoader(@Nullable String loader) {
+        if (loader == null || loader.trim().isEmpty()) {
+            return new String[0];
+        }
+        String norm = loader.trim().toLowerCase(Locale.ROOT);
+        if (Instance.LOADER_VANILLA.equals(norm)) {
+            return new String[0];
+        }
+        if (Instance.LOADER_QUILT.equals(norm)) {
+            return new String[]{Instance.LOADER_QUILT, Instance.LOADER_FABRIC};
+        }
+        return new String[]{norm};
+    }
+
+    /**
+     * 1-Tap "Zero-Lag" FPS Boost Pack:
      * <ol>
-     *   <li>Creates an automatic pre-mod config/world snapshot for 1-tap rollback.</li>
-     *   <li>If the instance is plain Vanilla (no loader yet), automatically installs Fabric Loader
-     *       for its Minecraft version and binds the instance to it.</li>
-     *   <li>Installs verified SHA-1 checked Fabric API + Sodium + Lithium + FerriteCore +
-     *       EntityCulling + ImmediatelyFast (+ Iris/Oculus if {@code includeIrisShaders}).</li>
-     *   <li>Applies optimal mobile FPS {@code options.txt} settings via
-     *       {@link git.artdeell.mojo.utils.GameOptionsUtils#applyZeroLagFpsOptions}.</li>
+     *   <li>Resolves the clean Mojang Minecraft version (handling Fabric/Quilt/Forge/NeoForge/OptiFine
+     *       IDs, {@code inheritsFrom}, and {@code latest_fabric}/{@code latest_release}).</li>
+     *   <li>If the instance is Vanilla on MC 1.14+ (or 26.x+), automatically installs the latest
+     *       compatible Fabric Loader via {@link FabriclikeUtils#FABRIC_UTILS} and binds the instance.</li>
+     *   <li>Creates a pre-mod safety snapshot, independently resolves every compatible performance
+     *       mod for the active loader, and auto-installs all {@code required} dependencies
+     *       (including {@code fabric-api}) with SHA-1 verification.</li>
+     *   <li>Applies competitive {@code options.txt} tweaks ({@code renderDistance:8},
+     *       {@code entityShadows:false}, {@code particles:1}, {@code enableVsync:false}) via
+     *       {@link GameOptionsUtils}.</li>
      * </ol>
      */
     @NonNull
     public static InstallSummary installZeroLagFpsPack(@NonNull Instance instance,
                                                        boolean includeIrisShaders,
                                                        @Nullable ProgressCallback cb) throws IOException {
-        String mcVer = extractMinecraftVersion(instance.versionId);
-        if (mcVer == null) {
-            throw new IOException("Select a release Minecraft version (e.g. 1.21.4 or 1.20.1) first.");
-        }
-        String loader = extractModLoader(instance.versionId);
-        if (loader == null) {
+        String autoInstalledLoaderId = null;
+
+        // Materialize symbolic "latest_fabric" onto a concrete verified Fabric profile
+        if (Instance.isLatestFabricId(instance.versionId)) {
             if (cb != null) {
-                cb.onProgress("Installing Fabric Loader for Minecraft " + mcVer + "…");
+                cb.onProgress("Installing latest stable Fabric Loader…");
             }
-            String fabricVersionId = git.artdeell.mojo.modding.fabric.FabriclikeUtils.FABRIC_UTILS
-                    .installLatestForGameVersion(mcVer);
-            if (fabricVersionId != null && !fabricVersionId.isEmpty()) {
-                instance.versionId = fabricVersionId;
-                instance.maybeWrite();
+            FabriclikeUtils.ResolvedFabricRelease rel =
+                    FabriclikeUtils.FABRIC_UTILS.resolveAndInstallLatestStable();
+            instance.versionId = rel.versionId;
+            instance.write();
+            notifyVersionChanged();
+            autoInstalledLoaderId = rel.versionId;
+        }
+
+        String cleanMc = resolveCleanMinecraftVersionOnline(instance);
+        if (cleanMc == null || cleanMc.isEmpty()) {
+            throw new IOException("Could not determine base Minecraft version from '"
+                    + instance.versionId + "'. Select a Minecraft version in Instance Settings first.");
+        }
+
+        String loader = instance.getDetectedModLoader();
+        File gameDir = instance.getGameDirectory();
+        FileUtils.ensureDirectory(gameDir);
+
+        // Vanilla profile handling: auto-install Fabric Loader on MC 1.14+ / 26.x+
+        if (Instance.LOADER_VANILLA.equals(loader)) {
+            if (!Instance.supportsFabricLoader(cleanMc)) {
+                boolean optionsApplied = GameOptionsUtils.applyFpsBoostOptions(gameDir);
+                String msg = "Applied low-latency options.txt settings for Minecraft " + cleanMc
+                        + " (Fabric FPS mods require MC 1.14+; install Forge for legacy versions).";
+                return new InstallSummary(
+                        0, 0, 0,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.singletonList("Fabric Loader requires Minecraft 1.14+"),
+                        cleanMc, Instance.LOADER_VANILLA, null, optionsApplied, msg);
+            }
+            if (cb != null) {
+                cb.onProgress("Installing Fabric Loader for Minecraft " + cleanMc + "…");
+            }
+            String fabricVersionId = FabriclikeUtils.FABRIC_UTILS.installLatestForGameVersion(cleanMc);
+            instance.versionId = fabricVersionId;
+            instance.write();
+            notifyVersionChanged();
+            autoInstalledLoaderId = fabricVersionId;
+            loader = Instance.LOADER_FABRIC;
+        }
+
+        InstanceBackupService.createPreModSnapshotQuietly(
+                instance, includeIrisShaders ? "fps-iris-pack" : "zero-lag-fps-pack");
+
+        InstallSummary modSummary = executeLoaderFpsBoostInstall(
+                instance, cleanMc, loader, autoInstalledLoaderId, includeIrisShaders, true, cb);
+        return modSummary;
+    }
+
+    /**
+     * 1-Click FPS Boost Pack (also auto-upgrades Vanilla MC 1.14+ instances to Fabric Loader and
+     * applies safe {@code options.txt} optimizations).
+     */
+    @NonNull
+    public static InstallSummary installFpsBoostPack(@NonNull Instance instance,
+                                                     boolean includeIrisShaders,
+                                                     @Nullable ProgressCallback cb) throws IOException {
+        return installZeroLagFpsPack(instance, includeIrisShaders, cb);
+    }
+
+    /** Convenience overload installing the core FPS Boost bundle without shaders. */
+    @NonNull
+    public static InstallSummary installFpsBoostPack(@NonNull Instance instance,
+                                                     @Nullable ProgressCallback cb) throws IOException {
+        return installZeroLagFpsPack(instance, false, cb);
+    }
+
+    @NonNull
+    private static InstallSummary executeLoaderFpsBoostInstall(@NonNull Instance instance,
+                                                               @NonNull String cleanMc,
+                                                               @NonNull String loader,
+                                                               @Nullable String autoInstalledLoaderId,
+                                                               boolean includeIrisShaders,
+                                                               boolean applyOptionsTweaks,
+                                                               @Nullable ProgressCallback cb) throws IOException {
+        File gameDir = instance.getGameDirectory();
+        File modsDir = new File(gameDir, "mods");
+        if (!modsDir.exists() && !modsDir.mkdirs()) {
+            throw new IOException("Could not create mods directory: " + modsDir.getAbsolutePath());
+        }
+
+        String[] queryLoaders = getQueryLoadersForLoader(loader);
+        List<FpsModSlot> slots = getFpsBoostCatalog(loader, includeIrisShaders);
+        Set<String> existingLower = listExistingJarNamesLower(modsDir);
+
+        List<String> installedFiles = new ArrayList<>();
+        List<String> installedLabels = new ArrayList<>();
+        List<String> alreadyPresentLabels = new ArrayList<>();
+        List<String> dependencyLabels = new ArrayList<>();
+        List<String> skippedLabels = new ArrayList<>();
+        Set<String> visitedProjects = new HashSet<>();
+
+        // On Fabric, ensure Fabric API is present up-front since Sodium/Iris/ecosystem mods rely on it
+        if (Instance.LOADER_FABRIC.equals(loader)
+                && !containsAny(existingLower, "fabric-api", "fabric_api")) {
+            if (cb != null) {
+                cb.onProgress("Resolving required Fabric API for MC " + cleanMc + "…");
+            }
+            try {
+                ResolvedDownload apiRes = downloadBestProjectVersion(
+                        "fabric-api", cleanMc, loader, queryLoaders, modsDir, cb);
+                visitedProjects.add("fabric-api");
+                visitedProjects.add("p7dr8msh");
+                if (apiRes.status == DownloadStatus.DOWNLOADED && apiRes.file != null) {
+                    installedFiles.add(apiRes.file.getName());
+                    existingLower.add(apiRes.file.getName().toLowerCase(Locale.ROOT));
+                    dependencyLabels.add("Fabric API");
+                } else if (apiRes.status == DownloadStatus.ALREADY_UP_TO_DATE) {
+                    alreadyPresentLabels.add("Fabric API");
+                }
+            } catch (Throwable ignored) {
+                // Non-fatal: Sodium/Lithium/FerriteCore still install independently even if Fabric API lags
             }
         }
-        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
-                instance, includeIrisShaders ? "fps-iris-pack" : "zero-lag-fps-pack");
-        InstallSummary summary = installFpsBoostPack(instance, includeIrisShaders, cb);
-        boolean isPvp = Instance.PRESET_MAX_FPS.equalsIgnoreCase(instance.performancePreset)
-                && instance.name != null
-                && instance.name.toLowerCase(Locale.ROOT).contains("pvp");
-        git.artdeell.mojo.utils.GameOptionsUtils.applyZeroLagFpsOptions(
-                instance.getGameDirectory(), isPvp);
-        String enrichedMsg = summary.message + " • Optimized options.txt applied (RD:8, VSync OFF).";
+
+        for (int i = 0; i < slots.size(); i++) {
+            FpsModSlot slot = slots.get(i);
+            if (containsAny(existingLower, slot.alreadyPresentTokens)) {
+                alreadyPresentLabels.add(slot.displayName);
+                continue;
+            }
+
+            if (cb != null) {
+                cb.onProgress("FPS Boost (" + (i + 1) + "/" + slots.size() + "): checking "
+                        + slot.displayName + " for MC " + cleanMc + "…");
+            }
+
+            boolean satisfied = false;
+            String lastReason = "no " + Instance.formatLoaderDisplayName(loader)
+                    + " build for MC " + cleanMc;
+
+            for (String slug : slot.candidateSlugs) {
+                ResolvedDownload res = downloadBestProjectVersion(
+                        slug, cleanMc, loader, queryLoaders, modsDir, cb);
+                String label = resolveFriendlySlugLabel(slot.displayName, slug);
+
+                if (res.status == DownloadStatus.DOWNLOADED && res.file != null) {
+                    installedFiles.add(res.file.getName());
+                    installedLabels.add(label);
+                    existingLower.add(res.file.getName().toLowerCase(Locale.ROOT));
+                    visitedProjects.add(slug.toLowerCase(Locale.ROOT));
+                    if (res.projectId != null) {
+                        visitedProjects.add(res.projectId.toLowerCase(Locale.ROOT));
+                    }
+                    // Auto-resolve direct & nested required dependencies for this mod
+                    if (res.versionObject != null) {
+                        resolveDependenciesFromVersionObject(
+                                res.versionObject, cleanMc, loader, queryLoaders, modsDir,
+                                existingLower, visitedProjects, installedFiles, dependencyLabels,
+                                0, cb);
+                    }
+                    satisfied = true;
+                    break;
+                } else if (res.status == DownloadStatus.ALREADY_UP_TO_DATE) {
+                    alreadyPresentLabels.add(label);
+                    if (res.versionObject != null) {
+                        resolveDependenciesFromVersionObject(
+                                res.versionObject, cleanMc, loader, queryLoaders, modsDir,
+                                existingLower, visitedProjects, installedFiles, dependencyLabels,
+                                0, cb);
+                    }
+                    satisfied = true;
+                    break;
+                } else if (res.failureReason != null && !res.failureReason.isEmpty()) {
+                    lastReason = res.failureReason;
+                }
+            }
+
+            if (!satisfied) {
+                skippedLabels.add(slot.displayName + " (" + lastReason + ")");
+            }
+        }
+
+        // Apply low-latency options.txt optimizations (renderDistance:8, entityShadows:false, particles:1, enableVsync:false)
+        boolean optionsApplied = false;
+        if (applyOptionsTweaks) {
+            if (cb != null) {
+                cb.onProgress("Applying low-latency options.txt tweaks…");
+            }
+            boolean isPvp = Instance.PRESET_MAX_FPS.equalsIgnoreCase(instance.performancePreset)
+                    && instance.name != null
+                    && instance.name.toLowerCase(Locale.ROOT).contains("pvp");
+            GameOptionsUtils.applyZeroLagFpsOptions(gameDir, isPvp);
+            optionsApplied = GameOptionsUtils.applyFpsBoostOptions(gameDir);
+        }
+
+        int newMods = installedLabels.size();
+        int depCount = dependencyLabels.size();
+        int skipCount = skippedLabels.size();
+        String loaderDisplay = Instance.formatLoaderDisplayName(loader);
+
+        String summaryMsg = buildConciseSummaryMessage(
+                cleanMc, loaderDisplay, autoInstalledLoaderId,
+                installedLabels, alreadyPresentLabels, dependencyLabels, skippedLabels,
+                optionsApplied);
+
         return new InstallSummary(
-                summary.installedCount,
-                summary.dependencyCount,
-                summary.skippedCount,
-                summary.installedFiles,
-                enrichedMsg);
+                newMods,
+                depCount,
+                skipCount,
+                installedFiles,
+                installedLabels,
+                alreadyPresentLabels,
+                dependencyLabels,
+                skippedLabels,
+                cleanMc,
+                loader,
+                autoInstalledLoaderId,
+                optionsApplied,
+                summaryMsg);
+    }
+
+    @NonNull
+    private static String buildConciseSummaryMessage(@NonNull String cleanMc,
+                                                     @NonNull String loaderDisplay,
+                                                     @Nullable String autoInstalledLoaderId,
+                                                     @NonNull List<String> installed,
+                                                     @NonNull List<String> alreadyPresent,
+                                                     @NonNull List<String> deps,
+                                                     @NonNull List<String> skipped,
+                                                     boolean optionsApplied) {
+        StringBuilder sb = new StringBuilder();
+        if (autoInstalledLoaderId != null) {
+            sb.append("Auto-installed Fabric • ");
+        }
+        if (!installed.isEmpty()) {
+            sb.append("Installed ").append(installed.size()).append(" FPS mod(s) (")
+                    .append(joinComma(installed)).append(")");
+            if (!deps.isEmpty()) {
+                sb.append(" + ").append(joinComma(deps));
+            }
+            sb.append(" for ").append(loaderDisplay).append(' ').append(cleanMc);
+            if (!skipped.isEmpty()) {
+                sb.append(" • ").append(skipped.size()).append(" skipped");
+            }
+        } else if (!alreadyPresent.isEmpty()) {
+            sb.append("FPS Boost already up to date (").append(alreadyPresent.size())
+                    .append(" active: ").append(joinComma(alreadyPresent)).append(")");
+            if (!deps.isEmpty()) {
+                sb.append(" • Added ").append(joinComma(deps));
+            }
+        } else {
+            sb.append("No Modrinth builds released yet for ").append(loaderDisplay)
+                    .append(' ').append(cleanMc);
+            if (optionsApplied) {
+                sb.append(" — applied low-latency options.txt FPS tuning instead");
+            }
+        }
+        if (optionsApplied && (!installed.isEmpty() || !alreadyPresent.isEmpty())) {
+            sb.append(" • options.txt optimized (RD:8, VSync OFF)");
+        }
+        return sb.toString();
     }
 
     /**
      * Installs a single verified Modrinth mod by project slug (e.g. {@code fabric-api},
-     * {@code cloth-config}, {@code indium}) matched to the instance's Minecraft version &amp; loader.
-     * Powers Crash Doctor's 1-Tap Missing Dependency Fix.
+     * {@code cloth-config}, {@code indium}) matched to the instance's clean Minecraft version and
+     * loader, including any required dependencies. Powers Crash Doctor's 1-Tap Dependency Fix.
      */
     @NonNull
     public static InstallSummary installModBySlug(@NonNull Instance instance,
@@ -196,36 +682,67 @@ public final class ModrinthContentInstaller {
         if (cleanSlug.isEmpty()) {
             throw new IOException("Invalid Modrinth project slug.");
         }
-        String mcVer = extractMinecraftVersion(instance.versionId);
-        String loader = extractModLoader(instance.versionId);
+        String mcVer = resolveCleanMinecraftVersionOnline(instance);
         if (mcVer == null) {
-            throw new IOException("Could not detect Minecraft version from instance '" + instance.versionId + "'.");
+            throw new IOException("Could not detect clean Minecraft version from '" + instance.versionId + "'.");
         }
-        if (loader == null) {
-            loader = "fabric";
+        String loader = instance.getDetectedModLoader();
+        if (Instance.LOADER_VANILLA.equals(loader)) {
+            if (Instance.supportsFabricLoader(mcVer)) {
+                if (cb != null) {
+                    cb.onProgress("Installing Fabric Loader for Minecraft " + mcVer + "…");
+                }
+                instance.versionId = FabriclikeUtils.FABRIC_UTILS.installLatestForGameVersion(mcVer);
+                instance.write();
+                notifyVersionChanged();
+                loader = Instance.LOADER_FABRIC;
+            } else {
+                loader = Instance.LOADER_FABRIC;
+            }
         }
         File modsDir = new File(instance.getGameDirectory(), "mods");
         if (!modsDir.exists() && !modsDir.mkdirs()) {
             throw new IOException("Could not create mods directory.");
         }
-        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
-                instance, "install-" + cleanSlug);
+        InstanceBackupService.createPreModSnapshotQuietly(instance, "install-" + cleanSlug);
+        String loaderDisplay = Instance.formatLoaderDisplayName(loader);
         if (cb != null) {
-            cb.onProgress("Resolving " + cleanSlug + " for " + loader + " " + mcVer + "…");
+            cb.onProgress("Resolving " + cleanSlug + " for " + loaderDisplay + " " + mcVer + "…");
         }
-        File downloaded = downloadBestProjectVersion(cleanSlug, mcVer, loader, modsDir, cb);
-        if (downloaded == null) {
-            throw new IOException("No compatible release of '" + cleanSlug + "' found for " + loader + " " + mcVer + ".");
+
+        String[] queryLoaders = getQueryLoadersForLoader(loader);
+        ResolvedDownload res = downloadBestProjectVersion(
+                cleanSlug, mcVer, loader, queryLoaders, modsDir, cb);
+        if (res.status == DownloadStatus.FAILED || res.file == null) {
+            throw new IOException("No compatible release of '" + cleanSlug + "' found for "
+                    + loaderDisplay + " " + mcVer
+                    + (res.failureReason != null ? " (" + res.failureReason + ")." : "."));
         }
+
         List<String> files = new ArrayList<>();
-        files.add(downloaded.getName());
-        return new InstallSummary(1, 0, 0, files,
-                "Installed " + downloaded.getName() + " for " + loader + " " + mcVer + ".");
+        files.add(res.file.getName());
+        List<String> depLabels = new ArrayList<>();
+        if (res.versionObject != null) {
+            Set<String> existing = listExistingJarNamesLower(modsDir);
+            Set<String> visited = new HashSet<>();
+            visited.add(cleanSlug);
+            if (res.projectId != null) visited.add(res.projectId.toLowerCase(Locale.ROOT));
+            resolveDependenciesFromVersionObject(
+                    res.versionObject, mcVer, loader, queryLoaders, modsDir,
+                    existing, visited, files, depLabels, 0, cb);
+        }
+
+        String msg = (res.status == DownloadStatus.ALREADY_UP_TO_DATE
+                ? ("Verified existing " + res.file.getName())
+                : ("Installed " + res.file.getName()))
+                + (!depLabels.isEmpty() ? (" + " + joinComma(depLabels)) : "")
+                + " for " + loaderDisplay + " " + mcVer + ".";
+        return new InstallSummary(1, depLabels.size(), 0, files, msg);
     }
 
     /**
      * Installs a single Mod, Shader Pack, or Resource Pack directly into {@code instance}, and for
-     * Modrinth mods automatically resolves and downloads required dependencies (e.g. Fabric API).
+     * mods automatically resolves and downloads {@code required} Modrinth dependencies.
      */
     @NonNull
     public static InstallSummary installDirectArtifact(@NonNull Instance instance,
@@ -235,11 +752,42 @@ public final class ModrinthContentInstaller {
                                                        @NonNull String downloadUrl,
                                                        @Nullable String expectedSha1,
                                                        @Nullable ProgressCallback cb) throws IOException {
+        return installDirectArtifact(instance, projectType, projectId, null,
+                displayTitle, downloadUrl, expectedSha1, cb);
+    }
+
+    /**
+     * Installs a specific version artifact into {@code instance}, resolving {@code required}
+     * dependencies via {@code versionId} (preferred) or {@code expectedSha1} hash lookup.
+     */
+    @NonNull
+    public static InstallSummary installDirectArtifact(@NonNull Instance instance,
+                                                       @NonNull String projectType,
+                                                       @Nullable String projectId,
+                                                       @Nullable String versionId,
+                                                       @NonNull String displayTitle,
+                                                       @NonNull String downloadUrl,
+                                                       @Nullable String expectedSha1,
+                                                       @Nullable ProgressCallback cb) throws IOException {
+        String autoInstalledLoaderId = null;
         if (TYPE_MOD.equalsIgnoreCase(projectType)) {
-            git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
-                    instance, "mod-install");
+            String cleanMc = resolveCleanMinecraftVersionOnline(instance);
+            String detectedLoader = instance.getDetectedModLoader();
+            if (Instance.LOADER_VANILLA.equals(detectedLoader)
+                    && cleanMc != null
+                    && Instance.supportsFabricLoader(cleanMc)) {
+                if (cb != null) {
+                    cb.onProgress("Installing Fabric Loader for Minecraft " + cleanMc + "…");
+                }
+                autoInstalledLoaderId = FabriclikeUtils.FABRIC_UTILS.installLatestForGameVersion(cleanMc);
+                instance.versionId = autoInstalledLoaderId;
+                instance.write();
+                notifyVersionChanged();
+            }
+            InstanceBackupService.createPreModSnapshotQuietly(instance, "mod-install");
         }
-        requireHttps(downloadUrl);
+
+        validateTrustedHttpsUrl(downloadUrl);
         File gameDir = instance.getGameDirectory();
         File targetDir;
         String fallbackExt;
@@ -263,162 +811,100 @@ public final class ModrinthContentInstaller {
         }
 
         String fileName = sanitizeFileName(extractFileNameFromUrl(downloadUrl), displayTitle + fallbackExt);
-        if (cb != null) cb.onProgress("Downloading " + displayTitle + "…");
-        File outFile = new File(targetDir, fileName);
-        downloadVerified(downloadUrl, expectedSha1, outFile);
+        File outFile = FileUtils.resolveInsideDirectory(targetDir, fileName);
+        if (!isExistingFileVerified(outFile, expectedSha1)) {
+            if (cb != null) cb.onProgress("Downloading " + displayTitle + "…");
+            downloadVerified(downloadUrl, expectedSha1, outFile);
+        }
 
-        List<String> installed = new ArrayList<>();
-        installed.add(outFile.getName());
-        int depsInstalled = 0;
+        List<String> installedFiles = new ArrayList<>();
+        installedFiles.add(outFile.getName());
+        List<String> depLabels = new ArrayList<>();
 
-        // Auto-resolve required Modrinth dependencies for individual mods
-        if (TYPE_MOD.equals(projectType) && expectedSha1 != null && !expectedSha1.isEmpty()) {
-            String mcVer = extractMinecraftVersion(instance.versionId);
-            String loader = extractModLoader(instance.versionId);
-            Set<String> visitedProjects = new HashSet<>();
-            if (projectId != null) visitedProjects.add(projectId);
-            try {
-                depsInstalled = resolveRequiredDependencies(
-                        expectedSha1, mcVer, loader, targetDir, visitedProjects, installed, 0, cb);
-            } catch (Throwable ignored) {
-                // Primary mod already verified & installed; non-fatal if dep lookup times out
+        // Auto-resolve required Modrinth dependencies (e.g. fabric-api) for installed mods
+        if (TYPE_MOD.equalsIgnoreCase(projectType)) {
+            String mcVer = resolveCleanMinecraftVersionOnline(instance);
+            String loader = instance.getDetectedModLoader();
+            if (mcVer != null && !Instance.LOADER_VANILLA.equals(loader)) {
+                Set<String> existing = listExistingJarNamesLower(targetDir);
+                Set<String> visited = new HashSet<>();
+                if (projectId != null && !projectId.isEmpty()) {
+                    visited.add(projectId.toLowerCase(Locale.ROOT));
+                }
+                String[] queryLoaders = getQueryLoadersForLoader(loader);
+                try {
+                    JsonObject verObj = fetchModrinthVersionMetadata(versionId, expectedSha1);
+                    if (verObj != null) {
+                        String pid = optString(verObj, "project_id");
+                        if (pid != null) visited.add(pid.toLowerCase(Locale.ROOT));
+                        resolveDependenciesFromVersionObject(
+                                verObj, mcVer, loader, queryLoaders, targetDir,
+                                existing, visited, installedFiles, depLabels, 0, cb);
+                    }
+                } catch (Throwable ignored) {
+                    // Primary mod is already verified & installed; non-fatal if dep lookup times out
+                }
             }
         }
 
-        String msg = "Installed " + displayTitle
-                + (depsInstalled > 0 ? (" + " + depsInstalled + " required dep(s)") : "")
+        int depsInstalled = depLabels.size();
+        String msg = (autoInstalledLoaderId != null ? "Auto-installed Fabric • " : "")
+                + "Installed " + displayTitle
+                + (depsInstalled > 0 ? (" + " + joinComma(depLabels)) : "")
                 + " into " + targetDir.getName() + "/";
-        return new InstallSummary(1 + depsInstalled, depsInstalled, 0, installed, msg);
-    }
-
-    /**
-     * 1-Click FPS Boost Pack: installs verified official Modrinth optimization mods matched strictly
-     * to the instance's Minecraft version and mod loader (Fabric / Quilt / NeoForge / Forge).
-     */
-    @NonNull
-    public static InstallSummary installFpsBoostPack(@NonNull Instance instance,
-                                                     boolean includeIrisShaders,
-                                                     @Nullable ProgressCallback cb) throws IOException {
-        String mcVer = extractMinecraftVersion(instance.versionId);
-        String loader = extractModLoader(instance.versionId);
-        if (mcVer == null || loader == null) {
-            throw new IOException("Select a Fabric, Quilt, NeoForge, or Forge instance first (e.g. Fabric 1.21.4) to install FPS Boost mods.");
-        }
-
-        File modsDir = new File(instance.getGameDirectory(), "mods");
-        if (!modsDir.exists() && !modsDir.mkdirs()) {
-            throw new IOException("Could not create mods directory");
-        }
-
-        List<String> slugs = new ArrayList<>();
-        if ("fabric".equals(loader)) {
-            slugs.add("fabric-api");
-            slugs.add("sodium");
-            slugs.add("lithium");
-            slugs.add("ferrite-core");
-            slugs.add("entityculling");
-            slugs.add("immediatelyfast");
-            if (includeIrisShaders) slugs.add("iris");
-        } else if ("quilt".equals(loader)) {
-            slugs.add("sodium");
-            slugs.add("lithium");
-            slugs.add("ferrite-core");
-            slugs.add("entityculling");
-            slugs.add("immediatelyfast");
-            if (includeIrisShaders) slugs.add("iris");
-        } else {
-            // NeoForge / Forge
-            slugs.add("sodium");
-            slugs.add("embeddium");
-            slugs.add("ferrite-core");
-            slugs.add("entityculling");
-            slugs.add("immediatelyfast");
-            if (includeIrisShaders) {
-                slugs.add("iris");
-                slugs.add("oculus");
-            }
-        }
-
-        Set<String> existingLower = listExistingJarNamesLower(modsDir);
-        List<String> installed = new ArrayList<>();
-        int skipped = 0;
-        boolean rendererInstalled = containsAny(existingLower, "sodium", "embeddium", "rubidium");
-        boolean shaderInstalled = containsAny(existingLower, "iris", "oculus");
-
-        for (int i = 0; i < slugs.size(); i++) {
-            String slug = slugs.get(i);
-            if (("sodium".equals(slug) || "embeddium".equals(slug)) && rendererInstalled) {
-                skipped++;
-                continue;
-            }
-            if (("iris".equals(slug) || "oculus".equals(slug)) && shaderInstalled) {
-                skipped++;
-                continue;
-            }
-            if (containsAny(existingLower, slug.replace("-", ""), slug)) {
-                skipped++;
-                continue;
-            }
-            if (cb != null) {
-                cb.onProgress("FPS Boost (" + (i + 1) + "/" + slugs.size() + "): checking " + slug + "…");
-            }
-            File downloaded = downloadBestProjectVersion(slug, mcVer, loader, modsDir, cb);
-            if (downloaded != null) {
-                installed.add(downloaded.getName());
-                existingLower.add(downloaded.getName().toLowerCase(Locale.ROOT));
-                if ("sodium".equals(slug) || "embeddium".equals(slug)) rendererInstalled = true;
-                if ("iris".equals(slug) || "oculus".equals(slug)) shaderInstalled = true;
-            }
-        }
-
-        if (installed.isEmpty() && skipped == 0) {
-            throw new IOException("No compatible FPS Boost mods found on Modrinth for " + loader + " " + mcVer + ".");
-        }
-        String msg = installed.isEmpty()
-                ? ("FPS Boost Pack is already installed (" + skipped + " optimization mods active)!")
-                : ("Installed " + installed.size() + " FPS optimization mod(s) for " + loader + " " + mcVer
-                + (skipped > 0 ? (" (" + skipped + " already present)") : ""));
-        return new InstallSummary(installed.size(), 0, skipped, installed, msg);
+        return new InstallSummary(
+                1 + depsInstalled,
+                depsInstalled,
+                0,
+                installedFiles,
+                Collections.singletonList(displayTitle),
+                Collections.emptyList(),
+                depLabels,
+                Collections.emptyList(),
+                instance.getCleanMinecraftVersion(),
+                instance.getDetectedModLoader(),
+                autoInstalledLoaderId,
+                false,
+                msg);
     }
 
     /**
      * 1-Tap Batch Mod Updater: upgrades all outdated Modrinth-hosted {@code .jar} mods in
-     * {@code <instance>/mods/} while preserving previous jars in {@code .zyrox_mod_backup/}
-     * for instant 1-tap rollback.
+     * {@code <instance>/mods/} using the instance's clean Minecraft version &amp; loader while
+     * preserving previous jars in {@code .zyrox_mod_backup/} for instant 1-tap rollback.
      */
     @NonNull
     public static InstallSummary batchUpdateAllMods(@NonNull Instance instance,
                                                     @Nullable ProgressCallback cb) throws IOException {
-        String mcVer = extractMinecraftVersion(instance.versionId);
+        String mcVer = resolveCleanMinecraftVersionOnline(instance);
         String loader = extractModLoader(instance.versionId);
         if (mcVer == null || loader == null) {
-            throw new IOException("Could not determine Minecraft version/loader for this instance.");
+            throw new IOException("Select a Fabric, Quilt, Forge, or NeoForge instance to check mod updates.");
         }
 
         File modsDir = new File(instance.getGameDirectory(), "mods");
         File[] jars = modsDir.listFiles(f -> f.isFile()
                 && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar"));
         if (jars == null || jars.length == 0) {
-            return new InstallSummary(0, 0, 0, new ArrayList<>(), "No enabled .jar mods to update.");
+            return new InstallSummary(0, 0, 0, Collections.emptyList(), "No enabled .jar mods to update.");
         }
 
         if (cb != null) cb.onProgress("Saving safety snapshot & hashing " + jars.length + " installed mod(s)…");
-        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshotQuietly(
-                instance, "batch-mod-update");
+        InstanceBackupService.createPreModSnapshotQuietly(instance, "batch-mod-update");
         Map<String, File> sha1ToFile = new LinkedHashMap<>();
         for (File jar : jars) {
-            String sha1 = computeSha1Hex(jar);
-            sha1ToFile.put(sha1, jar);
+            sha1ToFile.put(computeSha1Hex(jar), jar);
         }
 
-        // Official Modrinth bulk update check endpoint: POST /v2/version_files/update
         JsonObject req = new JsonObject();
         JsonArray hashesArr = new JsonArray();
         for (String h : sha1ToFile.keySet()) hashesArr.add(h);
         req.add("hashes", hashesArr);
         req.addProperty("algorithm", "sha1");
         JsonArray loadersArr = new JsonArray();
-        loadersArr.add(loader);
+        for (String qLoader : getQueryLoadersForLoader(loader)) {
+            loadersArr.add(qLoader);
+        }
         req.add("loaders", loadersArr);
         JsonArray gameVersArr = new JsonArray();
         gameVersArr.add(mcVer);
@@ -451,12 +937,11 @@ public final class ModrinthContentInstaller {
             }
 
             String safeName = sanitizeFileName(rawName, oldJar.getName());
-            if (cb != null) cb.onProgress("Updating " + oldJar.getName() + " -> " + safeName + "…");
+            if (cb != null) cb.onProgress("Updating " + oldJar.getName() + " → " + safeName + "…");
 
             File newJar = new File(modsDir, safeName + ".updating");
             downloadVerified(url, newSha, newJar);
 
-            // Prepare clean rollback folder once the first update succeeds
             if (!backupCleared) {
                 clearDirectoryFiles(backupDir);
                 if (!backupDir.exists()) {
@@ -487,9 +972,12 @@ public final class ModrinthContentInstaller {
             }
         }
 
+        String loaderDisplay = Instance.formatLoaderDisplayName(loader);
         String msg = updated.isEmpty()
-                ? ("All " + upToDate + " Modrinth mod(s) are already up to date for " + loader + " " + mcVer + "!")
-                : ("Updated " + updated.size() + " mod(s) with SHA-1 verification (previous jars backed up for rollback).");
+                ? ("All " + upToDate + " Modrinth mod(s) are already up to date for "
+                + loaderDisplay + " " + mcVer + "!")
+                : ("Updated " + updated.size()
+                + " mod(s) with SHA-1 verification (previous jars backed up for rollback).");
         return new InstallSummary(updated.size(), 0, upToDate, updated, msg);
     }
 
@@ -520,81 +1008,294 @@ public final class ModrinthContentInstaller {
         return restored;
     }
 
-    private static int resolveRequiredDependencies(@NonNull String versionSha1,
-                                                   @Nullable String mcVer,
-                                                   @Nullable String loader,
-                                                   @NonNull File modsDir,
-                                                   @NonNull Set<String> visitedProjects,
-                                                   @NonNull List<String> installed,
-                                                   int depth,
-                                                   @Nullable ProgressCallback cb) throws IOException {
-        if (depth >= 2 || visitedProjects.size() > MAX_AUTO_DEPS || mcVer == null || loader == null) {
-            return 0;
+    @Nullable
+    private static JsonObject fetchModrinthVersionMetadata(@Nullable String versionId,
+                                                           @Nullable String sha1) {
+        if (versionId != null && !versionId.trim().isEmpty()) {
+            String trimmed = versionId.trim();
+            // CurseForge numeric fileIds consist exclusively of digits; Modrinth IDs are base62
+            if (!trimmed.matches("^[0-9]+$")) {
+                try {
+                    String json = httpGet(MODRINTH_API + "/version/"
+                            + ZyroxHttpClient.encodeQueryComponent(trimmed));
+                    JsonElement el = JsonParser.parseString(json);
+                    if (el.isJsonObject()) return el.getAsJsonObject();
+                } catch (Throwable ignored) {
+                }
+            }
         }
-        String verJson = httpGet(MODRINTH_API + "/version_file/"
-                + URLEncoder.encode(versionSha1, "UTF-8") + "?algorithm=sha1");
-        JsonObject verObj = JsonParser.parseString(verJson).getAsJsonObject();
-        if (!verObj.has("dependencies") || !verObj.get("dependencies").isJsonArray()) {
-            return 0;
+        if (sha1 != null && !sha1.trim().isEmpty()) {
+            try {
+                String json = httpGet(MODRINTH_API + "/version_file/"
+                        + ZyroxHttpClient.encodeQueryComponent(sha1.trim()) + "?algorithm=sha1");
+                JsonElement el = JsonParser.parseString(json);
+                if (el.isJsonObject()) return el.getAsJsonObject();
+            } catch (Throwable ignored) {
+            }
         }
-        JsonArray deps = verObj.getAsJsonArray("dependencies");
-        Set<String> existing = listExistingJarNamesLower(modsDir);
-        int count = 0;
+        return null;
+    }
+
+    private static void resolveDependenciesFromVersionObject(@NonNull JsonObject versionObj,
+                                                             @NonNull String cleanMc,
+                                                             @NonNull String primaryLoader,
+                                                             @NonNull String[] queryLoaders,
+                                                             @NonNull File modsDir,
+                                                             @NonNull Set<String> existingLower,
+                                                             @NonNull Set<String> visitedProjects,
+                                                             @NonNull List<String> installedFiles,
+                                                             @NonNull List<String> depLabels,
+                                                             int depth,
+                                                             @Nullable ProgressCallback cb) {
+        if (depth >= MAX_DEPENDENCY_DEPTH
+                || depLabels.size() >= MAX_AUTO_DEPS
+                || !versionObj.has("dependencies")
+                || !versionObj.get("dependencies").isJsonArray()) {
+            return;
+        }
+
+        JsonArray deps = versionObj.getAsJsonArray("dependencies");
         for (JsonElement el : deps) {
-            if (!el.isJsonObject() || visitedProjects.size() > MAX_AUTO_DEPS) continue;
+            if (depLabels.size() >= MAX_AUTO_DEPS || !el.isJsonObject()) continue;
             JsonObject dep = el.getAsJsonObject();
-            if (!"required".equalsIgnoreCase(optString(dep, "dependency_type"))) continue;
-            String projId = optString(dep, "project_id");
-            if (projId == null || projId.isEmpty() || !visitedProjects.add(projId)) continue;
-            if ("P7dR8mSH".equals(projId) && containsAny(existing, "fabric-api", "fabric_api")) {
+            if (!"required".equalsIgnoreCase(optString(dep, "dependency_type"))) {
                 continue;
             }
-            if (cb != null) cb.onProgress("Resolving required dependency…");
-            File depJar = downloadBestProjectVersion(projId, mcVer, loader, modsDir, cb);
-            if (depJar != null) {
-                installed.add(depJar.getName());
-                existing.add(depJar.getName().toLowerCase(Locale.ROOT));
-                count++;
-                String depSha = computeSha1Hex(depJar);
-                count += resolveRequiredDependencies(
-                        depSha, mcVer, loader, modsDir, visitedProjects, installed, depth + 1, cb);
+
+            String depProjId = optString(dep, "project_id");
+            String depVerId = optString(dep, "version_id");
+
+            if (depProjId != null) {
+                String key = depProjId.toLowerCase(Locale.ROOT);
+                if (!visitedProjects.add(key)) continue;
+                if ("p7dr8msh".equals(key) && containsAny(existingLower, "fabric-api", "fabric_api")) {
+                    continue;
+                }
+                if ("qvifycyj".equals(key) && containsAny(existingLower, "qfapi", "quilted_fabric_api")) {
+                    continue;
+                }
+            } else if (depVerId != null) {
+                if (!visitedProjects.add("ver:" + depVerId)) continue;
+            } else {
+                continue;
+            }
+
+            try {
+                ResolvedDownload depDl = null;
+                if (depVerId != null && !depVerId.isEmpty()) {
+                    depDl = tryDownloadSpecificVersion(depVerId, cleanMc, queryLoaders, modsDir, cb);
+                }
+                if ((depDl == null || depDl.status == DownloadStatus.FAILED)
+                        && depProjId != null && !depProjId.isEmpty()) {
+                    if (cb != null) {
+                        cb.onProgress("Resolving required dependency for MC " + cleanMc + "…");
+                    }
+                    depDl = downloadBestProjectVersion(
+                            depProjId, cleanMc, primaryLoader, queryLoaders, modsDir, cb);
+                }
+                if (depDl == null || depDl.file == null) continue;
+
+                if (depDl.projectId != null) {
+                    visitedProjects.add(depDl.projectId.toLowerCase(Locale.ROOT));
+                }
+                existingLower.add(depDl.file.getName().toLowerCase(Locale.ROOT));
+                if (depDl.status == DownloadStatus.DOWNLOADED) {
+                    installedFiles.add(depDl.file.getName());
+                    String friendly = friendlyDependencyLabel(depDl.projectId, depDl.file.getName());
+                    if (!depLabels.contains(friendly)) {
+                        depLabels.add(friendly);
+                    }
+                }
+                if (depDl.versionObject != null) {
+                    resolveDependenciesFromVersionObject(
+                            depDl.versionObject, cleanMc, primaryLoader, queryLoaders, modsDir,
+                            existingLower, visitedProjects, installedFiles, depLabels,
+                            depth + 1, cb);
+                }
+            } catch (Throwable ignored) {
+                // Continue installing remaining required dependencies independently
             }
         }
-        return count;
     }
 
     @Nullable
-    private static File downloadBestProjectVersion(@NonNull String slugOrId,
-                                                   @NonNull String mcVer,
-                                                   @NonNull String loader,
-                                                   @NonNull File modsDir,
-                                                   @Nullable ProgressCallback cb) {
+    private static ResolvedDownload tryDownloadSpecificVersion(@NonNull String versionId,
+                                                               @NonNull String cleanMc,
+                                                               @NonNull String[] queryLoaders,
+                                                               @NonNull File modsDir,
+                                                               @Nullable ProgressCallback cb) {
         try {
-            String qLoaders = URLEncoder.encode("[\"" + loader + "\"]", "UTF-8");
-            String qVers = URLEncoder.encode("[\"" + mcVer + "\"]", "UTF-8");
-            String url = MODRINTH_API + "/project/" + URLEncoder.encode(slugOrId, "UTF-8")
-                    + "/version?loaders=" + qLoaders + "&game_versions=" + qVers;
-            String body = httpGet(url);
-            JsonArray arr = JsonParser.parseString(body).getAsJsonArray();
-            if (arr.size() == 0) return null;
-            JsonObject best = arr.get(0).getAsJsonObject();
-            JsonObject fileObj = pickPrimaryFile(best);
-            if (fileObj == null) return null;
-            String dlUrl = optString(fileObj, "url");
-            String rawName = optString(fileObj, "filename");
-            String sha1 = getFileSha1(fileObj);
-            if (dlUrl == null) return null;
-            String safeName = sanitizeFileName(rawName, slugOrId + ".jar");
-            File dest = new File(modsDir, safeName);
-            if (dest.isFile() && sha1 != null && sha1.equalsIgnoreCase(computeSha1Hex(dest))) {
+            String json = httpGet(MODRINTH_API + "/version/"
+                    + ZyroxHttpClient.encodeQueryComponent(versionId));
+            JsonObject verObj = JsonParser.parseString(json).getAsJsonObject();
+            if (!isVersionCompatible(verObj, cleanMc, queryLoaders)) {
                 return null;
             }
-            if (cb != null) cb.onProgress("Downloading " + safeName + "…");
-            downloadVerified(dlUrl, sha1, dest);
-            return dest;
+            return downloadFromVersionObject(verObj, versionId, modsDir, cb);
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    @NonNull
+    private static ResolvedDownload downloadBestProjectVersion(@NonNull String slugOrId,
+                                                               @NonNull String cleanMc,
+                                                               @NonNull String primaryLoader,
+                                                               @NonNull String[] queryLoaders,
+                                                               @NonNull File modsDir,
+                                                               @Nullable ProgressCallback cb) {
+        try {
+            String url = ZyroxHttpClient.buildModrinthProjectVersionsUrl(
+                    MODRINTH_API, slugOrId, cleanMc, queryLoaders);
+            String body = httpGet(url);
+            JsonElement parsed = JsonParser.parseString(body);
+            if (!parsed.isJsonArray()) {
+                return ResolvedDownload.failed("invalid response");
+            }
+            JsonArray arr = parsed.getAsJsonArray();
+            JsonObject best = selectBestVersion(arr, primaryLoader);
+            if (best == null) {
+                return ResolvedDownload.failed("no " + Instance.formatLoaderDisplayName(primaryLoader)
+                        + " release for MC " + cleanMc);
+            }
+            return downloadFromVersionObject(best, slugOrId, modsDir, cb);
+        } catch (ZyroxHttpClient.HttpStatusException httpEx) {
+            if (httpEx.statusCode == 404) {
+                return ResolvedDownload.failed("unavailable on Modrinth");
+            } else if (httpEx.statusCode == 429 || httpEx.statusCode == 403) {
+                return ResolvedDownload.failed("rate-limited");
+            }
+            return ResolvedDownload.failed("HTTP " + httpEx.statusCode);
+        } catch (IOException ioEx) {
+            String msg = ioEx.getMessage();
+            if (msg != null && msg.length() > 42) {
+                msg = msg.substring(0, 39) + "…";
+            }
+            return ResolvedDownload.failed(msg != null ? msg : "network error");
+        } catch (Throwable t) {
+            return ResolvedDownload.failed("lookup failed");
+        }
+    }
+
+    @NonNull
+    private static ResolvedDownload downloadFromVersionObject(@NonNull JsonObject verObj,
+                                                              @NonNull String fallbackSlug,
+                                                              @NonNull File modsDir,
+                                                              @Nullable ProgressCallback cb) throws IOException {
+        JsonObject fileObj = pickPrimaryFile(verObj);
+        if (fileObj == null) {
+            return ResolvedDownload.failed("no artifact attached");
+        }
+        String dlUrl = optString(fileObj, "url");
+        String rawName = optString(fileObj, "filename");
+        String sha1 = getFileSha1(fileObj);
+        String projectId = optString(verObj, "project_id");
+        if (dlUrl == null) {
+            return ResolvedDownload.failed("missing file URL");
+        }
+        String safeName = sanitizeFileName(rawName, fallbackSlug + ".jar");
+        if (!safeName.toLowerCase(Locale.ROOT).endsWith(".jar")) {
+            safeName = safeName + ".jar";
+        }
+        File dest = FileUtils.resolveInsideDirectory(modsDir, safeName);
+        if (isExistingFileVerified(dest, sha1)) {
+            return new ResolvedDownload(DownloadStatus.ALREADY_UP_TO_DATE, dest, verObj, projectId, null);
+        }
+        if (cb != null) {
+            cb.onProgress("Downloading " + safeName + "…");
+        }
+        downloadVerified(dlUrl, sha1, dest);
+        return new ResolvedDownload(DownloadStatus.DOWNLOADED, dest, verObj, projectId, null);
+    }
+
+    /**
+     * Selects the top recommended Modrinth build from a newest-first array, strongly preferring
+     * stable {@code release} builds matching {@code preferredLoader} over {@code beta}/{@code alpha}.
+     */
+    @Nullable
+    public static JsonObject selectBestVersion(@Nullable JsonArray versions,
+                                               @Nullable String preferredLoader) {
+        if (versions == null || versions.size() == 0) return null;
+        String pref = preferredLoader != null ? preferredLoader.trim().toLowerCase(Locale.ROOT) : null;
+
+        JsonObject anyRelease = null;
+        JsonObject prefBeta = null;
+        JsonObject anyBeta = null;
+        JsonObject firstValid = null;
+
+        for (JsonElement el : versions) {
+            if (!el.isJsonObject()) continue;
+            JsonObject obj = el.getAsJsonObject();
+            if (pickPrimaryFile(obj) == null) continue;
+            if (firstValid == null) firstValid = obj;
+
+            String type = optString(obj, "version_type");
+            String normType = type != null ? type.toLowerCase(Locale.ROOT) : "release";
+            boolean loaderMatches = pref == null || versionSupportsLoader(obj, pref);
+
+            if ("release".equals(normType)) {
+                if (loaderMatches) return obj;
+                if (anyRelease == null) anyRelease = obj;
+            } else if ("beta".equals(normType)) {
+                if (loaderMatches && prefBeta == null) prefBeta = obj;
+                if (anyBeta == null) anyBeta = obj;
+            }
+        }
+        if (anyRelease != null) return anyRelease;
+        if (prefBeta != null) return prefBeta;
+        if (anyBeta != null) return anyBeta;
+        return firstValid;
+    }
+
+    /** Verifies a Modrinth version JSON object declares {@code cleanMc} and an allowed loader. */
+    public static boolean isVersionCompatible(@Nullable JsonObject verObj,
+                                              @Nullable String cleanMc,
+                                              @Nullable String... allowedLoaders) {
+        if (verObj == null) return false;
+        if (cleanMc != null && !cleanMc.trim().isEmpty()) {
+            if (!verObj.has("game_versions") || !verObj.get("game_versions").isJsonArray()) {
+                return false;
+            }
+            boolean foundMc = false;
+            String target = cleanMc.trim();
+            for (JsonElement gv : verObj.getAsJsonArray("game_versions")) {
+                if (!gv.isJsonNull() && target.equalsIgnoreCase(gv.getAsString().trim())) {
+                    foundMc = true;
+                    break;
+                }
+            }
+            if (!foundMc) return false;
+        }
+        if (allowedLoaders != null && allowedLoaders.length > 0) {
+            if (!verObj.has("loaders") || !verObj.get("loaders").isJsonArray()) {
+                return false;
+            }
+            Set<String> present = new LinkedHashSet<>();
+            for (JsonElement ld : verObj.getAsJsonArray("loaders")) {
+                if (!ld.isJsonNull()) {
+                    present.add(ld.getAsString().trim().toLowerCase(Locale.ROOT));
+                }
+            }
+            boolean foundLoader = false;
+            for (String allowed : allowedLoaders) {
+                if (allowed != null && present.contains(allowed.trim().toLowerCase(Locale.ROOT))) {
+                    foundLoader = true;
+                    break;
+                }
+            }
+            if (!foundLoader) return false;
+        }
+        return true;
+    }
+
+    private static boolean versionSupportsLoader(@NonNull JsonObject verObj, @NonNull String loader) {
+        if (!verObj.has("loaders") || !verObj.get("loaders").isJsonArray()) return false;
+        for (JsonElement el : verObj.getAsJsonArray("loaders")) {
+            if (!el.isJsonNull() && loader.equalsIgnoreCase(el.getAsString().trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Nullable
@@ -602,15 +1303,17 @@ public final class ModrinthContentInstaller {
         if (!versionObj.has("files") || !versionObj.get("files").isJsonArray()) return null;
         JsonArray files = versionObj.getAsJsonArray("files");
         if (files.size() == 0) return null;
+        JsonObject fallback = null;
         for (JsonElement el : files) {
-            if (el.isJsonObject()) {
-                JsonObject fo = el.getAsJsonObject();
-                if (fo.has("primary") && fo.get("primary").getAsBoolean()) {
-                    return fo;
-                }
+            if (!el.isJsonObject()) continue;
+            JsonObject fo = el.getAsJsonObject();
+            if (optString(fo, "url") == null) continue;
+            if (fallback == null) fallback = fo;
+            if (fo.has("primary") && !fo.get("primary").isJsonNull() && fo.get("primary").getAsBoolean()) {
+                return fo;
             }
         }
-        return files.get(0).isJsonObject() ? files.get(0).getAsJsonObject() : null;
+        return fallback;
     }
 
     @Nullable
@@ -619,42 +1322,72 @@ public final class ModrinthContentInstaller {
         return optString(fileObj.getAsJsonObject("hashes"), "sha1");
     }
 
+    private static boolean isExistingFileVerified(@NonNull File file, @Nullable String expectedSha1) {
+        if (!file.isFile() || file.length() <= 0L) return false;
+        if (expectedSha1 == null || expectedSha1.trim().isEmpty()) return false;
+        try {
+            return expectedSha1.trim().equalsIgnoreCase(computeSha1Hex(file));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     private static void downloadVerified(@NonNull String httpsUrl,
                                          @Nullable String expectedSha1,
                                          @NonNull File targetFile) throws IOException {
-        requireHttps(httpsUrl);
-        // Fast path: link directly from the Global SHA-1 Shared Mod Pool (.zyrox_pool/<sha1>/)
-        if (expectedSha1 != null && !expectedSha1.trim().isEmpty()
+        validateTrustedHttpsUrl(httpsUrl);
+
+        // Instant zero-network link if SHA-1 is already verified inside .zyrox_pool/
+        if (expectedSha1 != null && !expectedSha1.isEmpty()
                 && InstanceContentManager.materializeFromSharedPool(expectedSha1, targetFile)) {
             return;
         }
-        File tmp = new File(targetFile.getParentFile(), targetFile.getName() + ".part");
-        HttpURLConnection conn = (HttpURLConnection) new URL(httpsUrl).openConnection();
-        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setInstanceFollowRedirects(true);
-        conn.setRequestProperty("User-Agent", USER_AGENT);
-        try {
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("HTTP " + code + " downloading " + targetFile.getName());
+
+        File parent = targetFile.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+            throw new IOException("Cannot create directory " + parent.getAbsolutePath());
+        }
+        File tmp = new File(parent, targetFile.getName() + ".part");
+
+        Request request = new Request.Builder()
+                .url(httpsUrl)
+                .header("User-Agent", USER_AGENT)
+                .get()
+                .build();
+
+        try (Response response = ZyroxHttpClient.downloadClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new ZyroxHttpClient.HttpStatusException(
+                        response.code(), "Download failed (HTTP " + response.code() + ")");
             }
+            if (!"https".equalsIgnoreCase(response.request().url().scheme())) {
+                throw new IOException("Blocked insecure HTTPS-to-HTTP redirect");
+            }
+            ResponseBody body = response.body();
+            if (body == null) {
+                throw new IOException("Empty artifact response body");
+            }
+
             MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
             long total = 0L;
-            try (InputStream in = new BufferedInputStream(conn.getInputStream());
-                 FileOutputStream out = new FileOutputStream(tmp)) {
+            try (InputStream in = body.byteStream();
+                 FileOutputStream out = new FileOutputStream(tmp, false)) {
                 byte[] buf = new byte[32768];
                 int n;
                 while ((n = in.read(buf)) != -1) {
                     total += n;
                     if (total > MAX_ARTIFACT_BYTES) {
-                        throw new IOException("Artifact exceeds safe size limit");
+                        throw new IOException("Artifact exceeds safe 256 MB size limit");
                     }
                     sha1.update(buf, 0, n);
                     out.write(buf, 0, n);
                 }
                 out.getFD().sync();
             }
+            if (total <= 0L) {
+                throw new IOException("Downloaded artifact was empty");
+            }
+
             String actual = toHex(sha1.digest());
             if (expectedSha1 != null && !expectedSha1.trim().isEmpty()
                     && !expectedSha1.trim().equalsIgnoreCase(actual)) {
@@ -662,7 +1395,7 @@ public final class ModrinthContentInstaller {
                 tmp.delete();
                 throw new IOException("SHA-1 verification failed for " + targetFile.getName());
             }
-            // Store verified artifact once in .zyrox_pool/<sha1>/ and hard-link across instances
+            // Store verified artifact once in .zyrox_pool/<sha1>/ and link into instance
             InstanceContentManager.ingestIntoSharedPoolAndLink(tmp, targetFile, actual);
         } catch (IOException e) {
             //noinspection ResultOfMethodCallIgnored
@@ -672,41 +1405,46 @@ public final class ModrinthContentInstaller {
             //noinspection ResultOfMethodCallIgnored
             tmp.delete();
             throw new IOException("Download failed: " + e.getMessage(), e);
-        } finally {
-            conn.disconnect();
         }
+    }
+
+    private static void validateTrustedHttpsUrl(@NonNull String url) throws IOException {
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Malformed download URL", e);
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new IOException("Blocked non-HTTPS URL");
+        }
+        String host = uri.getHost();
+        if (host == null || host.isEmpty()) {
+            throw new IOException("Missing host in download URL");
+        }
+        String lower = host.toLowerCase(Locale.ROOT);
+        for (String suffix : TRUSTED_CDN_SUFFIXES) {
+            if (lower.equals(suffix) || lower.endsWith("." + suffix)) {
+                return;
+            }
+        }
+        throw new IOException("Blocked untrusted download host: " + lower);
     }
 
     @NonNull
     private static String httpGet(@NonNull String httpsUrl) throws IOException {
-        requireHttps(httpsUrl);
-        return git.artdeell.mojo.utils.ZyroxHttpClient.getStringOrThrow(httpsUrl, null);
+        validateTrustedHttpsUrl(httpsUrl);
+        return ZyroxHttpClient.getStringOrThrow(httpsUrl, API_HEADERS);
     }
 
     @NonNull
     private static String httpPostJson(@NonNull String httpsUrl, @NonNull String json) throws IOException {
-        requireHttps(httpsUrl);
-        String resp = git.artdeell.mojo.utils.ZyroxHttpClient.postJson(httpsUrl, json, null);
+        validateTrustedHttpsUrl(httpsUrl);
+        String resp = ZyroxHttpClient.postJson(httpsUrl, json, API_HEADERS);
         if (resp == null) {
             throw new IOException("Modrinth update API request failed");
         }
         return resp;
-    }
-
-    @NonNull
-    private static String readStreamUtf8(@NonNull InputStream in, int maxBytes) throws IOException {
-        try (InputStream src = new BufferedInputStream(in);
-             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            byte[] buf = new byte[16384];
-            int total = 0;
-            int n;
-            while ((n = src.read(buf)) != -1) {
-                total += n;
-                if (total > maxBytes) throw new IOException("Response too large");
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        }
     }
 
     @NonNull
@@ -744,7 +1482,10 @@ public final class ModrinthContentInstaller {
         int slash = Math.max(raw.lastIndexOf('/'), raw.lastIndexOf('\\'));
         if (slash >= 0) raw = raw.substring(slash + 1);
         raw = raw.replace("..", "_").replaceAll("[^a-zA-Z0-9._+\\-() ]", "_").trim();
-        if (raw.isEmpty() || ".".equals(raw)) {
+        while (raw.startsWith(".")) {
+            raw = raw.substring(1).trim();
+        }
+        if (raw.isEmpty()) {
             raw = fallback.replaceAll("[^a-zA-Z0-9._+\\-]", "_");
         }
         return raw.length() > 120 ? raw.substring(raw.length() - 120) : raw;
@@ -757,15 +1498,9 @@ public final class ModrinthContentInstaller {
             if (path == null || path.isEmpty()) return null;
             int idx = path.lastIndexOf('/');
             String seg = idx >= 0 ? path.substring(idx + 1) : path;
-            return java.net.URLDecoder.decode(seg, "UTF-8");
+            return URLDecoder.decode(seg, "UTF-8");
         } catch (Throwable ignored) {
             return null;
-        }
-    }
-
-    private static void requireHttps(@NonNull String url) throws IOException {
-        if (!url.toLowerCase(Locale.ROOT).startsWith("https://")) {
-            throw new IOException("Blocked non-HTTPS URL");
         }
     }
 
@@ -773,7 +1508,8 @@ public final class ModrinthContentInstaller {
     private static String optString(@NonNull JsonObject obj, @NonNull String key) {
         if (!obj.has(key) || obj.get(key).isJsonNull()) return null;
         try {
-            return obj.get(key).getAsString();
+            String val = obj.get(key).getAsString();
+            return val != null && !val.trim().isEmpty() ? val.trim() : null;
         } catch (Throwable ignored) {
             return null;
         }
@@ -821,6 +1557,81 @@ public final class ModrinthContentInstaller {
                 out.write(buf, 0, n);
             }
             out.getFD().sync();
+        }
+    }
+
+    private static void notifyVersionChanged() {
+        try {
+            ExtraCore.setValue(ExtraConstants.REFRESH_VERSION_SPINNER, null);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @NonNull
+    private static String resolveFriendlySlugLabel(@NonNull String slotName, @NonNull String slug) {
+        if ("sodium".equalsIgnoreCase(slug)) return "Sodium";
+        if ("embeddium".equalsIgnoreCase(slug)) return "Embeddium";
+        if ("rubidium".equalsIgnoreCase(slug)) return "Rubidium";
+        if ("iris".equalsIgnoreCase(slug)) return "Iris Shaders";
+        if ("oculus".equalsIgnoreCase(slug)) return "Oculus";
+        return slotName;
+    }
+
+    @NonNull
+    private static String friendlyDependencyLabel(@Nullable String projectId, @NonNull String fileName) {
+        if ("P7dR8mSH".equalsIgnoreCase(projectId)) return "Fabric API";
+        if ("qvIfYCYJ".equalsIgnoreCase(projectId)) return "Quilted Fabric API";
+        if ("9s6osm5g".equalsIgnoreCase(projectId)) return "Cloth Config";
+        if ("lhGA9TYQ".equalsIgnoreCase(projectId)) return "Architectury API";
+        String lower = fileName.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("fabric-api") || lower.startsWith("fabric_api")) return "Fabric API";
+        if (lower.startsWith("qfapi") || lower.startsWith("quilted_fabric_api")) {
+            return "Quilted Fabric API";
+        }
+        if (lower.startsWith("cloth-config")) return "Cloth Config";
+        if (lower.startsWith("architectury")) return "Architectury API";
+        if (lower.startsWith("yet_another_config_lib") || lower.startsWith("yacl")) return "YACL";
+        return fileName;
+    }
+
+    @NonNull
+    private static String joinComma(@NonNull List<String> items) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(items.get(i));
+        }
+        return sb.toString();
+    }
+
+    private enum DownloadStatus {
+        DOWNLOADED,
+        ALREADY_UP_TO_DATE,
+        FAILED
+    }
+
+    private static final class ResolvedDownload {
+        @NonNull final DownloadStatus status;
+        @Nullable final File file;
+        @Nullable final JsonObject versionObject;
+        @Nullable final String projectId;
+        @Nullable final String failureReason;
+
+        ResolvedDownload(@NonNull DownloadStatus status,
+                         @Nullable File file,
+                         @Nullable JsonObject versionObject,
+                         @Nullable String projectId,
+                         @Nullable String failureReason) {
+            this.status = status;
+            this.file = file;
+            this.versionObject = versionObject;
+            this.projectId = projectId;
+            this.failureReason = failureReason;
+        }
+
+        @NonNull
+        static ResolvedDownload failed(@NonNull String reason) {
+            return new ResolvedDownload(DownloadStatus.FAILED, null, null, null, reason);
         }
     }
 }

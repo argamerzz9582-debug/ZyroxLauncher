@@ -62,6 +62,24 @@ public class Instance extends DisplayInstance {
     public static final String PRESET_BALANCED = "balanced";
     public static final String PRESET_MAX_FPS = "max_fps";
 
+    public static final String LOADER_FABRIC = "fabric";
+    public static final String LOADER_QUILT = "quilt";
+    public static final String LOADER_NEOFORGE = "neoforge";
+    public static final String LOADER_FORGE = "forge";
+    public static final String LOADER_VANILLA = "vanilla";
+
+    /** Matches official Mojang releases: classic {@code 1.x(.y)} and year-based {@code 26.x(.y)+}. */
+    private static final java.util.regex.Pattern MOJANG_RELEASE_PATTERN =
+            java.util.regex.Pattern.compile(
+                    "(?:^|[^0-9.])((?:1\\.[0-9]{1,2}|(?:2[6-9]|[3-9][0-9])\\.[0-9]{1,2})(?:\\.[0-9]{1,2})?)(?=$|[^0-9.])");
+    /** Generic strict numeric SemVer fallback {@code X.Y(.Z)} after stripping loader tokens. */
+    private static final java.util.regex.Pattern GENERIC_MC_SEMVER_PATTERN =
+            java.util.regex.Pattern.compile("(?:^|[^0-9.])([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)(?=$|[^0-9.])");
+    /** Matches standalone NeoForge version strings such as {@code neoforge-21.4.88} or {@code 20.4.237-beta}. */
+    private static final java.util.regex.Pattern NEOFORGE_STANDALONE_PATTERN =
+            java.util.regex.Pattern.compile(
+                    "(?i)(?:^|-)neoforge-([0-9]{2})\\.([0-9]{1,2})\\.[0-9]+");
+
     // Core Mojo/Zyrox v1 fields (preserved 100% intact for backward compatibility)
     public InstanceInstaller installer;
     public String renderer;
@@ -333,5 +351,350 @@ public class Instance extends DisplayInstance {
             this.lastKnownGoodRenderer = activeRenderer;
         }
         maybeWrite();
+    }
+
+    /**
+     * Resolves the clean base Mojang Minecraft version (e.g. {@code "1.21.4"}, {@code "1.20.1"},
+     * {@code "26.1.2"}) for Modrinth / CurseForge queries — never returning dirty loader wrappers
+     * such as {@code "fabric-loader-0.16.9-1.21.4"}, {@code "neoforge-21.4.88"}, or
+     * {@code "1.21.4-OptiFine_HD_U_J2"}.
+     *
+     * <p>Resolution order:
+     * <ol>
+     *   <li>Symbolic channel aliases ({@code latest_release}, {@code latest_snapshot},
+     *       {@code latest_fabric}) via synced Mojang / Fabric metadata catalogs.</li>
+     *   <li>On-disk {@code versions/<id>/<id>.json} {@code inheritsFrom} chain (bounded to 4 hops)
+     *       and manifest {@code clientVersion} / {@code id} metadata.</li>
+     *   <li>Deterministic loader-prefix stripping, NeoForge version mapping, and regex extraction.</li>
+     * </ol>
+     */
+    @Nullable
+    public String getCleanMinecraftVersion() {
+        return resolveCleanMinecraftVersion(this.versionId);
+    }
+
+    /** Static variant of {@link #getCleanMinecraftVersion()} accepting any raw {@code versionId}. */
+    @Nullable
+    public static String resolveCleanMinecraftVersion(@Nullable String rawVersionId) {
+        if (rawVersionId == null) return null;
+        String trimmed = rawVersionId.trim();
+        if (trimmed.isEmpty()) return null;
+
+        // 1. Resolve symbolic channel aliases against cached official catalogs
+        if (isSymbolicVersionId(trimmed)) {
+            return resolveSymbolicMinecraftVersion(trimmed);
+        }
+
+        // 2. Inspect local version manifest JSON inheritsFrom chain if installed on disk
+        String inherited = readInheritedMinecraftVersionFromDisk(trimmed);
+        if (inherited != null) {
+            return inherited;
+        }
+
+        // 3. Deterministic loader-aware string extraction
+        return extractCleanMinecraftVersion(trimmed);
+    }
+
+    /**
+     * Pure deterministic Minecraft version extractor that strips Fabric, Quilt, Legacy Fabric,
+     * Forge, NeoForge, and OptiFine loader version segments before matching the true base game
+     * version (safe in unit tests without filesystem access).
+     */
+    @Nullable
+    public static String extractCleanMinecraftVersion(@Nullable String rawVersionId) {
+        if (rawVersionId == null) return null;
+        String s = rawVersionId.trim();
+        if (s.isEmpty() || isSymbolicVersionId(s)) return null;
+
+        String lower = s.toLowerCase(java.util.Locale.ROOT);
+
+        // Fabric / Quilt / Legacy Fabric: "<kind>-loader-<loaderVer>-<mcVer>"
+        String[] fabricPrefixes = {
+                "legacy-fabric-loader-",
+                "fabric-loader-",
+                "quilt-loader-"
+        };
+        for (String prefix : fabricPrefixes) {
+            if (lower.startsWith(prefix) && s.length() > prefix.length()) {
+                String rest = s.substring(prefix.length());
+                // Skip "<loaderVer>-" (loader version starts with digits, e.g. 0.16.9 or 1.0.0+beta.1)
+                int dash = rest.indexOf('-');
+                while (dash > 0 && dash + 1 < rest.length()) {
+                    String after = rest.substring(dash + 1);
+                    String candidate = matchMojangOrGenericVersion(after);
+                    if (candidate != null && after.startsWith(candidate)) {
+                        return candidate;
+                    }
+                    dash = rest.indexOf('-', dash + 1);
+                }
+                int lastDash = rest.lastIndexOf('-');
+                if (lastDash > 0 && lastDash + 1 < rest.length()) {
+                    String tail = matchMojangOrGenericVersion(rest.substring(lastDash + 1));
+                    if (tail != null) return tail;
+                }
+            }
+        }
+
+        // Forge / NeoForge with explicit MC prefix: "1.20.1-forge-47.3.0", "1.21.1-neoforge-21.1.72",
+        // or "forge-1.20.1-47.3.0"
+        int forgeIdx = lower.indexOf("-forge-");
+        if (forgeIdx > 0) {
+            String pre = matchMojangOrGenericVersion(s.substring(0, forgeIdx));
+            if (pre != null) return pre;
+        }
+        int neoIdx = lower.indexOf("-neoforge-");
+        if (neoIdx > 0) {
+            String pre = matchMojangOrGenericVersion(s.substring(0, neoIdx));
+            if (pre != null) return pre;
+        }
+        if (lower.startsWith("forge-") && s.length() > 6) {
+            String afterForge = s.substring(6);
+            int nextDash = afterForge.indexOf('-');
+            String firstToken = nextDash > 0 ? afterForge.substring(0, nextDash) : afterForge;
+            String mc = matchMojangRelease(firstToken);
+            if (mc != null) return mc;
+            if (nextDash > 0 && nextDash + 1 < afterForge.length()) {
+                String tailMc = matchMojangRelease(afterForge.substring(nextDash + 1));
+                if (tailMc != null) return tailMc;
+            }
+        }
+
+        // Standalone NeoForge scheme: "neoforge-21.4.88" -> "1.21.4", "neoforge-21.0.167" -> "1.21",
+        // "neoforge-20.4.237" -> "1.20.4", "neoforge-26.1.12" -> "26.1"
+        java.util.regex.Matcher neoMatcher = NEOFORGE_STANDALONE_PATTERN.matcher(s);
+        if (neoMatcher.find()) {
+            try {
+                int neoMajor = Integer.parseInt(neoMatcher.group(1));
+                int neoMinor = Integer.parseInt(neoMatcher.group(2));
+                if (neoMajor >= 20 && neoMajor <= 25) {
+                    return neoMinor == 0 ? ("1." + neoMajor) : ("1." + neoMajor + "." + neoMinor);
+                } else if (neoMajor >= 26) {
+                    return neoMajor + "." + neoMinor;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        // OptiFine: "1.21.4-OptiFine_HD_U_J2" or "OptiFine_1.20.1_HD_U_I6"
+        int ofIdx = lower.indexOf("-optifine");
+        if (ofIdx > 0) {
+            String pre = matchMojangOrGenericVersion(s.substring(0, ofIdx));
+            if (pre != null) return pre;
+        }
+
+        // Standard Mojang release pattern (1.x[.y] or 26.x[.y]+)
+        String mojang = matchMojangRelease(s);
+        if (mojang != null) {
+            return mojang;
+        }
+
+        // Official snapshot tags (e.g. "24w44a", "1.21.4-pre2", "1.21.4-rc1")
+        if (git.artdeell.mojo.metadata.CurseForgeProvider.isMinecraftVersionTag(s)) {
+            int preDash = s.indexOf('-');
+            if (preDash > 0) {
+                String base = matchMojangRelease(s.substring(0, preDash));
+                if (base != null) return base;
+            }
+            return s;
+        }
+
+        // Fallback strict numeric X.Y(.Z) when string is a clean version token
+        if (!lower.contains("forge") && !lower.contains("loader")) {
+            java.util.regex.Matcher generic = GENERIC_MC_SEMVER_PATTERN.matcher(s);
+            if (generic.find()) {
+                return generic.group(1);
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String matchMojangRelease(@NonNull String text) {
+        java.util.regex.Matcher m = MOJANG_RELEASE_PATTERN.matcher(text);
+        return m.find() ? m.group(1) : null;
+    }
+
+    @Nullable
+    private static String matchMojangOrGenericVersion(@NonNull String text) {
+        String mojang = matchMojangRelease(text);
+        if (mojang != null) return mojang;
+        java.util.regex.Matcher g = GENERIC_MC_SEMVER_PATTERN.matcher(text);
+        return g.find() ? g.group(1) : null;
+    }
+
+    @Nullable
+    private static String resolveSymbolicMinecraftVersion(@NonNull String symbolicId) {
+        try {
+            git.artdeell.mojo.metadata.VersionMetadataRepository repo =
+                    git.artdeell.mojo.metadata.VersionMetadataRepository.getInstance();
+            git.artdeell.mojo.JVersionList catalog = repo.getCurrentCatalog();
+            if (isLatestSnapshotId(symbolicId)) {
+                String snap = git.artdeell.mojo.metadata.MojangVersionProvider.findLatestByType(
+                        catalog, git.artdeell.mojo.metadata.MojangVersionProvider.TYPE_SNAPSHOT);
+                if (snap != null && !snap.trim().isEmpty()) {
+                    String clean = extractCleanMinecraftVersion(snap.trim());
+                    return clean != null ? clean : snap.trim();
+                }
+            }
+            String latestRelease = git.artdeell.mojo.metadata.MojangVersionProvider.findLatestByType(
+                    catalog, git.artdeell.mojo.metadata.MojangVersionProvider.TYPE_RELEASE);
+            if (isLatestFabricId(symbolicId)) {
+                try {
+                    git.artdeell.mojo.modding.fabric.FabricVersion[] fVers =
+                            repo.getFabricProvider().getGameVersions(false);
+                    String picked = git.artdeell.mojo.modding.fabric.FabriclikeUtils
+                            .selectLatestStableGameVersion(fVers, latestRelease);
+                    if (picked != null && !picked.trim().isEmpty()) {
+                        return picked.trim();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            if (latestRelease != null && !latestRelease.trim().isEmpty()) {
+                return latestRelease.trim();
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String readInheritedMinecraftVersionFromDisk(@NonNull String versionId) {
+        if (Tools.DIR_HOME_VERSION == null
+                || versionId.contains("..")
+                || versionId.contains("/")
+                || versionId.contains("\\")) {
+            return null;
+        }
+        String cursor = versionId;
+        for (int hop = 0; hop < 4 && cursor != null && !cursor.isEmpty(); hop++) {
+            File jsonFile = new File(Tools.DIR_HOME_VERSION, cursor + "/" + cursor + ".json");
+            if (!jsonFile.isFile() || jsonFile.length() <= 0L || jsonFile.length() > 4L * 1024L * 1024L) {
+                break;
+            }
+            try {
+                com.google.gson.JsonObject obj = com.google.gson.JsonParser
+                        .parseString(Tools.read(jsonFile.getAbsolutePath()))
+                        .getAsJsonObject();
+                if (obj.has("inheritsFrom") && !obj.get("inheritsFrom").isJsonNull()) {
+                    String parent = obj.get("inheritsFrom").getAsString().trim();
+                    if (!parent.isEmpty() && !parent.equals(cursor)) {
+                        if (git.artdeell.mojo.metadata.CurseForgeProvider.isReleaseMinecraftVersion(parent)) {
+                            return parent;
+                        }
+                        cursor = parent;
+                        continue;
+                    }
+                }
+                if (obj.has("clientVersion") && !obj.get("clientVersion").isJsonNull()) {
+                    String cv = extractCleanMinecraftVersion(obj.get("clientVersion").getAsString());
+                    if (cv != null) return cv;
+                }
+                if (obj.has("id") && !obj.get("id").isJsonNull()) {
+                    String idVal = obj.get("id").getAsString().trim();
+                    if (git.artdeell.mojo.metadata.CurseForgeProvider.isReleaseMinecraftVersion(idVal)) {
+                        return idVal;
+                    }
+                    String extracted = extractCleanMinecraftVersion(idVal);
+                    if (extracted != null) return extracted;
+                }
+                break;
+            } catch (Throwable ignored) {
+                break;
+            }
+        }
+        if (!cursor.equals(versionId)) {
+            return extractCleanMinecraftVersion(cursor);
+        }
+        return null;
+    }
+
+    /**
+     * Detects this instance's active modloader family: {@code "fabric"}, {@code "quilt"},
+     * {@code "neoforge"}, {@code "forge"}, or {@code "vanilla"}.
+     */
+    @NonNull
+    public String getDetectedModLoader() {
+        return detectModLoader(this.versionId);
+    }
+
+    /**
+     * Deterministically resolves the canonical Modrinth loader slug ({@code fabric}, {@code quilt},
+     * {@code neoforge}, {@code forge}, or {@code vanilla}) from a {@code versionId} and, when
+     * needed, its on-disk {@code versions/<id>/<id>.json} metadata.
+     */
+    @NonNull
+    public static String detectModLoader(@Nullable String versionId) {
+        if (versionId == null) return LOADER_VANILLA;
+        String trimmed = versionId.trim();
+        if (trimmed.isEmpty()) return LOADER_VANILLA;
+        if (isLatestFabricId(trimmed)) return LOADER_FABRIC;
+        if (isLatestReleaseId(trimmed) || isLatestSnapshotId(trimmed)) return LOADER_VANILLA;
+
+        String lower = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("quilt")) return LOADER_QUILT;
+        if (lower.contains("fabric")) return LOADER_FABRIC;
+        if (lower.contains("neoforge")) return LOADER_NEOFORGE;
+        if (lower.contains("forge")) return LOADER_FORGE;
+
+        // Inspect on-disk version JSON mainClass & library coordinates for custom-named profiles
+        if (Tools.DIR_HOME_VERSION != null
+                && !trimmed.contains("..")
+                && !trimmed.contains("/")
+                && !trimmed.contains("\\")) {
+            File jsonFile = new File(Tools.DIR_HOME_VERSION, trimmed + "/" + trimmed + ".json");
+            if (jsonFile.isFile() && jsonFile.length() > 0L && jsonFile.length() <= 4L * 1024L * 1024L) {
+                try {
+                    String raw = Tools.read(jsonFile.getAbsolutePath()).toLowerCase(java.util.Locale.ROOT);
+                    if (raw.contains("org.quiltmc:quilt-loader") || raw.contains("quiltloader")) {
+                        return LOADER_QUILT;
+                    }
+                    if (raw.contains("net.fabricmc:fabric-loader") || raw.contains("knotclient")) {
+                        return LOADER_FABRIC;
+                    }
+                    if (raw.contains("net.neoforged") || raw.contains("neoforge")) {
+                        return LOADER_NEOFORGE;
+                    }
+                    if (raw.contains("net.minecraftforge") || raw.contains("fmlclient")
+                            || raw.contains("forgeclient")) {
+                        return LOADER_FORGE;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return LOADER_VANILLA;
+    }
+
+    /** Formats a loader slug into a user-facing label (e.g. {@code "Fabric"}, {@code "NeoForge"}). */
+    @NonNull
+    public static String formatLoaderDisplayName(@Nullable String loader) {
+        if (loader == null) return "Vanilla";
+        switch (loader.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case LOADER_FABRIC: return "Fabric";
+            case LOADER_QUILT: return "Quilt";
+            case LOADER_NEOFORGE: return "NeoForge";
+            case LOADER_FORGE: return "Forge";
+            case LOADER_VANILLA:
+            default: return "Vanilla";
+        }
+    }
+
+    /**
+     * Returns {@code true} if {@code cleanMcVersion} supports official Fabric Loader installation
+     * (Minecraft {@code 1.14+} and all year-based {@code 26.x+} releases).
+     */
+    public static boolean supportsFabricLoader(@Nullable String cleanMcVersion) {
+        if (cleanMcVersion == null || cleanMcVersion.trim().isEmpty()) return false;
+        String[] parts = cleanMcVersion.trim().split("\\.");
+        if (parts.length < 2) return false;
+        try {
+            int major = Integer.parseInt(parts[0].replaceAll("[^0-9]", ""));
+            int minor = Integer.parseInt(parts[1].replaceAll("[^0-9]", ""));
+            if (major >= 26) return true;
+            return major == 1 && minor >= 14;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

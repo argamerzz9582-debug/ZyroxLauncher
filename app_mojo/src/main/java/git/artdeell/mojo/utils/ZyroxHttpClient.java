@@ -32,7 +32,7 @@ import okhttp3.ResponseBody;
 public final class ZyroxHttpClient {
     private static final String TAG = "ZyroxHttpClient";
 
-    public static final String USER_AGENT = "ZyroxLauncher/2.5.0 (Android; arm64-v8a)";
+    public static final String USER_AGENT = "ZyroxLauncher/2.6.0 (Android; arm64-v8a)";
     public static final int DEFAULT_CONNECT_TIMEOUT_MS = 12_000;
     public static final int DEFAULT_READ_TIMEOUT_MS = 30_000;
     public static final int MAX_IDLE_CONNECTIONS = 16;
@@ -474,6 +474,83 @@ public final class ZyroxHttpClient {
         } catch (NumberFormatException ignored) {
         }
         return 0L;
+    }
+
+    /**
+     * RFC 3986 UTF-8 query-component encoder (encodes brackets, quotes, commas, colons, and spaces
+     * as {@code %20} so strict API gateways like Modrinth v2 never reject query arrays).
+     */
+    @NonNull
+    public static String encodeQueryComponent(@NonNull String value) {
+        try {
+            return java.net.URLEncoder.encode(value, "UTF-8")
+                    .replace("+", "%20")
+                    .replace("%7E", "~");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 always available", e);
+        }
+    }
+
+    /**
+     * Formats non-blank strings into a valid JSON string array literal (e.g. {@code ["1.21.4"]}).
+     */
+    @NonNull
+    public static String toJsonStringArray(@Nullable String... items) {
+        StringBuilder sb = new StringBuilder("[");
+        if (items != null) {
+            boolean first = true;
+            for (String raw : items) {
+                if (raw == null) continue;
+                String trimmed = raw.trim();
+                if (trimmed.isEmpty()) continue;
+                if (!first) sb.append(',');
+                sb.append('"');
+                for (int i = 0; i < trimmed.length(); i++) {
+                    char c = trimmed.charAt(i);
+                    if (c == '\\' || c == '"') {
+                        sb.append('\\').append(c);
+                    } else if (c >= 0x20) {
+                        sb.append(c);
+                    }
+                }
+                sb.append('"');
+                first = false;
+            }
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    /**
+     * Builds a properly JSON-formatted and UTF-8 URL-encoded Modrinth v2
+     * {@code /project/{id|slug}/version?game_versions=["1.21.4"]&loaders=["fabric"]} endpoint URL.
+     */
+    @NonNull
+    public static String buildModrinthProjectVersionsUrl(@NonNull String apiBaseUrl,
+                                                         @NonNull String projectIdOrSlug,
+                                                         @Nullable String cleanMcVersion,
+                                                         @Nullable String... loaders) {
+        String normalizedBase = apiBaseUrl.endsWith("/")
+                ? apiBaseUrl.substring(0, apiBaseUrl.length() - 1)
+                : apiBaseUrl;
+        StringBuilder url = new StringBuilder(normalizedBase)
+                .append("/project/")
+                .append(encodeQueryComponent(projectIdOrSlug.trim()))
+                .append("/version");
+        char sep = '?';
+        if (cleanMcVersion != null && !cleanMcVersion.trim().isEmpty()) {
+            url.append(sep)
+                    .append("game_versions=")
+                    .append(encodeQueryComponent(toJsonStringArray(cleanMcVersion.trim())));
+            sep = '&';
+        }
+        String loaderJson = toJsonStringArray(loaders);
+        if (!"[]".equals(loaderJson)) {
+            url.append(sep)
+                    .append("loaders=")
+                    .append(encodeQueryComponent(loaderJson));
+        }
+        return url.toString();
     }
 
     public static boolean isRetryableStatus(int code) {

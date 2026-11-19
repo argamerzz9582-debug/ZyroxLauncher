@@ -55,8 +55,7 @@ public class CommonApi implements ModpackApi {
         if (searchFilters != null && searchFilters.platform == SearchFilters.PLATFORM_CURSEFORGE) {
             CommonApiSearchResult prevCommon = (previousPageResult instanceof CommonApiSearchResult)
                     ? (CommonApiSearchResult) previousPageResult : null;
-            if (mCurseforgeApi != null && CurseForgeProvider.canQueryCurseForge(mCurseforgeApiKey)
-                    && searchFilters.projectTypeOverride == null) {
+            if (mCurseforgeApi != null && CurseForgeProvider.canQueryCurseForge(mCurseforgeApiKey)) {
                 SearchResult prevCf = (prevCommon != null && prevCommon.searchResults.length > 1)
                         ? prevCommon.searchResults[1] : null;
                 try {
@@ -170,18 +169,32 @@ public class CommonApi implements ModpackApi {
         copy.isModpack = src.isModpack;
         copy.name = src.name;
         copy.mcVersion = src.mcVersion;
+        copy.loader = src.loader;
         copy.platform = SearchFilters.PLATFORM_MODRINTH;
         copy.category = src.category;
         copy.projectTypeOverride = src.projectTypeOverride;
+        copy.strictCompatibility = src.strictCompatibility;
         return copy;
     }
 
     @Override
     public ModDetail getModDetails(ModItem item) {
+        return getModDetails(item, null, null, null, false);
+    }
+
+    @Override
+    public ModDetail getModDetails(ModItem item,
+                                   String cleanMcVersion,
+                                   String loader,
+                                   String projectType,
+                                   boolean strictCompatibility) {
         if (item == null) return null;
-        Log.i("CommonApi", "Invoking getModDetails on item.apiSource=" + item.apiSource + " item.title=" + item.title);
+        Log.i("CommonApi", "Invoking getModDetails on item.apiSource=" + item.apiSource
+                + " item.title=" + item.title + " strict=" + strictCompatibility);
         ModpackApi api = getModpackApi(item.apiSource);
-        return api != null ? api.getModDetails(item) : null;
+        return api != null
+                ? api.getModDetails(item, cleanMcVersion, loader, projectType, strictCompatibility)
+                : null;
     }
 
     @Override

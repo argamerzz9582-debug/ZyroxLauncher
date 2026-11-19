@@ -45,6 +45,18 @@ public interface ModpackApi {
     ModDetail getModDetails(ModItem item);
 
     /**
+     * Fetch downloadable versions for {@code item}, filtered by the active instance's clean
+     * Minecraft version and modloader when {@code strictCompatibility} is enabled.
+     */
+    default ModDetail getModDetails(ModItem item,
+                                    String cleanMcVersion,
+                                    String loader,
+                                    String projectType,
+                                    boolean strictCompatibility) {
+        return getModDetails(item);
+    }
+
+    /**
      * Download and install the modpack
      * @param modDetail The mod detail data
      * @param selectedVersion The selected version

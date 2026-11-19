@@ -94,8 +94,12 @@ public final class ZyroxRoomBridge {
 
         private final AtomicBoolean mRunning = new AtomicBoolean(true);
         private final AtomicInteger mActivePeers = new AtomicInteger(0);
+        private final java.util.Set<Socket> mOpenSockets =
+                new java.util.concurrent.CopyOnWriteArraySet<>();
         @NonNull private final ServerSocket mServerSocket;
         @Nullable private final DatagramSocket mBeaconSocket;
+        public final boolean carrierGradeNat;
+        @NonNull public final String networkDiagnostic;
 
         HostSession(@NonNull String shortCode,
                     @NonNull String fullShareCode,
@@ -104,7 +108,9 @@ public final class ZyroxRoomBridge {
                     int localMcPort,
                     int bridgeTcpPort,
                     @NonNull ServerSocket serverSocket,
-                    @Nullable DatagramSocket beaconSocket) {
+                    @Nullable DatagramSocket beaconSocket,
+                    boolean carrierGradeNat,
+                    @NonNull String networkDiagnostic) {
             this.shortCode = shortCode;
             this.fullShareCode = fullShareCode;
             this.worldTitle = worldTitle;
@@ -113,6 +119,8 @@ public final class ZyroxRoomBridge {
             this.bridgeTcpPort = bridgeTcpPort;
             this.mServerSocket = serverSocket;
             this.mBeaconSocket = beaconSocket;
+            this.carrierGradeNat = carrierGradeNat;
+            this.networkDiagnostic = networkDiagnostic;
         }
 
         public boolean isRunning() {
@@ -123,15 +131,38 @@ public final class ZyroxRoomBridge {
             return mActivePeers.get();
         }
 
+        void trackSocket(@Nullable Socket s) {
+            if (s == null) return;
+            if (!mRunning.get()) {
+                closeQuietly(s);
+                return;
+            }
+            mOpenSockets.add(s);
+        }
+
+        void untrackSocket(@Nullable Socket s) {
+            if (s != null) {
+                mOpenSockets.remove(s);
+            }
+        }
+
         @Override
         public void close() {
             if (!mRunning.compareAndSet(true, false)) return;
             closeQuietly(mBeaconSocket);
             closeQuietly(mServerSocket);
+            for (Socket s : mOpenSockets) {
+                closeQuietly(s);
+            }
+            mOpenSockets.clear();
+            mActivePeers.set(0);
+            if (sActiveHost == this) {
+                sActiveHost = null;
+            }
         }
     }
 
-    /** Active client tunnel binding a remote {@code ZYX-XXXX} room to {@code 127.0.0.1:<port>}. */
+    /** Active client tunnel binding a remote {@code ZYX-XXXX} room strictly to {@code 127.0.0.1:<port>}. */
     public static final class ClientTunnel implements Closeable {
         @NonNull public final String shortCode;
         @NonNull public final String remoteHost;
@@ -140,6 +171,8 @@ public final class ZyroxRoomBridge {
         @NonNull public final String worldTitle;
 
         private final AtomicBoolean mRunning = new AtomicBoolean(true);
+        private final java.util.Set<Socket> mOpenSockets =
+                new java.util.concurrent.CopyOnWriteArraySet<>();
         @NonNull private final ServerSocket mLocalLoopback;
 
         ClientTunnel(@NonNull String shortCode,
@@ -165,10 +198,32 @@ public final class ZyroxRoomBridge {
             return mRunning.get() && !mLocalLoopback.isClosed();
         }
 
+        void trackSocket(@Nullable Socket s) {
+            if (s == null) return;
+            if (!mRunning.get()) {
+                closeQuietly(s);
+                return;
+            }
+            mOpenSockets.add(s);
+        }
+
+        void untrackSocket(@Nullable Socket s) {
+            if (s != null) {
+                mOpenSockets.remove(s);
+            }
+        }
+
         @Override
         public void close() {
             if (!mRunning.compareAndSet(true, false)) return;
             closeQuietly(mLocalLoopback);
+            for (Socket s : mOpenSockets) {
+                closeQuietly(s);
+            }
+            mOpenSockets.clear();
+            if (sActiveClient == this) {
+                sActiveClient = null;
+            }
         }
     }
 
@@ -275,6 +330,14 @@ public final class ZyroxRoomBridge {
         return (c != null && c.isRunning()) ? c : null;
     }
 
+    /** Stops any active client loopback tunnel socket cleanly without disturbing an active host. */
+    public static synchronized void stopClientTunnel() {
+        if (sActiveClient != null) {
+            sActiveClient.close();
+            sActiveClient = null;
+        }
+    }
+
     /** Stops any active P2P host beacon and client loopback bridge cleanly. */
     public static synchronized void stopAll() {
         if (sActiveHost != null) {
@@ -310,7 +373,8 @@ public final class ZyroxRoomBridge {
         tcpBridge.bind(new InetSocketAddress(0));
         int bridgePort = tcpBridge.getLocalPort();
 
-        String lanIp = detectPrimarySiteLocalIpv4();
+        NetworkEndpointInfo netInfo = detectPrimaryNetworkEndpoint();
+        String lanIp = netInfo.ipv4;
         String fullCode = encodeDirectRoomCode(shortCode, lanIp, bridgePort);
 
         DatagramSocket udpBeacon = null;
@@ -319,13 +383,24 @@ public final class ZyroxRoomBridge {
             udpBeacon.setReuseAddress(true);
             udpBeacon.setBroadcast(true);
             udpBeacon.bind(new InetSocketAddress(DISCOVERY_UDP_PORT));
-        } catch (IOException ignored) {
-            // Port busy on same host — full ZYX direct token still works seamlessly
+        } catch (IOException wildcardErr) {
+            closeQuietly(udpBeacon);
+            udpBeacon = null;
+            // Fallback to strict 127.0.0.1 loopback bind if OEM firewall blocks wildcard UDP
+            try {
+                DatagramSocket loopbackBeacon = new DatagramSocket(null);
+                loopbackBeacon.setReuseAddress(true);
+                loopbackBeacon.bind(new InetSocketAddress(loopbackIpv4(), DISCOVERY_UDP_PORT));
+                udpBeacon = loopbackBeacon;
+            } catch (IOException ignored) {
+                // Full ZYX direct token still works seamlessly without UDP discovery
+            }
         }
 
         final HostSession session = new HostSession(
                 shortCode, fullCode, safeTitle, lanIp,
-                localMcLanPort, bridgePort, tcpBridge, udpBeacon);
+                localMcLanPort, bridgePort, tcpBridge, udpBeacon,
+                netInfo.carrierGradeNat, netInfo.diagnostic);
         sActiveHost = session;
 
         // 1. Authenticated TCP accept loop -> forwards to 127.0.0.1:<localMcLanPort>
@@ -360,8 +435,11 @@ public final class ZyroxRoomBridge {
         if (!parsed.hasDirectEndpoint()) {
             DiscoveredOffer offer = discoverHostViaUdp(parsed.shortCode);
             if (offer == null) {
-                throw new IOException("No host found for " + parsed.shortCode
-                        + " on local Wi-Fi/Hotspot. Ask the host for their full ZYX share code.");
+                NetworkEndpointInfo localNet = detectPrimaryNetworkEndpoint();
+                String hint = localNet.carrierGradeNat
+                        ? " Mobile carrier CGNAT blocks LAN broadcasts — join the host's Wi-Fi/Hotspot or connect via a shared VPN."
+                        : " Ensure both devices are on the same Wi-Fi/Hotspot, or paste the host's full ZYX share code.";
+                throw new IOException("No room found for " + parsed.shortCode + "." + hint);
             }
             remoteHost = offer.host;
             remotePort = offer.port;
@@ -371,20 +449,47 @@ public final class ZyroxRoomBridge {
             sendUdpHolePunchProbe(remoteHost, parsed.shortCode);
         }
 
-        // Verify live reachability & room-code authentication before returning to UI
-        verifyRemoteRoomHandshake(remoteHost, remotePort, parsed.shortCode);
+        // Verify live reachability & room-code authentication with CGNAT-aware diagnostics
+        try {
+            verifyRemoteRoomHandshake(remoteHost, remotePort, parsed.shortCode);
+        } catch (IOException handshakeErr) {
+            throw new IOException(diagnoseConnectionFailure(remoteHost, remotePort, handshakeErr),
+                    handshakeErr);
+        }
 
+        return openLoopbackClientTunnel(parsed.shortCode, remoteHost, remotePort, 0, worldTitle);
+    }
+
+    @NonNull
+    private static synchronized ClientTunnel openLoopbackClientTunnel(@NonNull String shortCode,
+                                                                      @NonNull String remoteHost,
+                                                                      int remotePort,
+                                                                      int preferredLocalPort,
+                                                                      @NonNull String worldTitle)
+            throws IOException {
         if (sActiveClient != null) {
             sActiveClient.close();
             sActiveClient = null;
         }
 
+        InetAddress loopbackAddr = loopbackIpv4();
         ServerSocket loopback = new ServerSocket();
         loopback.setReuseAddress(true);
-        loopback.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0));
+        if (preferredLocalPort > 0 && preferredLocalPort <= 65535) {
+            try {
+                loopback.bind(new InetSocketAddress(loopbackAddr, preferredLocalPort));
+            } catch (IOException busy) {
+                closeQuietly(loopback);
+                loopback = new ServerSocket();
+                loopback.setReuseAddress(true);
+                loopback.bind(new InetSocketAddress(loopbackAddr, 0));
+            }
+        } else {
+            loopback.bind(new InetSocketAddress(loopbackAddr, 0));
+        }
 
         final ClientTunnel tunnel = new ClientTunnel(
-                parsed.shortCode, remoteHost, remotePort,
+                shortCode, remoteHost, remotePort,
                 loopback.getLocalPort(), worldTitle, loopback);
         sActiveClient = tunnel;
 
@@ -393,6 +498,75 @@ public final class ZyroxRoomBridge {
         clientAccept.setDaemon(true);
         clientAccept.start();
         return tunnel;
+    }
+
+    private static final String PENDING_TUNNEL_FILE = ".zyrox_pending_room_tunnel.json";
+    private static final long PENDING_TUNNEL_TTL_MS = 10L * 60L * 1000L;
+
+    /**
+     * Persists a short-lived cross-process handoff file so {@code :game} seamlessly re-binds the
+     * {@code 127.0.0.1} tunnel after {@code :launcher} hands off to {@code GameActivity}.
+     */
+    public static void persistPendingTunnelForGameLaunch(@NonNull ClientTunnel tunnel) {
+        if (git.artdeell.mojo.Tools.DIR_CACHE == null) return;
+        try {
+            com.google.gson.JsonObject obj = new com.google.gson.JsonObject();
+            obj.addProperty("shortCode", tunnel.shortCode);
+            obj.addProperty("remoteHost", tunnel.remoteHost);
+            obj.addProperty("remotePort", tunnel.remotePort);
+            obj.addProperty("localPort", tunnel.localPort);
+            obj.addProperty("worldTitle", tunnel.worldTitle);
+            obj.addProperty("savedAtMs", System.currentTimeMillis());
+            java.io.File out = new java.io.File(
+                    git.artdeell.mojo.Tools.DIR_CACHE, PENDING_TUNNEL_FILE);
+            git.artdeell.mojo.Tools.write(out, obj.toString());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * Called in {@code :game} before JVM boot: if {@code quickConnectAddress} points to a pending
+     * {@code 127.0.0.1} room tunnel, re-establishes it in {@code :game} and returns its live
+     * {@code 127.0.0.1:<port>} address.
+     */
+    @NonNull
+    public static String ensurePendingTunnelInGameProcess(@NonNull String quickConnectAddress) {
+        if (!quickConnectAddress.startsWith("127.0.0.1:")
+                || git.artdeell.mojo.Tools.DIR_CACHE == null) {
+            return quickConnectAddress;
+        }
+        java.io.File handoff = new java.io.File(
+                git.artdeell.mojo.Tools.DIR_CACHE, PENDING_TUNNEL_FILE);
+        if (!handoff.isFile()) return quickConnectAddress;
+        try {
+            String raw = git.artdeell.mojo.Tools.read(handoff.getAbsolutePath());
+            //noinspection ResultOfMethodCallIgnored
+            handoff.delete();
+            com.google.gson.JsonObject obj = com.google.gson.JsonParser
+                    .parseString(raw).getAsJsonObject();
+            long savedAt = obj.has("savedAtMs") ? obj.get("savedAtMs").getAsLong() : 0L;
+            if (System.currentTimeMillis() - savedAt > PENDING_TUNNEL_TTL_MS) {
+                return quickConnectAddress;
+            }
+            ClientTunnel existing = sActiveClient;
+            if (existing != null && existing.isRunning()
+                    && quickConnectAddress.equals(existing.getLoopbackAddress())) {
+                return quickConnectAddress;
+            }
+            String shortCode = obj.get("shortCode").getAsString();
+            String remoteHost = obj.get("remoteHost").getAsString();
+            int remotePort = obj.get("remotePort").getAsInt();
+            int localPort = obj.get("localPort").getAsInt();
+            String title = obj.has("worldTitle") ? obj.get("worldTitle").getAsString()
+                    : ("Zyrox Room " + shortCode);
+            ClientTunnel reopened = openLoopbackClientTunnel(
+                    shortCode, remoteHost, remotePort, localPort, title);
+            return reopened.getLoopbackAddress();
+        } catch (Throwable ignored) {
+            //noinspection ResultOfMethodCallIgnored
+            handoff.delete();
+            return quickConnectAddress;
+        }
     }
 
     private static void runHostAcceptLoop(@NonNull HostSession session) {
@@ -419,6 +593,7 @@ public final class ZyroxRoomBridge {
     private static void handleHostPeer(@NonNull HostSession session, @NonNull Socket peer) {
         Socket localMc = null;
         session.mActivePeers.incrementAndGet();
+        session.trackSocket(peer);
         try {
             peer.setTcpNoDelay(true);
             peer.setSoTimeout(HANDSHAKE_TIMEOUT_MS);
@@ -440,8 +615,9 @@ public final class ZyroxRoomBridge {
             peer.setSoTimeout(IDLE_SOCKET_TIMEOUT_MS);
 
             localMc = new Socket();
+            session.trackSocket(localMc);
             localMc.setTcpNoDelay(true);
-            localMc.connect(new InetSocketAddress("127.0.0.1", session.localMcPort),
+            localMc.connect(new InetSocketAddress(loopbackIpv4(), session.localMcPort),
                     CONNECT_TIMEOUT_MS);
             localMc.setSoTimeout(IDLE_SOCKET_TIMEOUT_MS);
 
@@ -449,6 +625,8 @@ public final class ZyroxRoomBridge {
                     localMc, localMc.getInputStream(), localMc.getOutputStream());
         } catch (Throwable ignored) {
         } finally {
+            session.untrackSocket(localMc);
+            session.untrackSocket(peer);
             closeQuietly(localMc);
             closeQuietly(peer);
             session.mActivePeers.decrementAndGet();
@@ -460,6 +638,10 @@ public final class ZyroxRoomBridge {
             Socket localGame = null;
             try {
                 localGame = tunnel.mLocalLoopback.accept();
+                if (!tunnel.isRunning()) {
+                    closeQuietly(localGame);
+                    break;
+                }
                 final Socket gameSock = localGame;
                 Thread worker = new Thread(() -> handleClientConnection(tunnel, gameSock),
                         "ZyroxRoomForward");
@@ -475,11 +657,13 @@ public final class ZyroxRoomBridge {
     private static void handleClientConnection(@NonNull ClientTunnel tunnel,
                                                @NonNull Socket localGame) {
         Socket remote = null;
+        tunnel.trackSocket(localGame);
         try {
             localGame.setTcpNoDelay(true);
             localGame.setSoTimeout(IDLE_SOCKET_TIMEOUT_MS);
 
             remote = new Socket();
+            tunnel.trackSocket(remote);
             remote.setTcpNoDelay(true);
             remote.connect(new InetSocketAddress(tunnel.remoteHost, tunnel.remotePort),
                     CONNECT_TIMEOUT_MS);
@@ -501,6 +685,8 @@ public final class ZyroxRoomBridge {
                     remote, remIn, remOut);
         } catch (Throwable ignored) {
         } finally {
+            tunnel.untrackSocket(remote);
+            tunnel.untrackSocket(localGame);
             closeQuietly(remote);
             closeQuietly(localGame);
         }
@@ -600,12 +786,21 @@ public final class ZyroxRoomBridge {
             sock.setBroadcast(true);
             sock.setSoTimeout(DISCOVERY_TIMEOUT_MS);
             byte[] req = (DISCOVER_MAGIC + shortCode).getBytes(StandardCharsets.UTF_8);
-            // Send to both loopback (same-device testing) and LAN/Hotspot broadcast
+
+            // 1. Always probe strict 127.0.0.1 loopback first (instant same-device discovery)
             try {
-                sock.send(new DatagramPacket(req, req.length,
-                        InetAddress.getByName("127.0.0.1"), DISCOVERY_UDP_PORT));
+                sock.send(new DatagramPacket(req, req.length, loopbackIpv4(), DISCOVERY_UDP_PORT));
             } catch (IOException ignored) {
             }
+            // 2. Probe directed subnet broadcasts on active Wi-Fi/Hotspot interfaces (reliable on
+            // Android 10–16 even when mobile data is active alongside Wi-Fi)
+            for (InetAddress bcast : listSubnetBroadcastAddresses()) {
+                try {
+                    sock.send(new DatagramPacket(req, req.length, bcast, DISCOVERY_UDP_PORT));
+                } catch (IOException ignored) {
+                }
+            }
+            // 3. Probe standard limited broadcast as fallback
             try {
                 sock.send(new DatagramPacket(req, req.length,
                         InetAddress.getByName("255.255.255.255"), DISCOVERY_UDP_PORT));
@@ -631,6 +826,31 @@ public final class ZyroxRoomBridge {
         }
     }
 
+    @NonNull
+    private static java.util.List<InetAddress> listSubnetBroadcastAddresses() {
+        java.util.List<InetAddress> out = new java.util.ArrayList<>(4);
+        try {
+            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+            if (ifaces == null) return out;
+            for (NetworkInterface nif : Collections.list(ifaces)) {
+                if (!nif.isUp() || nif.isLoopback()) continue;
+                for (java.net.InterfaceAddress ia : nif.getInterfaceAddresses()) {
+                    InetAddress bcast = ia.getBroadcast();
+                    if (bcast instanceof Inet4Address && !out.contains(bcast)) {
+                        out.add(bcast);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    @NonNull
+    private static InetAddress loopbackIpv4() throws IOException {
+        return InetAddress.getByAddress("127.0.0.1", new byte[]{127, 0, 0, 1});
+    }
+
     private static void sendUdpHolePunchProbe(@NonNull String host, @NonNull String shortCode) {
         try (DatagramSocket sock = new DatagramSocket()) {
             byte[] punch = (PUNCH_MAGIC + shortCode).getBytes(StandardCharsets.UTF_8);
@@ -640,33 +860,157 @@ public final class ZyroxRoomBridge {
         }
     }
 
-    /** Discovers the device's primary Wi-Fi / Mobile Hotspot site-local IPv4 address. */
+    /** Returns {@code true} if {@code ipv4} lies inside RFC 6598 Shared CGNAT space (100.64.0.0/10). */
+    public static boolean isCarrierGradeNatIpv4(@Nullable String ipv4) {
+        if (ipv4 == null || ipv4.trim().isEmpty()) return false;
+        String[] parts = ipv4.trim().split("\\.");
+        if (parts.length != 4) return false;
+        try {
+            int o1 = Integer.parseInt(parts[0]);
+            int o2 = Integer.parseInt(parts[1]);
+            int o3 = Integer.parseInt(parts[2]);
+            int o4 = Integer.parseInt(parts[3]);
+            if ((o1 | o2 | o3 | o4) < 0 || o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+                return false;
+            }
+            return o1 == 100 && o2 >= 64 && o2 <= 127;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** Returns {@code true} if {@code ifaceName} looks like an Android mobile-carrier radio interface. */
+    public static boolean isCellularInterfaceName(@Nullable String ifaceName) {
+        if (ifaceName == null) return false;
+        String n = ifaceName.toLowerCase(Locale.ROOT);
+        return n.startsWith("rmnet") || n.startsWith("ccmni")
+                || n.startsWith("pdp") || n.startsWith("clat")
+                || n.startsWith("wwan") || n.startsWith("ril");
+    }
+
+    /** Produces clear, actionable diagnostics when a P2P room connection fails on mobile networks. */
     @NonNull
-    public static String detectPrimarySiteLocalIpv4() {
-        String fallback = "127.0.0.1";
+    public static String diagnoseConnectionFailure(@NonNull String remoteHost,
+                                                   int remotePort,
+                                                   @Nullable Throwable cause) {
+        if (isCarrierGradeNatIpv4(remoteHost)) {
+            return "Host (" + remoteHost + ") is behind Mobile Carrier CGNAT (100.64.0.0/10), "
+                    + "which blocks direct inbound connections. Join the host's Wi-Fi / Mobile Hotspot, "
+                    + "or connect both devices to the same mesh VPN (e.g. Tailscale/WireGuard).";
+        }
+        String rawMsg = cause != null && cause.getMessage() != null ? cause.getMessage() : "";
+        if (rawMsg.toLowerCase(Locale.ROOT).contains("rejected")
+                || rawMsg.toLowerCase(Locale.ROOT).contains("auth")) {
+            return "Room code rejected — the host may have restarted the room. Ask for the latest ZYX code.";
+        }
+        if (cause instanceof java.net.ConnectException) {
+            return "Room " + remoteHost + ":" + remotePort
+                    + " refused connection — verify the host still has the room & Open-to-LAN active.";
+        }
+        boolean remotePrivate = remoteHost.startsWith("192.168.")
+                || remoteHost.startsWith("10.")
+                || remoteHost.matches("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*");
+        if (cause instanceof java.net.SocketTimeoutException
+                || cause instanceof java.net.NoRouteToHostException) {
+            if (remotePrivate) {
+                return "Timed out reaching LAN host " + remoteHost + ":" + remotePort
+                        + ". Connect both devices to the exact same Wi-Fi or Mobile Hotspot "
+                        + "(mobile carrier NAT isolates cross-network private IPs).";
+            }
+            return "Timed out reaching " + remoteHost + ":" + remotePort
+                    + ". Mobile carrier CGNAT or router firewall blocked direct P2P — use same Wi-Fi, "
+                    + "Mobile Hotspot, or a shared mesh VPN.";
+        }
+        return "Could not connect to room (" + remoteHost + ":" + remotePort + "): "
+                + (!rawMsg.isEmpty() ? rawMsg : "connection unavailable");
+    }
+
+    /** Classified active IPv4 endpoint with carrier-CGNAT diagnosis. */
+    public static final class NetworkEndpointInfo {
+        @NonNull public final String ipv4;
+        public final boolean carrierGradeNat;
+        @NonNull public final String diagnostic;
+
+        public NetworkEndpointInfo(@NonNull String ipv4,
+                                   boolean carrierGradeNat,
+                                   @NonNull String diagnostic) {
+            this.ipv4 = ipv4;
+            this.carrierGradeNat = carrierGradeNat;
+            this.diagnostic = diagnostic;
+        }
+    }
+
+    /** Discovers the best LAN / Hotspot / Mesh-VPN IPv4 and detects Mobile Carrier CGNAT. */
+    @NonNull
+    public static NetworkEndpointInfo detectPrimaryNetworkEndpoint() {
+        String vpnIp = null;
+        String otherSiteLocal = null;
+        String cellularIp = null;
         try {
             Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
-            if (ifaces == null) return fallback;
-            for (NetworkInterface nif : Collections.list(ifaces)) {
-                if (!nif.isUp() || nif.isLoopback()) continue;
-                String name = nif.getName().toLowerCase(Locale.ROOT);
-                for (InetAddress addr : Collections.list(nif.getInetAddresses())) {
-                    if (!(addr instanceof Inet4Address) || addr.isLoopbackAddress()) continue;
-                    String ip = addr.getHostAddress();
-                    if (ip == null) continue;
-                    if (addr.isSiteLocalAddress()
-                            && (name.startsWith("wlan") || name.startsWith("ap")
-                                || name.startsWith("swlan") || name.startsWith("eth"))) {
-                        return ip;
-                    }
-                    if (addr.isSiteLocalAddress() || "127.0.0.1".equals(fallback)) {
-                        fallback = ip;
+            if (ifaces != null) {
+                for (NetworkInterface nif : Collections.list(ifaces)) {
+                    if (!nif.isUp() || nif.isLoopback()) continue;
+                    String name = nif.getName().toLowerCase(Locale.ROOT);
+                    boolean isLan = name.startsWith("wlan") || name.startsWith("ap")
+                            || name.startsWith("swlan") || name.startsWith("eth")
+                            || name.startsWith("rndis") || name.startsWith("softap");
+                    boolean isVpn = name.startsWith("tun") || name.startsWith("wg")
+                            || name.startsWith("tailscale") || name.startsWith("zt");
+                    boolean isCell = isCellularInterfaceName(name);
+
+                    for (InetAddress addr : Collections.list(nif.getInetAddresses())) {
+                        if (!(addr instanceof Inet4Address) || addr.isLoopbackAddress()
+                                || addr.isLinkLocalAddress()) {
+                            continue;
+                        }
+                        String ip = addr.getHostAddress();
+                        if (ip == null) continue;
+                        if (isLan && addr.isSiteLocalAddress()) {
+                            return new NetworkEndpointInfo(ip, false,
+                                    "Wi-Fi / Hotspot ready (" + ip + ") — nearby players join directly.");
+                        }
+                        if (isVpn && vpnIp == null) {
+                            vpnIp = ip;
+                        } else if (isCell && cellularIp == null) {
+                            cellularIp = ip;
+                        } else if (addr.isSiteLocalAddress() && otherSiteLocal == null) {
+                            otherSiteLocal = ip;
+                        }
                     }
                 }
             }
         } catch (Throwable ignored) {
         }
-        return fallback;
+        if (otherSiteLocal != null) {
+            return new NetworkEndpointInfo(otherSiteLocal, false,
+                    "LAN interface active (" + otherSiteLocal + ") — players on the same network can join.");
+        }
+        if (vpnIp != null) {
+            return new NetworkEndpointInfo(vpnIp, false,
+                    "VPN tunnel active (" + vpnIp + ") — friends on the same VPN share the full ZYX code.");
+        }
+        if (cellularIp != null) {
+            boolean cgnat = isCarrierGradeNatIpv4(cellularIp)
+                    || cellularIp.startsWith("10.")
+                    || cellularIp.startsWith("192.168.")
+                    || cellularIp.matches("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*");
+            String diag = cgnat
+                    ? ("Mobile Carrier CGNAT detected (" + cellularIp
+                        + "): inbound internet joins are blocked by your carrier. Turn on Mobile Hotspot "
+                        + "or connect both devices to the same Wi-Fi / mesh VPN.")
+                    : ("Mobile data endpoint (" + cellularIp
+                        + "): if friends time out due to carrier firewall, use Mobile Hotspot or Wi-Fi.");
+            return new NetworkEndpointInfo(cellularIp, true, diag);
+        }
+        return new NetworkEndpointInfo("127.0.0.1", false,
+                "Loopback only (127.0.0.1) — connect to Wi-Fi or turn on Mobile Hotspot to invite other devices.");
+    }
+
+    /** Discovers the device's primary Wi-Fi / Mobile Hotspot site-local IPv4 address. */
+    @NonNull
+    public static String detectPrimarySiteLocalIpv4() {
+        return detectPrimaryNetworkEndpoint().ipv4;
     }
 
     @NonNull

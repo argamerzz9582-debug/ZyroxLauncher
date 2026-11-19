@@ -47,6 +47,7 @@ import git.artdeell.mojo.ui.ZyroxLiquidGlassDrawable;
 public final class VoiceChatOverlayController implements View.OnTouchListener {
 
     public static final int REQUEST_CODE_VOICE_CHAT_MIC = 4192;
+    public static final int REQUEST_CODE_VOICE_CHAT_FALLBACK = 4193;
 
     @NonNull private final Activity mActivity;
     @NonNull private final ViewGroup mRootContainer;
@@ -56,6 +57,7 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
     private final int mTouchSlop;
 
     @Nullable private SpeechRecognizer mRecognizer;
+    private boolean mServiceUnavailable;
     private boolean mOverlayEnabled;
     private boolean mListening;
     private boolean mDragging;
@@ -141,13 +143,50 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
         }
     }
 
+    /** Exposes the floating MIC pill view for HUD obstacle collision avoidance. */
+    @NonNull
+    public View getMicPillView() {
+        return mMicPill;
+    }
+
+    /** Handles Android runtime {@code RECORD_AUDIO} permission result safely. */
+    public void onMicrophonePermissionResult(boolean granted) {
+        if (mActivity.isFinishing() || mActivity.isDestroyed()) return;
+        applyMicVisualState(false);
+        if (granted) {
+            Toast.makeText(mActivity,
+                    "Microphone enabled — hold MIC to dictate Minecraft chat.",
+                    Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(mActivity,
+                    "Microphone permission denied — Voice-to-Chat stays inactive.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** Handles fallback {@link RecognizerIntent#ACTION_RECOGNIZE_SPEECH} intent results. */
+    public void onFallbackSpeechResult(int resultCode, @Nullable Intent data) {
+        applyMicVisualState(false);
+        hideBubble();
+        if (resultCode != Activity.RESULT_OK || data == null) return;
+        ArrayList<String> matches = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+        if (matches != null && !matches.isEmpty() && matches.get(0) != null) {
+            String text = matches.get(0).trim();
+            if (!text.isEmpty()) {
+                deliverRecognizedChat(text);
+            }
+        }
+    }
+
     /** Handles hold/release from a custom {@code SPECIALBTN_VOICE_CHAT} control button. */
     public void onControlButtonState(boolean isDown) {
-        if (isDown) {
-            startHoldToSpeak();
-        } else {
-            finishHoldToSpeak();
-        }
+        git.artdeell.mojo.Tools.runOnUiThread(() -> {
+            if (isDown) {
+                startHoldToSpeak();
+            } else {
+                finishHoldToSpeak();
+            }
+        });
     }
 
     @Override
@@ -198,6 +237,7 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
     private void startHoldToSpeak() {
         if (mListening || mActivity.isFinishing() || mActivity.isDestroyed()) return;
 
+        // 1. Strictly enforce RECORD_AUDIO runtime permission BEFORE initializing SpeechRecognizer
         if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
@@ -210,38 +250,92 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
             return;
         }
 
-        if (!SpeechRecognizer.isRecognitionAvailable(mActivity)) {
-            Toast.makeText(mActivity,
-                    "Speech recognition service is unavailable on this device.",
-                    Toast.LENGTH_LONG).show();
+        // 2. Gracefully handle missing/disabled Google Speech Services on AOSP/custom ROMs
+        boolean recognitionAvailable = false;
+        if (!mServiceUnavailable) {
+            try {
+                recognitionAvailable = SpeechRecognizer.isRecognitionAvailable(mActivity);
+            } catch (Throwable ignored) {
+                recognitionAvailable = false;
+            }
+        }
+        if (!recognitionAvailable) {
+            launchSystemFallbackOrNotify();
             return;
         }
 
         try {
             ensureRecognizer();
-            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag());
-            intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-            intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-            intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, mActivity.getPackageName());
-
+            if (mRecognizer == null) {
+                mServiceUnavailable = true;
+                launchSystemFallbackOrNotify();
+                return;
+            }
+            Intent intent = createSpeechIntent(true);
             mLatestPartialText = "";
             mListening = true;
             pulseHaptic();
             applyMicVisualState(true);
             showBubble("Listening… release to send");
-            if (mRecognizer != null) {
-                mRecognizer.startListening(intent);
-            }
-        } catch (Throwable t) {
+            mRecognizer.startListening(intent);
+        } catch (SecurityException secEx) {
             mListening = false;
+            destroyRecognizerQuietly();
             applyMicVisualState(false);
             hideBubble();
             Toast.makeText(mActivity,
-                    "Voice-to-Chat unavailable: " + t.getMessage(),
+                    "Microphone or speech service access denied — verify app permissions.",
                     Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            mListening = false;
+            mServiceUnavailable = true;
+            destroyRecognizerQuietly();
+            applyMicVisualState(false);
+            hideBubble();
+            launchSystemFallbackOrNotify();
+        }
+    }
+
+    @NonNull
+    private Intent createSpeechIntent(boolean partialResults) {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag());
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, partialResults);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, mActivity.getPackageName());
+        return intent;
+    }
+
+    private void launchSystemFallbackOrNotify() {
+        applyMicVisualState(false);
+        hideBubble();
+        try {
+            Intent promptIntent = createSpeechIntent(false);
+            promptIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak Minecraft chat message");
+            if (promptIntent.resolveActivity(mActivity.getPackageManager()) != null) {
+                mActivity.startActivityForResult(promptIntent, REQUEST_CODE_VOICE_CHAT_FALLBACK);
+                return;
+            }
+        } catch (Throwable ignored) {
+        }
+        Toast.makeText(mActivity,
+                "Google Speech Services is unavailable — enable Speech Services by Google to use Voice-to-Chat.",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void destroyRecognizerQuietly() {
+        if (mRecognizer != null) {
+            try {
+                mRecognizer.cancel();
+            } catch (Throwable ignored) {
+            }
+            try {
+                mRecognizer.destroy();
+            } catch (Throwable ignored) {
+            }
+            mRecognizer = null;
         }
     }
 
@@ -276,13 +370,7 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
     /** Releases native {@link SpeechRecognizer} and detaches views on {@code GameActivity.onDestroy()}. */
     public void destroy() {
         cancelListening();
-        if (mRecognizer != null) {
-            try {
-                mRecognizer.destroy();
-            } catch (Throwable ignored) {
-            }
-            mRecognizer = null;
-        }
+        destroyRecognizerQuietly();
         mRootContainer.removeView(mMicPill);
         mRootContainer.removeView(mTranscriptBubble);
     }
@@ -316,12 +404,17 @@ public final class VoiceChatOverlayController implements View.OnTouchListener {
                     return;
                 }
                 hideBubble();
-                if (error == SpeechRecognizer.ERROR_NETWORK
+                if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                        || error == SpeechRecognizer.ERROR_CLIENT
+                        || error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
+                    destroyRecognizerQuietly();
+                } else if (error == SpeechRecognizer.ERROR_NETWORK
                         || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT) {
                     Toast.makeText(mActivity,
                             "Voice-to-Chat offline — enable offline speech pack or connect to Wi-Fi.",
                             Toast.LENGTH_SHORT).show();
                 } else if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
+                    destroyRecognizerQuietly();
                     Toast.makeText(mActivity,
                             "Microphone permission required for Voice-to-Chat.",
                             Toast.LENGTH_SHORT).show();

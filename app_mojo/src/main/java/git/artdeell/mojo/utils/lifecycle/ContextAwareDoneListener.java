@@ -48,13 +48,21 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
     @Override
     public void executeWithActivity(Activity activity) {
         try {
-            // Strictly release all background GIF/MP4/Shader resources before GameActivity starts
-            git.artdeell.mojo.ui.ZyroxShaderBackgroundView.releaseAllForGameStart();
+            // Strictly release all launcher background GIF bitmaps, MP4 decoders & shader surfaces
+            // BEFORE starting GameActivity / GameService so maximum RAM is free for the JVM.
+            if (activity instanceof git.artdeell.mojo.LauncherActivity) {
+                ((git.artdeell.mojo.LauncherActivity) activity).releaseAllLauncherBackgroundMedia(true);
+            } else {
+                git.artdeell.mojo.ui.ZyroxShaderBackgroundView.releaseAllForGameStart();
+                git.artdeell.mojo.ui.ZyroxLoopingVideoView.suspendInactiveDecoders(true);
+                git.artdeell.mojo.ui.ZyroxSeamlessGifView.purgeAllActiveInstances(true);
+            }
+            git.artdeell.mojo.servers.ZyroxRoomBridge.stopClientTunnel();
             Intent gameStartIntent = createGameStartIntent(activity);
             activity.startActivity(gameStartIntent);
             activity.finish();
             activity.overridePendingTransition(0, 0);
-            android.os.Process.killProcess(android.os.Process.myPid()); //You should kill yourself, NOW!
+            android.os.Process.killProcess(android.os.Process.myPid());
         } catch (Throwable e) {
             Tools.showError(activity.getBaseContext(), e);
         }

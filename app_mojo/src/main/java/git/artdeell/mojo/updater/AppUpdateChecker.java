@@ -262,6 +262,9 @@ public final class AppUpdateChecker {
         if (now < sp.getLong(KEY_SNOOZE_UNTIL_MS, 0L)) {
             return;
         }
+        if (!isDeviceOnline(appCtx)) {
+            return;
+        }
         long last = sp.getLong(KEY_LAST_CHECK_MS, 0L);
         final String skipped = sp.getString(KEY_DISMISSED_TAG, "");
         if (now - last < AUTO_CHECK_INTERVAL_MS) {
@@ -283,8 +286,14 @@ public final class AppUpdateChecker {
 
     /** Explicit user-triggered update check (bypasses snooze/skip so manual checks always work). */
     public static void checkNowInteractive(@NonNull Context ctx) {
-        Toast.makeText(ctx, "Checking GitHub Releases for updates…", Toast.LENGTH_SHORT).show();
         final Context appCtx = ctx.getApplicationContext();
+        if (!isDeviceOnline(appCtx)) {
+            Toast.makeText(appCtx,
+                    "You appear to be offline — connect to Wi-Fi or mobile data to check updates.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(ctx, "Checking GitHub Releases for updates…", Toast.LENGTH_SHORT).show();
         final SharedPreferences sp = appCtx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         MojoApplication.sExecutorService.execute(() -> {
             try {
@@ -298,11 +307,127 @@ public final class AppUpdateChecker {
                                 Toast.LENGTH_LONG).show();
                     }
                 });
+            } catch (GitHubRateLimitException rle) {
+                Tools.runOnUiThread(() -> showRateLimitFallback(ctx, appCtx, rle.getMessage()));
             } catch (Exception e) {
-                Tools.runOnUiThread(() -> Toast.makeText(appCtx,
-                        "Could not check updates: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                final String friendly = classifyUpdateError(e);
+                Tools.runOnUiThread(() -> Toast.makeText(appCtx, friendly, Toast.LENGTH_LONG).show());
             }
         });
+    }
+
+    private static void showRateLimitFallback(@NonNull Context ctx,
+                                              @NonNull Context appCtx,
+                                              @Nullable String message) {
+        String text = message != null ? message
+                : "GitHub API rate limit reached (HTTP 403). Please try again shortly.";
+        if (ctx instanceof android.app.Activity) {
+            android.app.Activity act = (android.app.Activity) ctx;
+            if (!act.isFinishing() && !act.isDestroyed()) {
+                new AlertDialog.Builder(act)
+                        .setTitle("GitHub Rate Limit Reached")
+                        .setMessage(text + "\n\nYou can still open the official Zyrox Launcher Releases page directly in your browser.")
+                        .setPositiveButton("Open GitHub Releases",
+                                (d, w) -> openHttpsUrl(act, RELEASES_PAGE))
+                        .setNegativeButton(android.R.string.ok, null)
+                        .show();
+                return;
+            }
+        }
+        Toast.makeText(appCtx, text, Toast.LENGTH_LONG).show();
+    }
+
+    /** Returns {@code true} if Android reports an active internet-capable network interface. */
+    public static boolean isDeviceOnline(@NonNull Context context) {
+        try {
+            android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
+                    context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.net.Network active = cm.getActiveNetwork();
+                if (active == null) return false;
+                android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(active);
+                return caps != null
+                        && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            } else {
+                @SuppressWarnings("deprecation")
+                android.net.NetworkInfo info = cm.getActiveNetworkInfo();
+                //noinspection deprecation
+                return info != null && info.isConnected();
+            }
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /** Converts raw network and GitHub HTTP errors into concise, user-actionable messages. */
+    @NonNull
+    public static String classifyUpdateError(@Nullable Throwable error) {
+        if (error == null) {
+            return "Could not check updates right now — please try again.";
+        }
+        if (error instanceof GitHubRateLimitException && error.getMessage() != null) {
+            return error.getMessage();
+        }
+        if (error instanceof java.net.UnknownHostException
+                || error instanceof java.net.ConnectException
+                || error instanceof java.net.NoRouteToHostException) {
+            return "You appear to be offline — check your internet connection and try again.";
+        }
+        if (error instanceof java.net.SocketTimeoutException
+                || error instanceof java.io.InterruptedIOException) {
+            return "Connection to GitHub timed out — please retry on a stable network.";
+        }
+        if (error instanceof javax.net.ssl.SSLException) {
+            return "Secure TLS handshake with GitHub failed — check your device date/time or network.";
+        }
+        String msg = error.getMessage();
+        if (msg != null && (msg.contains("403") || msg.contains("429")
+                || msg.toLowerCase(Locale.ROOT).contains("rate limit"))) {
+            return "GitHub API rate limit reached — please wait a few minutes and try again.";
+        }
+        return "Could not check updates: " + (msg != null ? msg : error.getClass().getSimpleName());
+    }
+
+    /** Formats a GitHub {@code X-RateLimit-Reset} epoch-second header into a friendly wait message. */
+    @NonNull
+    public static String formatRateLimitMessage(int statusCode,
+                                                @Nullable String rateLimitResetEpochSec,
+                                                @Nullable String retryAfterHeader,
+                                                long nowMs) {
+        long waitMinutes = 0L;
+        if (retryAfterHeader != null && !retryAfterHeader.trim().isEmpty()) {
+            long retryMs = ZyroxHttpClient.parseRetryAfterMs(retryAfterHeader);
+            if (retryMs > 0L) {
+                waitMinutes = Math.max(1L, (retryMs + 59_999L) / 60_000L);
+            }
+        }
+        if (waitMinutes == 0L && rateLimitResetEpochSec != null
+                && !rateLimitResetEpochSec.trim().isEmpty()) {
+            try {
+                long resetMs = Long.parseLong(rateLimitResetEpochSec.trim()) * 1000L;
+                if (resetMs > nowMs) {
+                    waitMinutes = Math.max(1L, Math.min(60L, (resetMs - nowMs + 59_999L) / 60_000L));
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (waitMinutes > 0L) {
+            return "GitHub Releases API rate limit reached (HTTP " + statusCode
+                    + ") — resets in ~" + waitMinutes + " min.";
+        }
+        return "GitHub Releases API rate limit reached (HTTP " + statusCode
+                + ") — please try again in a few minutes.";
+    }
+
+    /** Typed exception indicating GitHub HTTP 403/429 rate limiting. */
+    public static final class GitHubRateLimitException extends IOException {
+        public final int statusCode;
+
+        public GitHubRateLimitException(int statusCode, @NonNull String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
     }
 
     /** Displays the Liquid Glass {@link AppUpdateDialogFragment} (with safe AlertDialog fallback). */
@@ -358,7 +483,9 @@ public final class AppUpdateChecker {
                 .header("Accept", "application/vnd.github+json");
         String cachedEtag = sp.getString(KEY_CACHED_ETAG, null);
         String cachedJson = sp.getString(KEY_CACHED_JSON, null);
-        if (!manualForce && cachedEtag != null && !cachedEtag.isEmpty()
+        // Always include If-None-Match when cached: GitHub returns 200 immediately on any new
+        // release while 304 Not Modified responses consume zero unauthenticated rate-limit quota.
+        if (cachedEtag != null && !cachedEtag.isEmpty()
                 && cachedJson != null && !cachedJson.isEmpty()) {
             reqBuilder.header("If-None-Match", cachedEtag);
         }
@@ -369,10 +496,23 @@ public final class AppUpdateChecker {
                 return parseReleaseJson(cachedJson, currentVersion, getDeviceAbis());
             }
             if (code == 403 || code == 429) {
-                if (cachedJson != null && !cachedJson.isEmpty()) {
+                String resetHdr = res.header("X-RateLimit-Reset");
+                String retryHdr = res.header("Retry-After");
+                if (!manualForce && cachedJson != null && !cachedJson.isEmpty()) {
                     return parseReleaseJson(cachedJson, currentVersion, getDeviceAbis());
                 }
-                throw new IOException("GitHub Releases API rate limit reached — try again shortly");
+                if (cachedJson != null && !cachedJson.isEmpty()) {
+                    ReleaseInfo cached = parseReleaseJson(cachedJson, currentVersion, getDeviceAbis());
+                    if (cached.updateAvailable) {
+                        return cached;
+                    }
+                }
+                throw new GitHubRateLimitException(code, formatRateLimitMessage(
+                        code, resetHdr, retryHdr, System.currentTimeMillis()));
+            }
+            if (code == HttpURLConnection.HTTP_NOT_FOUND) {
+                // Repository has no published release yet — treat gracefully as up-to-date
+                return null;
             }
             okhttp3.ResponseBody rb = res.body();
             String bodyText = rb != null ? rb.string() : "";
@@ -394,8 +534,15 @@ public final class AppUpdateChecker {
     public static ReleaseInfo fetchLatestRelease(@NonNull String currentVersion) throws IOException {
         Map<String, String> headers = new HashMap<>();
         headers.put("Accept", "application/vnd.github+json");
+        headers.put("X-GitHub-Api-Version", "2022-11-28");
         ZyroxHttpClient.StatusTextResponse res =
                 ZyroxHttpClient.getStringWithStatus(LATEST_RELEASE_API, headers);
+        if (res.statusCode == 403 || res.statusCode == 429) {
+            throw new GitHubRateLimitException(res.statusCode, formatRateLimitMessage(
+                    res.statusCode, null,
+                    res.retryAfterMs > 0L ? Long.toString(res.retryAfterMs / 1000L) : null,
+                    System.currentTimeMillis()));
+        }
         if (!res.isSuccessful() || res.body == null || res.body.trim().isEmpty()) {
             throw new IOException("GitHub API HTTP " + res.statusCode);
         }
@@ -697,14 +844,40 @@ public final class AppUpdateChecker {
         return unlinked.replace("`", "").trim();
     }
 
-    /** Resolves {@code getExternalCacheDir()/updates/} with safe fallback to internal cache. */
+    /**
+     * Resolves {@code getCacheDir()/updates/} (mapped to {@code FileProvider} {@code cache-path}
+     * {@code updates/*.apk} in {@code file_paths.xml}) with automatic free-space fallback to
+     * {@code getExternalCacheDir()/updates/}, and prunes stale artifacts across both caches.
+     */
     @NonNull
     public static File resolveUpdatesCacheDirectory(@NonNull Context context) throws IOException {
-        File base = context.getExternalCacheDir();
-        if (base == null || (!base.exists() && !base.mkdirs()) || !base.canWrite()) {
-            base = context.getCacheDir();
+        File internalCache = context.getCacheDir();
+        File externalCache = context.getExternalCacheDir();
+        long minFreeBytes = 200L * 1024L * 1024L;
+
+        File chosenBase = internalCache;
+        if (internalCache == null || !internalCache.canWrite()
+                || internalCache.getUsableSpace() < minFreeBytes) {
+            if (externalCache != null
+                    && (externalCache.exists() || externalCache.mkdirs())
+                    && externalCache.canWrite()
+                    && (internalCache == null
+                        || externalCache.getUsableSpace() > internalCache.getUsableSpace())) {
+                chosenBase = externalCache;
+            }
         }
-        File updatesDir = new File(base, "updates");
+        if (chosenBase == null) {
+            throw new IOException("No writable cache directory available for APK update");
+        }
+        // Also prune any stale APKs left in the alternate cache directory
+        File alternateBase = (chosenBase == internalCache) ? externalCache : internalCache;
+        if (alternateBase != null) {
+            File altUpdates = new File(alternateBase, "updates");
+            if (altUpdates.isDirectory()) {
+                pruneStaleUpdateFiles(altUpdates, "");
+            }
+        }
+        File updatesDir = new File(chosenBase, "updates");
         FileUtils.ensureDirectory(updatesDir);
         return updatesDir;
     }
@@ -761,8 +934,14 @@ public final class AppUpdateChecker {
                 try (okhttp3.Response res = ZyroxHttpClient.openDownloadResponse(
                         release.apkDownloadUrl, 0L)) {
                     okhttp3.ResponseBody body = res.body();
+                    int httpCode = res.code();
+                    if (httpCode == 403 || httpCode == 429) {
+                        throw new GitHubRateLimitException(httpCode, formatRateLimitMessage(
+                                httpCode, res.header("X-RateLimit-Reset"),
+                                res.header("Retry-After"), System.currentTimeMillis()));
+                    }
                     if (!res.isSuccessful() || body == null) {
-                        throw new IOException("APK download failed (HTTP " + res.code() + ")");
+                        throw new IOException("APK download failed (HTTP " + httpCode + ")");
                     }
                     long contentLength = body.contentLength();
                     final long totalBytes = contentLength > 0 ? contentLength : release.apkSizeBytes;
