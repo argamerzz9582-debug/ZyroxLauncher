@@ -229,13 +229,15 @@ public final class Tools {
     public static DisplayMetrics currentDisplayMetrics;
 
     public static float dpToPx(float dp) {
-        //Better hope for the currentDisplayMetrics to be good
-        return dp * currentDisplayMetrics.density;
+        float density = (currentDisplayMetrics != null && currentDisplayMetrics.density > 0f)
+                ? currentDisplayMetrics.density : 1f;
+        return dp * density;
     }
 
     public static float pxToDp(float px){
-        //Better hope for the currentDisplayMetrics to be good
-        return px / currentDisplayMetrics.density;
+        float density = (currentDisplayMetrics != null && currentDisplayMetrics.density > 0f)
+                ? currentDisplayMetrics.density : 1f;
+        return px / density;
     }
 
     public static void copyAssetFile(Context ctx, String assetPath, String output, boolean overwrite) throws IOException {

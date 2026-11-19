@@ -117,6 +117,7 @@ public class GameActivity extends BaseActivity
     private GameRenderer mGameRenderer;
     private GameService.LocalBinder mServiceBinder;
     private QuickSettingSideDialog mQuickSettingSideDialog;
+    private GameOptimizer.ThermalGovernor mThermalGovernor;
 
     private GameLoadingOverlayController mLoadingController;
     private GameHudCoordinator mHudCoordinator;
@@ -175,6 +176,19 @@ public class GameActivity extends BaseActivity
         }
 
         GameOptimizer.applyInGameSystemBoost(this, LauncherPreferences.PREF_ZYROX_OPTIMIZER_MODE);
+        mThermalGovernor = new GameOptimizer.ThermalGovernor(
+                this, (multiplier, cap60Hz, hudBadge) -> {
+                    if (launcherGLView != null) {
+                        launcherGLView.applyThermalGovernorScale(multiplier, cap60Hz);
+                    }
+                    if (mHotbarView != null) {
+                        mHotbarView.onResolutionChanged();
+                    }
+                    if (mHudCoordinator != null) {
+                        mHudCoordinator.setThermalGovernorBadge(hudBadge);
+                    }
+                });
+        mThermalGovernor.start(LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR);
         InstancePlaytimeTracker.recordSessionStart(this, instance, System.currentTimeMillis());
 
         setupWindowInsetsAndImePanning();
@@ -493,6 +507,10 @@ public class GameActivity extends BaseActivity
     @Override
     protected void onDestroy() {
         flushPlaytimeSession();
+        if (mThermalGovernor != null) {
+            mThermalGovernor.stop();
+            mThermalGovernor = null;
+        }
         if (mHudCoordinator != null) {
             mHudCoordinator.onDestroy();
             mHudCoordinator = null;
@@ -611,6 +629,10 @@ public class GameActivity extends BaseActivity
                     if (mHudCoordinator != null) {
                         mHudCoordinator.syncPreferencesLive();
                     }
+                    if (mThermalGovernor != null) {
+                        mThermalGovernor.setEnabled(
+                                LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR);
+                    }
                 }
 
                 @Override
@@ -669,6 +691,23 @@ public class GameActivity extends BaseActivity
             touchCharInput.setKeyboardState(state);
             GameActivity.mForcedPanningHeight = panningHeight;
         }
+    }
+
+    /** Triggers the hold-to-speak Voice-to-Chat recognizer from a custom touch button. */
+    public static void triggerVoiceChatFromControl(boolean isDown) {
+        ContextExecutor.executeActivity(activity -> {
+            if (activity instanceof GameActivity) {
+                GameActivity ga = (GameActivity) activity;
+                if (ga.mHudCoordinator != null) {
+                    ga.mHudCoordinator.onVoiceChatButtonState(isDown);
+                }
+            }
+        });
+    }
+
+    /** Opens the 8-slot thumb-hold Radial Macro Wheel from a custom touch button. */
+    public static void openQuickMacroWheelFromControl() {
+        ContextExecutor.executeActivity(QuickMacroDialog::show);
     }
 
     @Override

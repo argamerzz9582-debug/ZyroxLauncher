@@ -506,4 +506,211 @@ public final class GameOptimizer {
             tmp.delete();
         }
     }
+
+    // =========================================================================
+    // Real-Time Android Thermal & Battery Governor (Dynamic Resolution Scaling)
+    // =========================================================================
+
+    /** Callback receiving dynamic thermal/battery resolution scale changes on the main thread. */
+    public interface ThermalScaleListener {
+        void onThermalScaleChanged(float resolutionMultiplier,
+                                   boolean capRefreshTo60Hz,
+                                   @Nullable String hudBadgeText);
+    }
+
+    /**
+     * Deterministic governor policy mapping Android {@link android.os.PowerManager} thermal status
+     * ({@code 0..6}), battery temperature ({@code °C}), battery level, charging state, and system
+     * power-saver mode to a smooth render-resolution multiplier:
+     * <ul>
+     *   <li>Normal ({@code NONE}/{@code LIGHT}, {@code < 42°C}) &rarr; {@code 1.00f}</li>
+     *   <li>Moderate / Low Battery / Power Saver ({@code MODERATE} or {@code 42–44.9°C}) &rarr; {@code 0.85f}</li>
+     *   <li>Severe ({@code THERMAL_STATUS_SEVERE} or {@code 45–47.4°C}) &rarr; {@code 0.80f}</li>
+     *   <li>Critical ({@code >= THERMAL_STATUS_CRITICAL} or {@code >= 47.5°C}) &rarr; {@code 0.70f}</li>
+     * </ul>
+     */
+    public static float computeThermalScaleMultiplier(int androidThermalStatus,
+                                                      float batteryTempCelsius,
+                                                      int batteryPercent,
+                                                      boolean isCharging,
+                                                      boolean isPowerSaveMode) {
+        if (androidThermalStatus >= 4 || batteryTempCelsius >= 47.5f) {
+            return 0.70f;
+        }
+        if (androidThermalStatus == 3 || batteryTempCelsius >= 45.0f) {
+            return 0.80f;
+        }
+        if (androidThermalStatus == 2 || batteryTempCelsius >= 42.0f) {
+            return 0.85f;
+        }
+        if (isPowerSaveMode || (!isCharging && batteryPercent > 0 && batteryPercent <= 15)) {
+            return 0.85f;
+        }
+        return 1.00f;
+    }
+
+    /** Returns a compact non-intrusive HUD badge when active (e.g. {@code "THM 80%"}), else {@code null}. */
+    @Nullable
+    public static String formatThermalGovernorBadge(float multiplier,
+                                                    int androidThermalStatus,
+                                                    float batteryTempCelsius) {
+        if (multiplier >= 0.99f) return null;
+        int pct = Math.round(multiplier * 100f);
+        boolean thermalCause = androidThermalStatus >= 2 || batteryTempCelsius >= 42.0f;
+        return (thermalCause ? "THM " : "ECO ") + pct + "%";
+    }
+
+    /**
+     * Leak-free lifecycle governor registering {@link android.os.PowerManager} thermal callbacks
+     * (API 29+) and periodic battery-temperature probes (API 21+) to dynamically step down render
+     * resolution during long gaming sessions before SoC throttling causes hard FPS drops.
+     */
+    public static final class ThermalGovernor {
+        private static final long POLL_INTERVAL_MS = 10_000L;
+        private static final long RECOVERY_COOLDOWN_MS = 8_000L;
+
+        @NonNull private final android.content.Context mAppContext;
+        @NonNull private final ThermalScaleListener mListener;
+        @NonNull private final android.os.Handler mMainHandler =
+                new android.os.Handler(android.os.Looper.getMainLooper());
+        @Nullable private final android.os.PowerManager mPowerManager;
+        @Nullable private Object mThermalListenerObj;
+
+        private boolean mRunning;
+        private boolean mEnabled = true;
+        private int mLastThermalStatus = 0;
+        private float mAppliedMultiplier = 1.0f;
+        private long mLastTransitionElapsedMs = 0L;
+
+        private final Runnable mPollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (!mRunning) return;
+                evaluateAndApply(false);
+                mMainHandler.postDelayed(this, POLL_INTERVAL_MS);
+            }
+        };
+
+        public ThermalGovernor(@NonNull android.content.Context context,
+                               @NonNull ThermalScaleListener listener) {
+            mAppContext = context.getApplicationContext();
+            mListener = listener;
+            mPowerManager = (android.os.PowerManager)
+                    mAppContext.getSystemService(android.content.Context.POWER_SERVICE);
+        }
+
+        public void start(boolean enabled) {
+            mEnabled = enabled;
+            if (mRunning) {
+                evaluateAndApply(true);
+                return;
+            }
+            mRunning = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mPowerManager != null) {
+                try {
+                    mLastThermalStatus = mPowerManager.getCurrentThermalStatus();
+                    android.os.PowerManager.OnThermalStatusChangedListener tl = status -> {
+                        mLastThermalStatus = status;
+                        mMainHandler.post(() -> evaluateAndApply(false));
+                    };
+                    mPowerManager.addThermalStatusListener(tl);
+                    mThermalListenerObj = tl;
+                } catch (Throwable ignored) {
+                }
+            }
+            evaluateAndApply(true);
+            mMainHandler.postDelayed(mPollRunnable, POLL_INTERVAL_MS);
+        }
+
+        public void setEnabled(boolean enabled) {
+            if (mEnabled == enabled) return;
+            mEnabled = enabled;
+            if (!enabled) {
+                if (mAppliedMultiplier != 1.0f) {
+                    mAppliedMultiplier = 1.0f;
+                    mListener.onThermalScaleChanged(1.0f, false, null);
+                }
+            } else {
+                evaluateAndApply(true);
+            }
+        }
+
+        public void stop() {
+            if (!mRunning) return;
+            mRunning = false;
+            mMainHandler.removeCallbacksAndMessages(null);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                    && mPowerManager != null && mThermalListenerObj != null) {
+                try {
+                    mPowerManager.removeThermalStatusListener(
+                            (android.os.PowerManager.OnThermalStatusChangedListener)
+                                    mThermalListenerObj);
+                } catch (Throwable ignored) {
+                }
+                mThermalListenerObj = null;
+            }
+        }
+
+        private void evaluateAndApply(boolean force) {
+            if (!mRunning) return;
+            if (!mEnabled) {
+                if (mAppliedMultiplier != 1.0f) {
+                    mAppliedMultiplier = 1.0f;
+                    mListener.onThermalScaleChanged(1.0f, false, null);
+                }
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mPowerManager != null) {
+                try {
+                    mLastThermalStatus = mPowerManager.getCurrentThermalStatus();
+                } catch (Throwable ignored) {
+                }
+            }
+
+            float tempC = 0f;
+            int batPct = 100;
+            boolean charging = false;
+            try {
+                android.content.Intent sticky = mAppContext.registerReceiver(null,
+                        new android.content.IntentFilter(
+                                android.content.Intent.ACTION_BATTERY_CHANGED));
+                if (sticky != null) {
+                    int tenths = sticky.getIntExtra(
+                            android.os.BatteryManager.EXTRA_TEMPERATURE, 0);
+                    if (tenths > 0) tempC = tenths / 10f;
+                    int lvl = sticky.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = sticky.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100);
+                    if (lvl >= 0 && scale > 0) batPct = Math.round((lvl * 100f) / scale);
+                    int st = sticky.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                    charging = st == android.os.BatteryManager.BATTERY_STATUS_CHARGING
+                            || st == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                }
+            } catch (Throwable ignored) {
+            }
+
+            boolean powerSave = mPowerManager != null && mPowerManager.isPowerSaveMode();
+            float desired = computeThermalScaleMultiplier(
+                    mLastThermalStatus, tempC, batPct, charging, powerSave);
+
+            if (desired > mAppliedMultiplier && tempC >= 40.5f && mLastThermalStatus >= 1) {
+                return;
+            }
+            if (Math.abs(desired - mAppliedMultiplier) < 0.01f) {
+                return;
+            }
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (!force && desired > mAppliedMultiplier
+                    && (now - mLastTransitionElapsedMs) < RECOVERY_COOLDOWN_MS) {
+                return;
+            }
+
+            mAppliedMultiplier = desired;
+            mLastTransitionElapsedMs = now;
+            boolean cap60 = desired <= 0.80f || powerSave;
+            String badge = formatThermalGovernorBadge(desired, mLastThermalStatus, tempC);
+            Log.i(TAG, "ThermalGovernor scale=" + desired
+                    + " (thermalStatus=" + mLastThermalStatus + ", temp=" + tempC + "C)");
+            mListener.onThermalScaleChanged(desired, cap60, badge);
+        }
+    }
 }

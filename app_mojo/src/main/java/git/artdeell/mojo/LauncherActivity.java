@@ -309,9 +309,19 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                             "Pre-flight advisor warning: " + t.getMessage());
                 }
 
+                git.artdeell.mojo.content.ModMetadataParser.SimulationReport modSim = null;
+                try {
+                    modSim = git.artdeell.mojo.instances.InstanceHealthInspector
+                            .simulateModConflicts(selectedInstance, resolvedVersionId);
+                } catch (Throwable simErr) {
+                    android.util.Log.w("LauncherActivity",
+                            "Mod simulator warning: " + simErr.getMessage());
+                }
+
                 final String finalVersionId = resolvedVersionId;
                 final JVersionList.Version finalMcVersion = resolvedMcVersion;
-                Tools.runOnUiThread(() -> {
+                final git.artdeell.mojo.content.ModMetadataParser.SimulationReport finalSim = modSim;
+                final Runnable proceedDownloadAndBoot = () -> {
                     if (isFinishing() || isDestroyed()) {
                         ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
                         return;
@@ -325,6 +335,20 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
                             finalVersionId,
                             new ContextAwareDoneListener(LauncherActivity.this, finalVersionId)
                     );
+                };
+
+                Tools.runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+                        return;
+                    }
+                    if (finalSim != null && finalSim.hasBlockingIssues()) {
+                        ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+                        showPreLaunchModConflictDialog(
+                                selectedInstance, finalSim, proceedDownloadAndBoot);
+                        return;
+                    }
+                    proceedDownloadAndBoot.run();
                 });
             });
         };
@@ -360,6 +384,55 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         startLaunch.run();
         return false;
     };
+
+    /**
+     * Surfaces the static Pre-Launch Mod Conflict &amp; Dependency Simulator diagnosis with a
+     * 1-Tap Auto-Fix &amp; Launch action (auto-downloads missing Modrinth dependencies + safely
+     * disables duplicate/corrupt/mismatched JARs after capturing a rolling pre-mod snapshot).
+     */
+    private void showPreLaunchModConflictDialog(
+            @NonNull Instance instance,
+            @NonNull git.artdeell.mojo.content.ModMetadataParser.SimulationReport report,
+            @NonNull Runnable proceedLaunch) {
+        androidx.appcompat.app.AlertDialog.Builder builder =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Mod Conflict Simulator")
+                        .setMessage(report.buildHumanSummary())
+                        .setNeutralButton("Launch Anyway", (d, w) -> {
+                            ProgressLayout.setProgress(
+                                    ProgressLayout.DOWNLOAD_GAME, 0, R.string.newdl_starting);
+                            proceedLaunch.run();
+                        })
+                        .setNegativeButton(android.R.string.cancel, null);
+
+        if (report.canAutoFix()) {
+            builder.setPositiveButton("1-Tap Auto-Fix & Launch", (d, w) -> {
+                ProgressLayout.setProgress(
+                        ProgressLayout.DOWNLOAD_GAME, 10, R.string.newdl_starting);
+                MojoApplication.sExecutorService.execute(() -> {
+                    String fixResult;
+                    try {
+                        fixResult = git.artdeell.mojo.content.InstanceContentManager
+                                .autoFixSimulationIssues(instance, report, status ->
+                                        ProgressLayout.setProgress(ProgressLayout.DOWNLOAD_GAME,
+                                                50, R.string.newdl_starting));
+                    } catch (Exception e) {
+                        fixResult = "Auto-fix warning: " + e.getMessage();
+                    }
+                    final String toastMsg = fixResult;
+                    Tools.runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) {
+                            ProgressLayout.clearProgress(ProgressLayout.DOWNLOAD_GAME);
+                            return;
+                        }
+                        Toast.makeText(LauncherActivity.this, toastMsg, Toast.LENGTH_LONG).show();
+                        proceedLaunch.run();
+                    });
+                });
+            });
+        }
+        builder.show();
+    }
 
     private final TaskCountListener mDoubleLaunchPreventionListener = taskCount -> {
         mActiveTaskCount = taskCount;

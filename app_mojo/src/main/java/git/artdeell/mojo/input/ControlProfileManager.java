@@ -98,6 +98,7 @@ public final class ControlProfileManager {
         @NonNull public final String performancePreset;
         public final int resolutionScalePct;
         public final boolean contextAwareControls;
+        @NonNull public final List<String> modIds;
 
         public ZyroxSetupBundle(@NonNull String profileName,
                                 @NonNull String controlJson,
@@ -112,6 +113,26 @@ public final class ControlProfileManager {
                                 @NonNull String performancePreset,
                                 int resolutionScalePct,
                                 boolean contextAwareControls) {
+            this(profileName, controlJson, buttonScalePct, mouseScalePct, mouseSpeedPct,
+                    gyroEnabled, gyroSensitivity, gyroInvertX, gyroInvertY,
+                    rendererTag, performancePreset, resolutionScalePct, contextAwareControls,
+                    Collections.emptyList());
+        }
+
+        public ZyroxSetupBundle(@NonNull String profileName,
+                                @NonNull String controlJson,
+                                int buttonScalePct,
+                                int mouseScalePct,
+                                int mouseSpeedPct,
+                                boolean gyroEnabled,
+                                float gyroSensitivity,
+                                boolean gyroInvertX,
+                                boolean gyroInvertY,
+                                @NonNull String rendererTag,
+                                @NonNull String performancePreset,
+                                int resolutionScalePct,
+                                boolean contextAwareControls,
+                                @NonNull List<String> modIds) {
             this.profileName = profileName;
             this.controlJson = controlJson;
             this.buttonScalePct = buttonScalePct;
@@ -125,6 +146,7 @@ public final class ControlProfileManager {
             this.performancePreset = performancePreset;
             this.resolutionScalePct = resolutionScalePct;
             this.contextAwareControls = contextAwareControls;
+            this.modIds = Collections.unmodifiableList(new ArrayList<>(modIds));
         }
     }
 
@@ -789,6 +811,19 @@ public final class ControlProfileManager {
             JsonObject parsedLayout = new JsonParser().parse(bundle.controlJson).getAsJsonObject();
             root.add("layout", parsedLayout);
         }
+        if (!bundle.modIds.isEmpty()) {
+            JsonArray modsArr = new JsonArray();
+            int cap = Math.min(250, bundle.modIds.size());
+            for (int i = 0; i < cap; i++) {
+                String id = bundle.modIds.get(i);
+                if (id != null && !id.trim().isEmpty()) {
+                    modsArr.add(id.trim());
+                }
+            }
+            if (modsArr.size() > 0) {
+                root.add("mods", modsArr);
+            }
+        }
 
         byte[] utf8 = root.toString().getBytes(StandardCharsets.UTF_8);
         if (utf8.length > MAX_CONTROL_JSON_BYTES) {
@@ -846,6 +881,17 @@ public final class ControlProfileManager {
         if (name.isEmpty()) name = "Zyrox Shared Setup";
         String layoutJson = (root.has("layout") && root.get("layout").isJsonObject())
                 ? root.getAsJsonObject("layout").toString() : "";
+        List<String> modIds = new ArrayList<>();
+        if (root.has("mods") && root.get("mods").isJsonArray()) {
+            JsonArray arr = root.getAsJsonArray("mods");
+            for (int i = 0; i < Math.min(250, arr.size()); i++) {
+                JsonElement el = arr.get(i);
+                if (el != null && el.isJsonPrimitive()) {
+                    String m = el.getAsString().trim();
+                    if (!m.isEmpty() && m.length() <= 80) modIds.add(m);
+                }
+            }
+        }
 
         return new ZyroxSetupBundle(
                 name,
@@ -860,7 +906,8 @@ public final class ControlProfileManager {
                 optSafeString(root, "renderer", ""),
                 optSafeString(root, "preset", "balanced"),
                 optClampedInt(root, "resolutionScale", 100, 25, 100),
-                optBool(root, "contextAwareControls", true)
+                optBool(root, "contextAwareControls", true),
+                modIds
         );
     }
 
@@ -904,6 +951,11 @@ public final class ControlProfileManager {
         String preset = (instance != null && Tools.isValidString(instance.performancePreset))
                 ? instance.performancePreset : "balanced";
 
+        List<String> enabledMods = instance != null
+                ? git.artdeell.mojo.content.InstanceContentManager.listEnabledModIds(
+                        instance.getGameDirectory())
+                : Collections.emptyList();
+
         ZyroxSetupBundle bundle = new ZyroxSetupBundle(
                 profileName,
                 controlJson,
@@ -917,7 +969,8 @@ public final class ControlProfileManager {
                 renderer,
                 preset,
                 resScale,
-                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS
+                git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTEXT_CONTROLS,
+                enabledMods
         );
         return encodeZyroxSetupBundle(bundle);
     }

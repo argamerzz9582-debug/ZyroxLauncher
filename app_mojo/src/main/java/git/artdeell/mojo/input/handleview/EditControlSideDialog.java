@@ -66,6 +66,11 @@ public class EditControlSideDialog extends SideDialogView {
     private SwitchCompat mToggleSwitch, mPassthroughSwitch, mSwipeableSwitch, mForwardLockSwitch, mAbsoluteTrackingSwitch;
     private Spinner mOrientationSpinner;
     private final TextView[] mKeycodeTextviews = new TextView[4];
+    private final Spinner[] mGestureSpinners = new Spinner[3];
+    private final TextView[] mGestureTextviews = new TextView[3];
+    private final TextView[] mGestureLabels = new TextView[3];
+    private TextView mGesturesHeaderTextView, mPanicSlotLabel, mPanicSlotValue;
+    private SeekBar mPanicSlotSeekbar;
     private SeekBar mStrokeWidthSeekbar, mCornerRadiusSeekbar, mAlphaSeekbar;
     private TextView mStrokePercentTextView, mCornerRadiusPercentTextView, mAlphaPercentTextView;
     private TextView mSelectBackgroundBitmap, mSelectBackgroundColor, mSelectStrokeColor;
@@ -185,11 +190,20 @@ public class EditControlSideDialog extends SideDialogView {
         mDisplayInMenuCheckbox.setChecked(data.displayInMenu);
 
         for (int i = 0; i < data.keycodes.length; i++) {
-            if (data.keycodes[i] < 0) {
-                mKeycodeSpinners[i].setSelection(data.keycodes[i] + mSpecialArray.size());
-            } else {
-                mKeycodeSpinners[i].setSelection(KeycodeUtils.getIndexByValue(data.keycodes[i]) + mSpecialArray.size());
-            }
+            selectKeycodeInSpinner(mKeycodeSpinners[i], data.keycodes[i]);
+        }
+        int[] gestureKeys = new int[]{
+                data.longPressKeycode, data.swipeUpKeycode, data.swipeDownKeycode
+        };
+        for (int i = 0; i < mGestureSpinners.length; i++) {
+            selectKeycodeInSpinner(mGestureSpinners[i], gestureKeys[i]);
+        }
+        int panicSlot = data.getEffectivePanicMacroSlot();
+        if (mPanicSlotSeekbar != null) {
+            mPanicSlotSeekbar.setProgress(panicSlot - 1);
+        }
+        if (mPanicSlotValue != null) {
+            mPanicSlotValue.setText("Slot " + panicSlot);
         }
 
         setHasBitmap(Tools.isValidString(data.bitmapTag));
@@ -223,6 +237,7 @@ public class EditControlSideDialog extends SideDialogView {
         mSwipeableSwitch.setVisibility(View.GONE);
         mPassthroughSwitch.setVisibility(View.GONE);
         mToggleSwitch.setVisibility(View.GONE);
+        setGestureSectionVisible(false);
     }
 
     /**
@@ -236,6 +251,7 @@ public class EditControlSideDialog extends SideDialogView {
             mKeycodeSpinners[i].setVisibility(GONE);
             mKeycodeTextviews[i].setVisibility(GONE);
         }
+        setGestureSectionVisible(false);
 
         mNameTextView.setVisibility(GONE);
         mNameEditText.setVisibility(GONE);
@@ -289,6 +305,9 @@ public class EditControlSideDialog extends SideDialogView {
         for (Spinner spinner : mKeycodeSpinners) {
             spinner.setAdapter(mAdapter);
         }
+        for (Spinner spinner : mGestureSpinners) {
+            if (spinner != null) spinner.setAdapter(mAdapter);
+        }
 
         // Orientation spinner
         ArrayAdapter<ControlDrawerData.Orientation> adapter = new ArrayAdapter<>(mDialogContent.getContext(), android.R.layout.simple_spinner_item);
@@ -305,7 +324,46 @@ public class EditControlSideDialog extends SideDialogView {
         for(Spinner s : mKeycodeSpinners) {
             s.setVisibility(View.INVISIBLE);
         }
+        for (Spinner s : mGestureSpinners) {
+            if (s != null) s.setVisibility(View.INVISIBLE);
+        }
         mColorSelectWarningTextView.setVisibility(GONE);
+    }
+
+    private void selectKeycodeInSpinner(Spinner spinner, int keycode) {
+        if (spinner == null || mAdapter == null || mSpecialArray == null) return;
+        int idx;
+        if (keycode < 0) {
+            idx = keycode + mSpecialArray.size();
+        } else {
+            int keyIdx = KeycodeUtils.getIndexByValue(keycode);
+            idx = Math.max(0, keyIdx) + mSpecialArray.size();
+        }
+        if (idx >= 0 && idx < mAdapter.getCount()) {
+            spinner.setSelection(idx);
+        }
+    }
+
+    private int resolveKeycodeFromPosition(int position) {
+        if (position < mSpecialArray.size()) {
+            return position - mSpecialArray.size();
+        }
+        return KeycodeUtils.getValueByIndex(position - mSpecialArray.size());
+    }
+
+    private void setGestureSectionVisible(boolean visible) {
+        int vis = visible ? VISIBLE : GONE;
+        if (mGesturesHeaderTextView != null) mGesturesHeaderTextView.setVisibility(vis);
+        for (int i = 0; i < mGestureSpinners.length; i++) {
+            if (mGestureLabels[i] != null) mGestureLabels[i].setVisibility(vis);
+            if (mGestureTextviews[i] != null) mGestureTextviews[i].setVisibility(vis);
+            if (mGestureSpinners[i] != null) {
+                mGestureSpinners[i].setVisibility(visible ? View.INVISIBLE : GONE);
+            }
+        }
+        if (mPanicSlotLabel != null) mPanicSlotLabel.setVisibility(vis);
+        if (mPanicSlotValue != null) mPanicSlotValue.setVisibility(vis);
+        if (mPanicSlotSeekbar != null) mPanicSlotSeekbar.setVisibility(vis);
     }
 
     private void setHasBitmap(boolean hasBitmap) {
@@ -365,6 +423,21 @@ public class EditControlSideDialog extends SideDialogView {
         mSizeXTextView = mDialogContent.findViewById(R.id.editSize_x_textView);
         mStrokeWidthTextView = mDialogContent.findViewById(R.id.editStrokeWidth_textView);
         mColorSelectWarningTextView = mDialogContent.findViewById(R.id.editBackgroundColorWarning_textView);
+
+        // Multi-gesture combo & Smart Pearl/Totem panic macro bindings
+        mGesturesHeaderTextView = mDialogContent.findViewById(R.id.editGestures_textView);
+        mGestureLabels[0] = mDialogContent.findViewById(R.id.gesture_longpress_label);
+        mGestureLabels[1] = mDialogContent.findViewById(R.id.gesture_swipeup_label);
+        mGestureLabels[2] = mDialogContent.findViewById(R.id.gesture_swipedown_label);
+        mGestureSpinners[0] = mDialogContent.findViewById(R.id.gesture_longpress_spinner);
+        mGestureSpinners[1] = mDialogContent.findViewById(R.id.gesture_swipeup_spinner);
+        mGestureSpinners[2] = mDialogContent.findViewById(R.id.gesture_swipedown_spinner);
+        mGestureTextviews[0] = mDialogContent.findViewById(R.id.gesture_longpress_textview);
+        mGestureTextviews[1] = mDialogContent.findViewById(R.id.gesture_swipeup_textview);
+        mGestureTextviews[2] = mDialogContent.findViewById(R.id.gesture_swipedown_textview);
+        mPanicSlotLabel = mDialogContent.findViewById(R.id.gesture_panicslot_label);
+        mPanicSlotValue = mDialogContent.findViewById(R.id.gesture_panicslot_value);
+        mPanicSlotSeekbar = mDialogContent.findViewById(R.id.gesture_panicslot_seekbar);
     }
 
     private void removeBitmap(ControlInterface button) {
@@ -483,6 +556,42 @@ public class EditControlSideDialog extends SideDialogView {
                     mCurrentlyEditedButton.getProperties().keycodes[finalI] = KeycodeUtils.getValueByIndex(mKeycodeSpinners[finalI].getSelectedItemPosition() - mSpecialArray.size());
                 }
                 mKeycodeTextviews[finalI].setText((String) mKeycodeSpinners[finalI].getSelectedItem());
+            });
+        }
+
+        for (int i = 0; i < mGestureSpinners.length; ++i) {
+            final int gIdx = i;
+            if (mGestureTextviews[gIdx] == null || mGestureSpinners[gIdx] == null) continue;
+            mGestureTextviews[gIdx].setOnClickListener(v -> mGestureSpinners[gIdx].performClick());
+            mGestureSpinners[gIdx].setOnItemSelectedListener(
+                    (SimpleItemSelectedListener) (parent, view, position, id) -> {
+                        if (mCurrentlyEditedButton == null) return;
+                        int mapped = resolveKeycodeFromPosition(position);
+                        ControlData props = mCurrentlyEditedButton.getProperties();
+                        if (gIdx == 0) props.longPressKeycode = mapped;
+                        else if (gIdx == 1) props.swipeUpKeycode = mapped;
+                        else props.swipeDownKeycode = mapped;
+                        mGestureTextviews[gIdx].setText(
+                                (String) mGestureSpinners[gIdx].getSelectedItem());
+                        mCurrentlyEditedButton.getControlView().invalidate();
+                    });
+        }
+
+        if (mPanicSlotSeekbar != null) {
+            mPanicSlotSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    int slot = Math.max(1, Math.min(9, progress + 1));
+                    if (mPanicSlotValue != null) {
+                        mPanicSlotValue.setText("Slot " + slot);
+                    }
+                    if (!internalChanges && mCurrentlyEditedButton != null) {
+                        mCurrentlyEditedButton.getProperties().panicMacroSlot = slot;
+                    }
+                }
+
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
             });
         }
 

@@ -80,6 +80,16 @@ public class ServerManagerFragment extends Fragment {
         topBar.addView(btnLan, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
 
+        Button btnHostRoom = ZyroxStudioUi.createSecondaryButton(ctx, "Host ZYX", true);
+        btnHostRoom.setOnClickListener(v -> showHostRoomBridgeDialog());
+        topBar.addView(btnHostRoom, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
+        Button btnJoinRoom = ZyroxStudioUi.createSecondaryButton(ctx, "Join ZYX", true);
+        btnJoinRoom.setOnClickListener(v -> showJoinRoomBridgeDialog());
+        topBar.addView(btnJoinRoom, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
         Button btnPingAll = ZyroxStudioUi.createSecondaryButton(ctx, "Ping All", true);
         btnPingAll.setOnClickListener(v -> pingAllServers());
         topBar.addView(btnPingAll, ZyroxStudioUi.spacedParam(
@@ -417,6 +427,209 @@ public class ServerManagerFragment extends Fragment {
         }
         saveAndRender();
         pingAllServers();
+    }
+
+    /**
+     * Hosts a local "Open to LAN" Minecraft world via {@link git.artdeell.mojo.servers.ZyroxRoomBridge},
+     * generating a 1-tap shareable {@code ZYX-XXXX} room code with zero port-forwarding hassle on
+     * Wi-Fi/Hotspot and a full direct P2P token for cross-subnet friends.
+     */
+    private void showHostRoomBridgeDialog() {
+        final Context ctx = requireContext();
+        final git.artdeell.mojo.servers.ZyroxRoomBridge.HostSession active =
+                git.artdeell.mojo.servers.ZyroxRoomBridge.getActiveHost();
+        if (active != null) {
+            String status = "Active Room Code:  " + active.shortCode
+                    + "\nDirect P2P Code:  " + active.fullShareCode
+                    + "\nLocal LAN Port:  " + active.localMcPort
+                    + "  ·  Connected Peers:  " + active.getConnectedPeerCount()
+                    + "\n\nFriends on the same Wi-Fi/Hotspot enter " + active.shortCode
+                    + ". Friends on routed/direct networks paste the full code.";
+            new AlertDialog.Builder(ctx)
+                    .setTitle("Zyrox Room Active • " + active.shortCode)
+                    .setMessage(status)
+                    .setPositiveButton("Copy Full Code", (d, w) -> {
+                        ClipboardManager cm =
+                                (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null) {
+                            cm.setPrimaryClip(ClipData.newPlainText(
+                                    "Zyrox Room Code", active.fullShareCode));
+                        }
+                        Toast.makeText(ctx, "Copied " + active.fullShareCode, Toast.LENGTH_SHORT).show();
+                    })
+                    .setNeutralButton("Stop Hosting", (d, w) -> {
+                        active.close();
+                        Toast.makeText(ctx, "Room " + active.shortCode + " closed.",
+                                Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
+
+        LinearLayout form = new LinearLayout(ctx);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int pad = ZyroxStudioUi.dp(ctx, 16);
+        form.setPadding(pad, ZyroxStudioUi.dp(ctx, 10), pad, ZyroxStudioUi.dp(ctx, 4));
+
+        TextView hint = new TextView(ctx);
+        hint.setText("Open your singleplayer world -> Pause -> Open to LAN, then enter the LAN port below (default 25565) to generate an instant ZYX-XXXX room code:");
+        hint.setTextColor(0xFFD6E4F8);
+        hint.setTextSize(12f);
+        form.addView(hint);
+
+        final EditText portInput = new EditText(ctx);
+        portInput.setHint("Minecraft LAN Port (e.g. 25565)");
+        portInput.setText("25565");
+        portInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        portInput.setSingleLine(true);
+        form.addView(portInput);
+
+        final EditText titleInput = new EditText(ctx);
+        titleInput.setHint("Room Name (optional)");
+        titleInput.setText(mInstance != null && Tools.isValidString(mInstance.name)
+                ? mInstance.name + " LAN" : "Zyrox Co-Op World");
+        titleInput.setSingleLine(true);
+        form.addView(titleInput);
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Host 1-Tap ZYX Room Bridge")
+                .setView(form)
+                .setPositiveButton("Start Room", (d, w) -> {
+                    int port;
+                    try {
+                        port = Integer.parseInt(portInput.getText().toString().trim());
+                    } catch (NumberFormatException e) {
+                        Toast.makeText(ctx, "Enter a valid port (1024–65535).",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    String roomTitle = titleInput.getText().toString().trim();
+                    MojoApplication.sExecutorService.execute(() -> {
+                        try {
+                            git.artdeell.mojo.servers.ZyroxRoomBridge.HostSession session =
+                                    git.artdeell.mojo.servers.ZyroxRoomBridge.startHosting(
+                                            port, roomTitle);
+                            Tools.runOnUiThread(() -> {
+                                if (!isAdded()) return;
+                                ClipboardManager cm = (ClipboardManager)
+                                        requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                                if (cm != null) {
+                                    cm.setPrimaryClip(ClipData.newPlainText(
+                                            "Zyrox Room Code", session.fullShareCode));
+                                }
+                                Toast.makeText(requireContext(),
+                                        "Room live! Copied code: " + session.shortCode,
+                                        Toast.LENGTH_LONG).show();
+                                showHostRoomBridgeDialog();
+                            });
+                        } catch (Exception e) {
+                            Tools.runOnUiThread(() -> {
+                                if (isAdded()) {
+                                    Toast.makeText(requireContext(),
+                                            "Host failed: " + e.getMessage(),
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * Connects to a friend's {@code ZYX-XXXX} room code, pings the tunneled world to auto-match
+     * the required Minecraft protocol version against local instances, and joins in 1 tap.
+     */
+    private void showJoinRoomBridgeDialog() {
+        final Context ctx = requireContext();
+        final EditText codeInput = new EditText(ctx);
+        codeInput.setHint("ZYX-7K9M  or  ZYX-7K9M-...");
+        codeInput.setSingleLine(true);
+        int pad = ZyroxStudioUi.dp(ctx, 16);
+        codeInput.setPadding(pad, pad, pad, pad);
+
+        // Auto-prefill if clipboard already holds a ZYX- room code
+        try {
+            ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip() != null
+                    && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence clip = cm.getPrimaryClip().getItemAt(0).getText();
+                if (clip != null && clip.toString().trim().toUpperCase(java.util.Locale.ROOT)
+                        .startsWith(git.artdeell.mojo.servers.ZyroxRoomBridge.ROOM_PREFIX)) {
+                    codeInput.setText(clip.toString().trim());
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        new AlertDialog.Builder(ctx)
+                .setTitle("Join Friend's ZYX Room")
+                .setMessage("Enter your friend's ZYX-XXXX room code. Zyrox automatically tunnels the session and matches your Minecraft version.")
+                .setView(codeInput)
+                .setPositiveButton("Connect & Join", (d, w) -> {
+                    final String rawCode = codeInput.getText().toString().trim();
+                    Toast.makeText(ctx, "Connecting to " + rawCode + "…",
+                            Toast.LENGTH_SHORT).show();
+                    MojoApplication.sExecutorService.execute(() -> {
+                        try {
+                            git.artdeell.mojo.servers.ZyroxRoomBridge.ClientTunnel tunnel =
+                                    git.artdeell.mojo.servers.ZyroxRoomBridge.connectToRoom(rawCode);
+                            ServerListManager.ServerEntry entry = new ServerListManager.ServerEntry(
+                                    tunnel.worldTitle, tunnel.getLoopbackAddress());
+                            entry.group = "ZYX Room";
+
+                            // Probe the live tunneled world to auto-match its MC protocol version
+                            ServerPinger.PingResult ping =
+                                    ServerPinger.ping(tunnel.getLoopbackAddress());
+                            final String reqMc = ping.online ? ping.resolvedMcVersion : null;
+                            entry.lastOnline = ping.online;
+                            entry.lastPingMs = ping.latencyMs;
+                            entry.lastProtocol = ping.protocolVersion;
+                            entry.lastVersion = ping.versionName;
+                            entry.lastResolvedMcVersion = reqMc;
+
+                            Tools.runOnUiThread(() -> {
+                                if (!isAdded()) return;
+                                for (int idx = mServers.size() - 1; idx >= 0; idx--) {
+                                    ServerListManager.ServerEntry cur = mServers.get(idx);
+                                    if ("ZYX Room".equals(cur.group)
+                                            && cur.name.equals(entry.name)) {
+                                        mServers.remove(idx);
+                                    }
+                                }
+                                mServers.add(0, entry);
+                                saveAndRender();
+
+                                boolean curOk = reqMc == null || mInstance == null
+                                        || ServerPinger.doesInstanceMatchVersion(
+                                            mInstance.versionId, reqMc)
+                                        || Instance.isLatestReleaseId(mInstance.versionId)
+                                        || Instance.isLatestFabricId(mInstance.versionId);
+                                if (!curOk) {
+                                    Instance match = findMatchingInstance(reqMc);
+                                    if (match != null) {
+                                        switchInstanceAndJoin(match, entry);
+                                        return;
+                                    }
+                                    createMatchedInstanceAndJoin(entry, reqMc);
+                                    return;
+                                }
+                                quickJoin(entry);
+                            });
+                        } catch (Exception e) {
+                            Tools.runOnUiThread(() -> {
+                                if (isAdded()) {
+                                    Toast.makeText(requireContext(),
+                                            e.getMessage(), Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        }
+                    });
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void runLanWorldScan() {

@@ -537,4 +537,354 @@ public final class InstanceContentManager {
             throw new IOException("Failed to remove config file after creating .bak backup");
         }
     }
+
+    // =========================================================================
+    // Global SHA-1 Shared Mod Pool (.zyrox_pool/<sha1>/) & 1-Tap Auto-Fixer
+    // =========================================================================
+
+    public static final String DISABLED_SUFFIX = ".disabled";
+    public static final String SHARED_POOL_DIR_NAME = ".zyrox_pool";
+    private static final String SHARED_POOL_BLOB_NAME = "blob.jar";
+    private static final java.util.regex.Pattern VALID_SHA1_PATTERN =
+            java.util.regex.Pattern.compile("^[0-9a-f]{40}$");
+
+    /** Storage deduplication metrics returned by Global SHA-1 Shared Mod Pool scans. */
+    public static final class PoolStats {
+        public final int uniqueBlobs;
+        public final int deduplicatedFiles;
+        public final long totalPoolBytes;
+        public final long savedBytes;
+        public final boolean usedHardLinks;
+
+        public PoolStats(int uniqueBlobs,
+                         int deduplicatedFiles,
+                         long totalPoolBytes,
+                         long savedBytes,
+                         boolean usedHardLinks) {
+            this.uniqueBlobs = uniqueBlobs;
+            this.deduplicatedFiles = deduplicatedFiles;
+            this.totalPoolBytes = totalPoolBytes;
+            this.savedBytes = savedBytes;
+            this.usedHardLinks = usedHardLinks;
+        }
+    }
+
+    /** Returns the default content-addressed mod pool directory ({@code <DIR_GAME_HOME>/.zyrox_pool}). */
+    @Nullable
+    public static File getDefaultSharedPoolRoot() {
+        if (git.artdeell.mojo.Tools.DIR_GAME_HOME == null
+                || git.artdeell.mojo.Tools.DIR_GAME_HOME.trim().isEmpty()) {
+            return null;
+        }
+        return new File(git.artdeell.mojo.Tools.DIR_GAME_HOME, SHARED_POOL_DIR_NAME);
+    }
+
+    /** Resolves {@code <poolRoot>/<sha1>/blob.jar} after strictly validating the 40-hex SHA-1. */
+    @Nullable
+    public static File resolvePoolBlob(@Nullable File poolRoot, @Nullable String rawSha1) {
+        if (poolRoot == null || rawSha1 == null) return null;
+        String clean = rawSha1.trim().toLowerCase(Locale.ROOT);
+        if (!VALID_SHA1_PATTERN.matcher(clean).matches()) return null;
+        return new File(new File(poolRoot, clean), SHARED_POOL_BLOB_NAME);
+    }
+
+    /** Links a verified artifact from the default {@code .zyrox_pool/<sha1>/} without downloading. */
+    public static boolean materializeFromSharedPool(@Nullable String expectedSha1,
+                                                    @NonNull File targetFile) {
+        return materializeFromPool(getDefaultSharedPoolRoot(), expectedSha1, targetFile);
+    }
+
+    /**
+     * Checks {@code <poolRoot>/<sha1>/blob.jar}, verifies its SHA-1 digest, and links (or copies)
+     * it directly to {@code targetFile} in &lt;1 ms with zero network bandwidth.
+     */
+    public static boolean materializeFromPool(@Nullable File poolRoot,
+                                              @Nullable String expectedSha1,
+                                              @NonNull File targetFile) {
+        File blob = resolvePoolBlob(poolRoot, expectedSha1);
+        if (blob == null || !blob.isFile() || blob.length() <= 0L) return false;
+        try {
+            String actual = ModrinthContentInstaller.computeSha1Hex(blob);
+            if (!actual.equalsIgnoreCase(expectedSha1.trim())) {
+                //noinspection ResultOfMethodCallIgnored
+                blob.delete();
+                return false;
+            }
+            File parent = targetFile.getParentFile();
+            if (parent != null) FileUtils.ensureDirectory(parent);
+            if (targetFile.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                targetFile.delete();
+            }
+            if (!tryHardLink(blob, targetFile)) {
+                copyPoolStream(blob, targetFile);
+            }
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** Ingests {@code sourceFile} into default {@code .zyrox_pool/<sha1>/} and hard-links target. */
+    public static boolean ingestIntoSharedPoolAndLink(@NonNull File sourceFile,
+                                                      @NonNull File targetFile,
+                                                      @Nullable String knownSha1)
+            throws IOException {
+        File poolRoot = getDefaultSharedPoolRoot();
+        if (poolRoot == null) {
+            replaceFileSafe(sourceFile, targetFile);
+            return false;
+        }
+        return ingestIntoPoolAndLink(poolRoot, sourceFile, targetFile, knownSha1);
+    }
+
+    /**
+     * Stores {@code sourceFile} once inside {@code <poolRoot>/<sha1>/blob.jar} and hard-links
+     * {@code targetFile} to the canonical inode (falling back safely to copy when unsupported).
+     */
+    public static boolean ingestIntoPoolAndLink(@NonNull File poolRoot,
+                                                @NonNull File sourceFile,
+                                                @NonNull File targetFile,
+                                                @Nullable String knownSha1) throws IOException {
+        if (!sourceFile.isFile()) {
+            throw new IOException("Pool source file missing: " + sourceFile);
+        }
+        String sha1 = (knownSha1 != null && VALID_SHA1_PATTERN.matcher(
+                knownSha1.trim().toLowerCase(Locale.ROOT)).matches())
+                ? knownSha1.trim().toLowerCase(Locale.ROOT)
+                : ModrinthContentInstaller.computeSha1Hex(sourceFile);
+
+        File blob = resolvePoolBlob(poolRoot, sha1);
+        if (blob == null) {
+            replaceFileSafe(sourceFile, targetFile);
+            return false;
+        }
+        File blobDir = blob.getParentFile();
+        if (blobDir != null) FileUtils.ensureDirectory(blobDir);
+        boolean samePath = sourceFile.getCanonicalPath().equals(targetFile.getCanonicalPath());
+
+        synchronized (InstanceContentManager.class) {
+            if (!blob.isFile() || blob.length() != sourceFile.length()) {
+                File tmpBlob = new File(blobDir,
+                        SHARED_POOL_BLOB_NAME + "." + Thread.currentThread().getId() + ".tmp");
+                copyPoolStream(sourceFile, tmpBlob);
+                if (blob.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    blob.delete();
+                }
+                if (!tmpBlob.renameTo(blob)) {
+                    copyPoolStream(tmpBlob, blob);
+                    //noinspection ResultOfMethodCallIgnored
+                    tmpBlob.delete();
+                }
+            }
+        }
+
+        File parent = targetFile.getParentFile();
+        if (parent != null) FileUtils.ensureDirectory(parent);
+        File staged = new File(parent, targetFile.getName() + ".poollink");
+        if (staged.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            staged.delete();
+        }
+        if (tryHardLink(blob, staged)) {
+            if (targetFile.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                targetFile.delete();
+            }
+            if (staged.renameTo(targetFile)) {
+                if (!samePath && sourceFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    sourceFile.delete();
+                }
+                return true;
+            }
+            //noinspection ResultOfMethodCallIgnored
+            staged.delete();
+        }
+        if (!samePath) {
+            replaceFileSafe(sourceFile, targetFile);
+        }
+        return false;
+    }
+
+    /** Deduplicates identical mod JARs across multiple instance directories via {@code .zyrox_pool}. */
+    @NonNull
+    public static PoolStats deduplicateModDirectories(@NonNull File poolRoot,
+                                                      @NonNull List<File> gameDirs)
+            throws IOException {
+        FileUtils.ensureDirectory(poolRoot);
+        Set<String> uniqueSeen = new HashSet<>();
+        int deduped = 0;
+        long savedBytes = 0L;
+        boolean linkedAny = false;
+
+        for (File gameDir : gameDirs) {
+            if (gameDir == null) continue;
+            File modsDir = new File(gameDir, "mods");
+            File[] jars = modsDir.listFiles(f -> {
+                if (!f.isFile() || f.length() <= 0L) return false;
+                String low = f.getName().toLowerCase(Locale.ROOT);
+                return low.endsWith(".jar") || low.endsWith(".jar" + DISABLED_SUFFIX);
+            });
+            if (jars == null) continue;
+            for (File jar : jars) {
+                long size = jar.length();
+                String sha1 = ModrinthContentInstaller.computeSha1Hex(jar);
+                boolean dup = !uniqueSeen.add(sha1);
+                if (ingestIntoPoolAndLink(poolRoot, jar, jar, sha1)) {
+                    linkedAny = true;
+                }
+                if (dup) {
+                    deduped++;
+                    savedBytes += size;
+                }
+            }
+        }
+
+        int totalBlobs = 0;
+        long totalPoolBytes = 0L;
+        File[] subdirs = poolRoot.listFiles();
+        if (subdirs != null) {
+            for (File sub : subdirs) {
+                File b = new File(sub, SHARED_POOL_BLOB_NAME);
+                if (b.isFile()) {
+                    totalBlobs++;
+                    totalPoolBytes += b.length();
+                }
+            }
+        }
+        return new PoolStats(totalBlobs, deduped, totalPoolBytes, savedBytes, linkedAny);
+    }
+
+    /** Deduplicates installed mods across all configured Zyrox instances. */
+    @NonNull
+    public static PoolStats deduplicateAllInstances() throws IOException {
+        File poolRoot = getDefaultSharedPoolRoot();
+        if (poolRoot == null) return new PoolStats(0, 0, 0L, 0L, false);
+        List<git.artdeell.mojo.instances.Instance> all =
+                git.artdeell.mojo.instances.Instances.loadInstances();
+        List<File> dirs = new ArrayList<>();
+        if (all != null) {
+            Set<String> seen = new HashSet<>();
+            for (git.artdeell.mojo.instances.Instance inst : all) {
+                File d = inst.getGameDirectory();
+                if (seen.add(d.getAbsolutePath())) dirs.add(d);
+            }
+        }
+        return deduplicateModDirectories(poolRoot, dirs);
+    }
+
+    /** Returns compact list of enabled mod IDs for shareable {@code ZYROX://} setup codes. */
+    @NonNull
+    public static List<String> listEnabledModIds(@NonNull File gameDir) {
+        List<ModMetadataParser.ModInfo> mods = listMods(gameDir, null);
+        List<String> ids = new ArrayList<>();
+        for (ModMetadataParser.ModInfo m : mods) {
+            if (m.enabled && !m.corruptJar && !m.modId.isEmpty()) {
+                ids.add(m.modId);
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Executes 1-Tap Auto-Fix for {@link ModMetadataParser.SimulationReport}: snapshots instance
+     * configs, disables duplicate/corrupt/mismatched JARs, and downloads missing Modrinth deps.
+     */
+    @NonNull
+    public static String autoFixSimulationIssues(
+            @NonNull git.artdeell.mojo.instances.Instance instance,
+            @NonNull ModMetadataParser.SimulationReport report,
+            @Nullable ModrinthContentInstaller.ProgressCallback cb) throws IOException {
+        git.artdeell.mojo.instances.InstanceBackupService.createPreModSnapshot(
+                instance, "prelaunch-autofix");
+        saveModStateSnapshot(instance.getGameDirectory());
+
+        List<File> quarantine = new ArrayList<>();
+        quarantine.addAll(report.corruptFiles);
+        quarantine.addAll(report.duplicateFilesToDisable);
+        quarantine.addAll(report.loaderMismatchFiles);
+        quarantine.addAll(report.mcVersionMismatchFiles);
+
+        int disabled = 0;
+        Set<String> seen = new HashSet<>();
+        for (File f : quarantine) {
+            if (f == null || !f.exists() || !seen.add(f.getAbsolutePath())) continue;
+            try {
+                setModEnabled(f, false);
+                disabled++;
+            } catch (IOException ignored) {
+            }
+        }
+
+        int installed = 0;
+        List<String> unresolved = new ArrayList<>();
+        int totalDeps = report.missingDependencies.size();
+        for (int i = 0; i < totalDeps; i++) {
+            String depId = report.missingDependencies.get(i);
+            String slug = ModMetadataParser.resolveModrinthDependencySlug(depId);
+            if (cb != null) {
+                cb.onProgress("Downloading missing dependency: " + slug + "…");
+            }
+            try {
+                ModrinthContentInstaller.installModBySlug(instance, slug, cb);
+                installed++;
+            } catch (IOException e) {
+                unresolved.add(depId);
+            }
+        }
+
+        StringBuilder msg = new StringBuilder();
+        if (installed > 0) msg.append("Installed ").append(installed).append(" missing dependency(s)");
+        if (disabled > 0) {
+            if (msg.length() > 0) msg.append(" · ");
+            msg.append("Disabled ").append(disabled).append(" conflicting/corrupt JAR(s)");
+        }
+        if (!unresolved.isEmpty()) {
+            if (msg.length() > 0) msg.append(" · ");
+            msg.append("Manual install needed: ").append(unresolved);
+        }
+        return msg.length() > 0 ? msg.toString() : "Mod list verified.";
+    }
+
+    @android.annotation.SuppressLint("NewApi")
+    private static boolean tryHardLink(@NonNull File blob, @NonNull File linkPath) {
+        try {
+            android.system.Os.link(blob.getAbsolutePath(), linkPath.getAbsolutePath());
+            if (linkPath.isFile()) return true;
+        } catch (Throwable ignored) {
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
+                || android.os.Build.VERSION.SDK_INT == 0) {
+            try {
+                java.nio.file.Files.createLink(linkPath.toPath(), blob.toPath());
+                if (linkPath.isFile()) return true;
+            } catch (Throwable ignored) {
+            }
+        }
+        return false;
+    }
+
+    private static void replaceFileSafe(@NonNull File src, @NonNull File dst) throws IOException {
+        if (src.getCanonicalPath().equals(dst.getCanonicalPath())) return;
+        if (dst.exists() && !dst.delete()) {
+            throw new IOException("Cannot replace " + dst.getName());
+        }
+        if (!src.renameTo(dst)) {
+            copyPoolStream(src, dst);
+            //noinspection ResultOfMethodCallIgnored
+            src.delete();
+        }
+    }
+
+    private static void copyPoolStream(@NonNull File src, @NonNull File dst) throws IOException {
+        try (FileInputStream in = new FileInputStream(src);
+             FileOutputStream out = new FileOutputStream(dst, false)) {
+            byte[] buf = new byte[32768];
+            int n;
+            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            out.getFD().sync();
+        }
+    }
 }

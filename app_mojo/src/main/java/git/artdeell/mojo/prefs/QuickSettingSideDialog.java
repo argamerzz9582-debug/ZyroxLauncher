@@ -34,6 +34,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
     private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch, mHapticsSwitch, mEdgeGuardSwitch;
     private SwitchCompat mHudEnabledSwitch, mHudLockSwitch, mHudCompactSwitch;
+    private SwitchCompat mVoiceChatSwitch, mThermalGovernorSwitch;
     private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar, mGyroDeadzoneBar;
     private CustomSeekbar mHudScaleBar, mHudOpacityBar;
     private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText, mGyroDeadzoneText, mGyroDeadzoneLabel;
@@ -42,6 +43,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
 
     private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled, mOriginalHaptics, mOriginalEdgeGuard;
     private boolean mOriginalHudEnabled, mOriginalHudLocked, mOriginalHudCompact;
+    private boolean mOriginalVoiceChat, mOriginalThermalGovernor;
     private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution, mOriginalGyroDeadzone;
     private int mOriginalGestureDelay, mOriginalHudScale, mOriginalHudOpacity;
     private short mOriginalTransparency;
@@ -103,6 +105,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mHudOpacityBar = mDialogContent.findViewById(R.id.editHudOpacity_seekBar);
         mHudLockSwitch = mDialogContent.findViewById(R.id.checkboxHudLock);
         mHudCompactSwitch = mDialogContent.findViewById(R.id.checkboxHudCompact);
+        mVoiceChatSwitch = mDialogContent.findViewById(R.id.checkboxVoiceChatOverlay);
+        mThermalGovernorSwitch = mDialogContent.findViewById(R.id.checkboxThermalGovernor);
         mHudResetButton = mDialogContent.findViewById(R.id.quickBtn_hudReset);
         if (mHudResetButton != null) {
             mHudResetButton.setOnClickListener(v -> {
@@ -300,6 +304,24 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
                 onHudPreferencesChanged();
             });
         }
+        mOriginalVoiceChat = LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY;
+        if (mVoiceChatSwitch != null) {
+            mVoiceChatSwitch.setChecked(mOriginalVoiceChat);
+            mVoiceChatSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY = checked;
+                mEditor.putBoolean(LauncherPreferences.KEY_ZYROX_VOICE_CHAT_OVERLAY, checked);
+                onHudPreferencesChanged();
+            });
+        }
+        mOriginalThermalGovernor = LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR;
+        if (mThermalGovernorSwitch != null) {
+            mThermalGovernorSwitch.setChecked(mOriginalThermalGovernor);
+            mThermalGovernorSwitch.setOnCheckedChangeListener((b, checked) -> {
+                LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR = checked;
+                mEditor.putBoolean(LauncherPreferences.KEY_ZYROX_THERMAL_GOVERNOR, checked);
+                onHudPreferencesChanged();
+            });
+        }
         updateHudControlsVisibility(mOriginalHudEnabled);
     }
 
@@ -366,6 +388,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         if (mHudEnabledSwitch != null) mHudEnabledSwitch.setOnCheckedChangeListener(null);
         if (mHudLockSwitch != null) mHudLockSwitch.setOnCheckedChangeListener(null);
         if (mHudCompactSwitch != null) mHudCompactSwitch.setOnCheckedChangeListener(null);
+        if (mVoiceChatSwitch != null) mVoiceChatSwitch.setOnCheckedChangeListener(null);
+        if (mThermalGovernorSwitch != null) mThermalGovernorSwitch.setOnCheckedChangeListener(null);
 
         mGyroSensitivityBar.setOnSeekBarChangeListener(null);
         if (mGyroDeadzoneBar != null) mGyroDeadzoneBar.setOnSeekBarChangeListener(null);
@@ -407,6 +431,8 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             LauncherPreferences.PREF_ZYROX_HUD_OPACITY = mOriginalHudOpacity;
             LauncherPreferences.PREF_ZYROX_HUD_LOCKED = mOriginalHudLocked;
             LauncherPreferences.PREF_ZYROX_HUD_COMPACT = mOriginalHudCompact;
+            LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY = mOriginalVoiceChat;
+            LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR = mOriginalThermalGovernor;
 
             onGyroStateChanged();
             onResolutionChanged();

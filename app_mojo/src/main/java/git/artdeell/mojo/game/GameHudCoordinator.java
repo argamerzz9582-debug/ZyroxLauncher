@@ -37,6 +37,8 @@ public final class GameHudCoordinator {
     private View mDrawerPullButton;
     @Nullable
     private View mHotbarView;
+    @Nullable
+    private VoiceChatOverlayController mVoiceChatOverlay;
     private final int[] mParentLoc = new int[2];
     private final int[] mViewLoc = new int[2];
 
@@ -113,6 +115,13 @@ public final class GameHudCoordinator {
         invLp.topMargin = topMargin;
         contentFrame.addView(invBar, invLp);
         mInventoryHelperBar = invBar;
+
+        // Phase 4.5 — Hold-to-Speak In-Game Voice-to-Chat floating Mic overlay
+        VoiceChatOverlayController voiceOverlay =
+                new VoiceChatOverlayController(mActivity, contentFrame);
+        voiceOverlay.setOverlayEnabled(LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY);
+        mVoiceChatOverlay = voiceOverlay;
+
         git.artdeell.mojo.game.platform.Platform.addGrabListener(mContextGrabListener);
     }
 
@@ -167,19 +176,40 @@ public final class GameHudCoordinator {
             mInventoryHelperBar.onContextStateChanged(
                     git.artdeell.mojo.game.platform.Platform.isGrabbing(), inEditor);
         }
+        if (mVoiceChatOverlay != null) {
+            boolean inEditor = mControlLayout != null && mControlLayout.getModifiable();
+            mVoiceChatOverlay.setEditorHidden(inEditor);
+        }
         if (mOverlay != null && mOverlay.isHudEnabled()) {
             mOverlay.post(mOverlay::applyClampedCollisionFreePlacement);
         }
     }
 
-    /** Applies live HUD customization updates from {@link git.artdeell.mojo.prefs.QuickSettingSideDialog}. */
+    /** Applies live HUD &amp; Voice-to-Chat updates from {@link git.artdeell.mojo.prefs.QuickSettingSideDialog}. */
     public void syncPreferencesLive() {
+        if (mVoiceChatOverlay != null) {
+            mVoiceChatOverlay.setOverlayEnabled(LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY);
+        }
         if (mOverlay == null) return;
         boolean shouldShow = LauncherPreferences.PREF_ZYROX_PERF_HUD;
         if (shouldShow != mOverlay.isHudEnabled()) {
             mOverlay.setHudEnabled(shouldShow);
         } else if (shouldShow) {
             mOverlay.syncFromPreferences();
+        }
+    }
+
+    /** Updates the Thermal &amp; Battery Governor dynamic resolution badge on the HUD pill. */
+    public void setThermalGovernorBadge(@Nullable String badge) {
+        if (mOverlay != null) {
+            mOverlay.setThermalGovernorBadge(badge);
+        }
+    }
+
+    /** Forwards press/release state from a bound {@code SPECIALBTN_VOICE_CHAT} control button. */
+    public void onVoiceChatButtonState(boolean isDown) {
+        if (mVoiceChatOverlay != null) {
+            mVoiceChatOverlay.onControlButtonState(isDown);
         }
     }
 
@@ -214,6 +244,9 @@ public final class GameHudCoordinator {
         if (mInventoryHelperBar != null) {
             mInventoryHelperBar.releaseLatchedModifiers();
         }
+        if (mVoiceChatOverlay != null) {
+            mVoiceChatOverlay.cancelListening();
+        }
         if (mOverlay != null) {
             mOverlay.stopMonitoring(false);
         }
@@ -224,6 +257,10 @@ public final class GameHudCoordinator {
         if (mInventoryHelperBar != null) {
             mInventoryHelperBar.releaseLatchedModifiers();
             mInventoryHelperBar = null;
+        }
+        if (mVoiceChatOverlay != null) {
+            mVoiceChatOverlay.destroy();
+            mVoiceChatOverlay = null;
         }
         if (mOverlay != null) {
             mOverlay.stopMonitoring(true);

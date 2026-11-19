@@ -63,10 +63,31 @@ public class ControlButton extends TextView implements ControlInterface {
     private final ZyroxControlGlyphRenderer mGlyphRenderer = new ZyroxControlGlyphRenderer();
     protected ZyroxControlGlyphRenderer.Glyph mActiveGlyph = ZyroxControlGlyphRenderer.Glyph.NONE;
 
+    /** Tracks the player's last active hotbar slot (1..9) so Panic Macros snap right back. */
+    private static volatile int sLastActiveHotbarSlot = 1;
+
     protected ControlData mProperties;
     private final ControlLayout mControlLayout;
     private boolean mHasBitmap;
     protected boolean mIsToggled = false;
+
+    // Smart Claw & PvP multi-gesture touch state (zero overhead when no combo bindings are set)
+    private float mTouchDownX;
+    private float mTouchDownY;
+    private boolean mLongPressFired;
+    private int mActiveSwipeKeycode = KeyEvent.KEYCODE_UNKNOWN;
+    private boolean mPanicMacroBusy;
+    private final Paint mComboIndicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Runnable mLongPressRunnable = () -> {
+        ControlData props = getProperties();
+        if (props == null || props.longPressKeycode == KeyEvent.KEYCODE_UNKNOWN
+                || mActiveSwipeKeycode != KeyEvent.KEYCODE_UNKNOWN || !isPressed()) {
+            return;
+        }
+        mLongPressFired = true;
+        triggerControlHaptic();
+        dispatchSingleKeycode(props.longPressKeycode, true);
+    };
 
     public ControlButton(ControlLayout layout, ControlData properties) {
         super(layout.getContext());
@@ -220,6 +241,14 @@ public class ControlButton extends TextView implements ControlInterface {
                 return "SEC";
             case ControlData.SPECIALBTN_MOUSEMID:
                 return "MID";
+            case ControlData.SPECIALBTN_PANIC_PEARL:
+                return "PEARL";
+            case ControlData.SPECIALBTN_PANIC_TOTEM:
+                return "TOTEM";
+            case ControlData.SPECIALBTN_VOICE_CHAT:
+                return "MIC";
+            case ControlData.SPECIALBTN_RADIAL_MACRO:
+                return "WHEEL";
             case LwjglGlfwKeycode.GLFW_KEY_ESCAPE:
                 return "ESC";
             case LwjglGlfwKeycode.GLFW_KEY_TAB:
@@ -296,6 +325,36 @@ public class ControlButton extends TextView implements ControlInterface {
             mGlyphRenderer.drawGlyph(canvas, mActiveGlyph, getWidth(), getHeight(),
                     isPressed() || isActivated());
         }
+        if (mProperties != null && mProperties.hasGestureCombos()) {
+            drawGestureComboIndicators(canvas);
+        }
+    }
+
+    /** Renders subtle specular micro-chevrons indicating configured Swipe-Up / Swipe-Down / Hold combos. */
+    private void drawGestureComboIndicators(@NonNull Canvas canvas) {
+        float d = getResources().getDisplayMetrics().density;
+        float cx = getWidth() * 0.5f;
+        float chevW = Math.max(3f, 3.4f * d);
+        float chevH = Math.max(1.8f, 2.1f * d);
+        float inset = Math.max(2.5f, 3.0f * d);
+        mComboIndicatorPaint.setColor(0xB8F6D37A);
+        mComboIndicatorPaint.setStyle(Paint.Style.STROKE);
+        mComboIndicatorPaint.setStrokeWidth(Math.max(1.1f, 1.25f * d));
+        mComboIndicatorPaint.setStrokeCap(Paint.Cap.ROUND);
+        if (mProperties.swipeUpKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+            canvas.drawLine(cx - chevW, inset + chevH, cx, inset, mComboIndicatorPaint);
+            canvas.drawLine(cx, inset, cx + chevW, inset + chevH, mComboIndicatorPaint);
+        }
+        if (mProperties.swipeDownKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+            float by = getHeight() - inset;
+            canvas.drawLine(cx - chevW, by - chevH, cx, by, mComboIndicatorPaint);
+            canvas.drawLine(cx, by, cx + chevW, by - chevH, mComboIndicatorPaint);
+        }
+        if (mProperties.longPressKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+            mComboIndicatorPaint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(getWidth() - inset - (1.8f * d), inset + (1.8f * d),
+                    Math.max(1.4f, 1.5f * d), mComboIndicatorPaint);
+        }
     }
 
     @Override
@@ -362,15 +421,14 @@ public class ControlButton extends TextView implements ControlInterface {
             return true;
         }
 
+        if (properties.hasGestureCombos()) {
+            return handleMultiGestureTouch(properties, event, action);
+        }
+
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN:
-                if (git.artdeell.mojo.prefs.LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS) {
-                    try {
-                        performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
-                    } catch (Throwable ignored) {
-                    }
-                }
+                triggerControlHaptic();
                 handlePressed();
                 break;
             case MotionEvent.ACTION_UP:
@@ -383,6 +441,87 @@ public class ControlButton extends TextView implements ControlInterface {
         }
 
         return super.onTouchEvent(event);
+    }
+
+    private boolean handleMultiGestureTouch(@NonNull ControlData props,
+                                            @NonNull MotionEvent event,
+                                            int action) {
+        switch (action) {
+            case MotionEvent.ACTION_DOWN:
+                mTouchDownX = event.getX();
+                mTouchDownY = event.getY();
+                mLongPressFired = false;
+                mActiveSwipeKeycode = KeyEvent.KEYCODE_UNKNOWN;
+                setPressed(true);
+                triggerControlHaptic();
+                if (props.longPressKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+                    long delayMs = Math.max(160L,
+                            Math.min(800L, LauncherPreferences.PREF_LONGPRESS_TRIGGER));
+                    removeCallbacks(mLongPressRunnable);
+                    postDelayed(mLongPressRunnable, delayMs);
+                }
+                return true;
+
+            case MotionEvent.ACTION_MOVE:
+                if (mLongPressFired || mActiveSwipeKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+                    return true;
+                }
+                float dx = event.getX() - mTouchDownX;
+                float dy = event.getY() - mTouchDownY;
+                float swipeThresholdPx = Math.max(24f,
+                        18f * getResources().getDisplayMetrics().density);
+                if (Math.abs(dy) >= swipeThresholdPx && Math.abs(dy) > Math.abs(dx) * 0.85f) {
+                    int candidate = dy < 0 ? props.swipeUpKeycode : props.swipeDownKeycode;
+                    if (candidate != KeyEvent.KEYCODE_UNKNOWN) {
+                        removeCallbacks(mLongPressRunnable);
+                        mActiveSwipeKeycode = candidate;
+                        triggerControlHaptic();
+                        dispatchSingleKeycode(candidate, true);
+                    }
+                }
+                return true;
+
+            case MotionEvent.ACTION_UP:
+                removeCallbacks(mLongPressRunnable);
+                setPressed(false);
+                if (mLongPressFired) {
+                    dispatchSingleKeycode(props.longPressKeycode, false);
+                    mLongPressFired = false;
+                } else if (mActiveSwipeKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+                    dispatchSingleKeycode(mActiveSwipeKeycode, false);
+                    mActiveSwipeKeycode = KeyEvent.KEYCODE_UNKNOWN;
+                } else if (!triggerToggle()) {
+                    // Clean tap: fire primary bound action immediately
+                    sendKeyPresses(true);
+                    postDelayed(() -> sendKeyPresses(false), 32L);
+                }
+                return true;
+
+            case MotionEvent.ACTION_CANCEL:
+                removeCallbacks(mLongPressRunnable);
+                setPressed(false);
+                if (mLongPressFired) {
+                    dispatchSingleKeycode(props.longPressKeycode, false);
+                    mLongPressFired = false;
+                }
+                if (mActiveSwipeKeycode != KeyEvent.KEYCODE_UNKNOWN) {
+                    dispatchSingleKeycode(mActiveSwipeKeycode, false);
+                    mActiveSwipeKeycode = KeyEvent.KEYCODE_UNKNOWN;
+                }
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    private void triggerControlHaptic() {
+        if (LauncherPreferences.PREF_ZYROX_CONTROL_HAPTICS) {
+            try {
+                performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -401,15 +540,65 @@ public class ControlButton extends TextView implements ControlInterface {
         setActivated(isDown || (mProperties.isToggle && mIsToggled));
         refreshDrawableState();
         for (int keycode : mProperties.keycodes) {
-            if (keycode >= KeyEvent.KEYCODE_UNKNOWN) {
-                CallbackBridge.setModifiers(keycode, isDown);
-                int modifiers = CallbackBridge.getCurrentMods();
-                PLATFORM.sendKeyEvent(keycode, isDown ? 1 : 0, modifiers);
-            } else {
-                Log.d(TAG, "sendSpecialKey(" + keycode + "," + isDown + ")");
-                sendSpecialKey(keycode, isDown);
-            }
+            dispatchSingleKeycode(keycode, isDown);
         }
+    }
+
+    private void dispatchSingleKeycode(int keycode, boolean isDown) {
+        if (keycode == KeyEvent.KEYCODE_UNKNOWN) return;
+        if (keycode > KeyEvent.KEYCODE_UNKNOWN) {
+            if (isDown && keycode >= LwjglGlfwKeycode.GLFW_KEY_1
+                    && keycode <= LwjglGlfwKeycode.GLFW_KEY_9) {
+                sLastActiveHotbarSlot = 1 + (keycode - LwjglGlfwKeycode.GLFW_KEY_1);
+            }
+            CallbackBridge.setModifiers(keycode, isDown);
+            int modifiers = CallbackBridge.getCurrentMods();
+            PLATFORM.sendKeyEvent(keycode, isDown ? 1 : 0, modifiers);
+        } else {
+            Log.d(TAG, "sendSpecialKey(" + keycode + "," + isDown + ")");
+            sendSpecialKey(keycode, isDown);
+        }
+    }
+
+    /**
+     * Executes a 1-gesture PvP Panic Macro: switches to the configured utility hotbar slot,
+     * either right-clicks to throw/clutch (Pearl/Water/Splash Potion) or taps F to swap Totem
+     * into offhand, then immediately restores the player's previous weapon hotbar slot.
+     */
+    private void executeSmartPanicMacro(boolean offhandTotemSwap) {
+        if (mPanicMacroBusy || mProperties == null) return;
+        mPanicMacroBusy = true;
+        final int targetSlot = mProperties.getEffectivePanicMacroSlot();
+        final int returnSlot = (sLastActiveHotbarSlot >= 1 && sLastActiveHotbarSlot <= 9)
+                ? sLastActiveHotbarSlot : 1;
+        final int targetKey = LwjglGlfwKeycode.GLFW_KEY_1 + (targetSlot - 1);
+        final int returnKey = LwjglGlfwKeycode.GLFW_KEY_1 + (returnSlot - 1);
+
+        // Step 1: Select utility slot
+        tapGlfwKey(targetKey);
+
+        // Step 2: Use item (Pearl / Water / Splash Potion) or swap into offhand (Totem)
+        postDelayed(() -> {
+            if (offhandTotemSwap) {
+                tapGlfwKey(LwjglGlfwKeycode.GLFW_KEY_F);
+            } else {
+                sendMouseButton(MotionEvent.BUTTON_SECONDARY, true);
+                postDelayed(() -> sendMouseButton(MotionEvent.BUTTON_SECONDARY, false), 28L);
+            }
+            // Step 3: Snap back to previous combat hotbar slot
+            postDelayed(() -> {
+                if (returnSlot != targetSlot) {
+                    tapGlfwKey(returnKey);
+                }
+                mPanicMacroBusy = false;
+            }, 48L);
+        }, 28L);
+    }
+
+    private static void tapGlfwKey(int glfwKey) {
+        int mods = CallbackBridge.getCurrentMods();
+        PLATFORM.sendKeyEvent(glfwKey, 1, mods);
+        PLATFORM.sendKeyEvent(glfwKey, 0, mods);
     }
 
     private void sendSpecialKey(int keycode, boolean isDown) {
@@ -444,7 +633,25 @@ public class ControlButton extends TextView implements ControlInterface {
             case ControlData.SPECIALBTN_MENU:
                 mControlLayout.notifyAppMenu();
                 break;
+            case ControlData.SPECIALBTN_PANIC_PEARL:
+                if (isDown) executeSmartPanicMacro(false);
+                break;
+            case ControlData.SPECIALBTN_PANIC_TOTEM:
+                if (isDown) executeSmartPanicMacro(true);
+                break;
+            case ControlData.SPECIALBTN_VOICE_CHAT:
+                GameActivity.triggerVoiceChatFromControl(isDown);
+                break;
+            case ControlData.SPECIALBTN_RADIAL_MACRO:
+                if (isDown) GameActivity.openQuickMacroWheelFromControl();
+                break;
         }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        removeCallbacks(mLongPressRunnable);
+        super.onDetachedFromWindow();
     }
 
     @Override

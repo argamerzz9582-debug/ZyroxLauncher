@@ -170,13 +170,17 @@ public class MainMenuFragment extends Fragment {
 
         setupFullScreenGlassPolish(view);
 
-        // Throttled HTTPS check for newer official Zyrox Launcher releases on GitHub
-        git.artdeell.mojo.updater.AppUpdateChecker.checkSilentlyIfDue(
-                requireContext(), (info, err) -> {
-                    if (isAdded() && info != null && info.updateAvailable) {
-                        git.artdeell.mojo.updater.AppUpdateChecker.showUpdateDialog(requireContext(), info);
-                    }
-                });
+        // Throttled GitHub Releases in-app auto-updater check (runs once onboarding is complete)
+        if (LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE) {
+            git.artdeell.mojo.updater.AppUpdateChecker.checkSilentlyIfDue(
+                    requireContext(), (info, err) -> {
+                        if (isAdded() && isResumed() && getActivity() != null
+                                && info != null && info.updateAvailable) {
+                            git.artdeell.mojo.updater.AppUpdateChecker.showUpdateDialog(
+                                    requireActivity(), info);
+                        }
+                    });
+        }
     }
 
     private void setupFullScreenGlassPolish(@NonNull View root) {
