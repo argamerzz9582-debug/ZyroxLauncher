@@ -155,7 +155,7 @@ public final class GameOptionsUtils {
         tweaks.put("entityShadows", "false");
         tweaks.put("particles", "1");
         tweaks.put("enableVsync", "false");
-        return applyOverrides(gameDir, tweaks);
+        return applyOptionOverrides(gameDir, tweaks);
     }
 
     /** Reads {@code options.txt} key:value pairs in insertion order. */

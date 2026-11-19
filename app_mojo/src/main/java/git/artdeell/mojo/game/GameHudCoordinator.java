@@ -784,7 +784,9 @@ public final class GameHudCoordinator {
     public boolean onRequestPermissionsResult(int requestCode, @NonNull int[] grantResults) {
         if (requestCode == VoiceChatOverlayController.REQUEST_CODE_VOICE_CHAT_MIC
                 && mVoiceChatOverlay != null) {
-            mVoiceChatOverlay.onMicrophonePermissionResult(grantResults);
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED;
+            mVoiceChatOverlay.onMicrophonePermissionResult(granted);
             return true;
         }
         return false;

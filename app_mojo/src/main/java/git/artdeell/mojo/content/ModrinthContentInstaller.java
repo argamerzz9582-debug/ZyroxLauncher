@@ -249,7 +249,10 @@ public final class ModrinthContentInstaller {
         if (Instance.isSymbolicVersionId(raw)) {
             try {
                 VersionMetadataRepository repo = VersionMetadataRepository.getInstance();
-                JVersionList catalog = repo.getMojangProvider().loadCatalog(false);
+                JVersionList catalog = repo.getCurrentCatalog();
+                if (catalog == null) {
+                    catalog = repo.getMojangProvider().syncManifest(false).data;
+                }
                 if (catalog != null) {
                     String type = Instance.isLatestSnapshotId(raw)
                             ? MojangVersionProvider.TYPE_SNAPSHOT
@@ -1336,7 +1339,7 @@ public final class ModrinthContentInstaller {
 
         // Instant zero-network link if SHA-1 is already verified inside .zyrox_pool/
         if (expectedSha1 != null && !expectedSha1.isEmpty()
-                && InstanceContentManager.tryLinkFromSharedPool(expectedSha1, targetFile)) {
+                && InstanceContentManager.materializeFromSharedPool(expectedSha1, targetFile)) {
             return;
         }
 
@@ -1352,7 +1355,7 @@ public final class ModrinthContentInstaller {
                 .get()
                 .build();
 
-        try (Response response = ZyroxHttpClient.getClient().newCall(request).execute()) {
+        try (Response response = ZyroxHttpClient.downloadClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new ZyroxHttpClient.HttpStatusException(
                         response.code(), "Download failed (HTTP " + response.code() + ")");
