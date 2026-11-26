@@ -107,15 +107,32 @@ public final class Tools {
     // PojavLauncher is left for compatibility purposes
     public static String DIR_GAME_HOME = resolveInitialGameHome();
 
+    /**
+     * Placeholder used only until {@link #initStorageConstants(Context)} assigns the real,
+     * context-derived root. Code must not cache paths derived from this value in static finals.
+     */
     private static String resolveInitialGameHome() {
-        try {
-            File ext = Environment.getExternalStorageDirectory();
-            if (ext != null) {
-                return ext.getAbsolutePath() + "/games/PojavLauncher";
+        if (SDK_INT < 29) {
+            try {
+                File ext = legacyExternalStorageDirectory();
+                if (ext != null) {
+                    return ext.getAbsolutePath() + "/games/PojavLauncher";
+                }
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
         }
         return "/sdcard/games/PojavLauncher";
+    }
+
+    /**
+     * The single, intentional use of the deprecated shared-storage root. Only valid for the legacy
+     * (pre-scoped-storage, API &lt; 29) PojavLauncher layout; API 29+ uses
+     * {@link Context#getExternalFilesDir(String)} instead.
+     */
+    @SuppressWarnings("deprecation")
+    @Nullable
+    private static File legacyExternalStorageDirectory() {
+        return Environment.getExternalStorageDirectory();
     }
     public static String DIR_GAME_NEW;
 
@@ -135,7 +152,7 @@ public final class Tools {
         if(SDK_INT >= 29) {
             return ctx.getExternalFilesDir(null);
         }
-        File externalStorageDirectory = Environment.getExternalStorageDirectory();
+        File externalStorageDirectory = legacyExternalStorageDirectory();
         if(externalStorageDirectory == null) return null;
         // PojavLauncher is left for compatibility purposes
         File launcherRoot = new File(externalStorageDirectory,"games/PojavLauncher");

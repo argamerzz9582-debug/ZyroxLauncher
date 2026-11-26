@@ -24,7 +24,7 @@ public final class ExtraCore {
     private final Map<String, Object> mValueMap = new ConcurrentHashMap<>();
 
     // Store what each ExtraListener listen to
-    private final Map<String, ConcurrentLinkedQueue<WeakReference<ExtraListener>>> mListenerMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WeakReference<ExtraListener>>> mListenerMap = new ConcurrentHashMap<>();
 
     // All public methods will pass through this one
     private static ExtraCore getInstance(){
@@ -49,15 +49,17 @@ public final class ExtraCore {
         getInstance().mValueMap.put(key, value);
         ConcurrentLinkedQueue<WeakReference<ExtraListener>> extraListenerList = getInstance().mListenerMap.get(key);
         if(extraListenerList == null) return; //No listeners
-        for(WeakReference<ExtraListener> listener : extraListenerList){
-            if(listener.get() == null){
-                extraListenerList.remove(listener);
+        for(WeakReference<ExtraListener> listenerRef : extraListenerList){
+            // Take one strong reference: calling get() twice could observe a GC in between (NPE).
+            ExtraListener listener = listenerRef.get();
+            if(listener == null){
+                extraListenerList.remove(listenerRef);
                 continue;
             }
 
             //Notify the listener about a state change and remove it if asked for
-            if(listener.get().onValueSet(key, value)){
-                ExtraCore.removeExtraListenerFromValue(key, listener.get());
+            if(listener.onValueSet(key, value)){
+                ExtraCore.removeExtraListenerFromValue(key, listener);
             }
         }
     }
@@ -79,9 +81,9 @@ public final class ExtraCore {
     }
 
     public static Object consumeValue(String key){
-        Object value = getInstance().mValueMap.get(key);
-        getInstance().mValueMap.remove(key);
-        return value;
+        if(key == null) return null;
+        // Atomic get-and-remove so two consumers can never both receive the same value.
+        return getInstance().mValueMap.remove(key);
     }
 
     /** Remove all values */
@@ -95,15 +97,42 @@ public final class ExtraCore {
      * @param listener The ExtraListener to link
      */
     public static void addExtraListener(String key, ExtraListener listener){
-        ConcurrentLinkedQueue<WeakReference<ExtraListener>> listenerList = getInstance().mListenerMap.get(key);
-        // Look for new sets
-        if(listenerList == null){
-            listenerList = new ConcurrentLinkedQueue<>();
-            getInstance().mListenerMap.put(key, listenerList);
-        }
+        if(key == null || listener == null) return;
+        ConcurrentLinkedQueue<WeakReference<ExtraListener>> listenerList = getOrCreateListenerList(key);
 
-        // This is kinda naive, I should look for duplicates
-        listenerList.add(new WeakReference<>(listener));
+        // Synchronize on the per-key list so check-then-add cannot race into a duplicate entry.
+        synchronized (listenerList) {
+            for(WeakReference<ExtraListener> ref : listenerList){
+                ExtraListener existing = ref.get();
+                if(existing == null){
+                    listenerList.remove(ref); // prune collected listeners while we're here
+                } else if(existing == listener){
+                    return; // already registered: re-adding would fire the callback twice
+                }
+            }
+            listenerList.add(new WeakReference<>(listener));
+        }
+    }
+
+    /** Atomically returns the listener list for {@code key}, creating it exactly once. */
+    private static ConcurrentLinkedQueue<WeakReference<ExtraListener>> getOrCreateListenerList(String key){
+        ConcurrentHashMap<String, ConcurrentLinkedQueue<WeakReference<ExtraListener>>> map = getInstance().mListenerMap;
+        ConcurrentLinkedQueue<WeakReference<ExtraListener>> list = map.get(key);
+        if(list != null) return list;
+        ConcurrentLinkedQueue<WeakReference<ExtraListener>> created = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<WeakReference<ExtraListener>> raced = map.putIfAbsent(key, created);
+        return raced != null ? raced : created;
+    }
+
+    /** @return number of live listeners registered for {@code key} (visible for tests). */
+    static int liveListenerCount(String key){
+        ConcurrentLinkedQueue<WeakReference<ExtraListener>> list = getInstance().mListenerMap.get(key);
+        if(list == null) return 0;
+        int count = 0;
+        for(WeakReference<ExtraListener> ref : list){
+            if(ref.get() != null) count++;
+        }
+        return count;
     }
 
     /**
@@ -113,12 +142,9 @@ public final class ExtraCore {
      * @param listener The ExtraListener to unlink
      */
     public static void removeExtraListenerFromValue(String key, ExtraListener listener){
+        if(key == null) return;
         ConcurrentLinkedQueue<WeakReference<ExtraListener>> listenerList = getInstance().mListenerMap.get(key);
-        // Look for new sets
-        if(listenerList == null){
-            listenerList = new ConcurrentLinkedQueue<>();
-            getInstance().mListenerMap.put(key, listenerList);
-        }
+        if(listenerList == null) return; // nothing registered; don't allocate an empty list
 
         // Removes all occurrences of ExtraListener and all null references
         for(WeakReference<ExtraListener> listenerWeakReference : listenerList){
@@ -135,14 +161,9 @@ public final class ExtraCore {
      * @param key The key to which ExtraListener are linked
      */
     public static void removeAllExtraListenersFromValue(String key){
+        if(key == null) return;
         ConcurrentLinkedQueue<WeakReference<ExtraListener>> listenerList = getInstance().mListenerMap.get(key);
-        // Look for new sets
-        if(listenerList == null){
-            listenerList = new ConcurrentLinkedQueue<>();
-            getInstance().mListenerMap.put(key, listenerList);
-        }
-
-        listenerList.clear();
+        if(listenerList != null) listenerList.clear();
     }
 
     /**

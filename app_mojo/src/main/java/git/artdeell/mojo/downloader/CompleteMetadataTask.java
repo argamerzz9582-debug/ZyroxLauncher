@@ -35,8 +35,13 @@ public class CompleteMetadataTask extends DownloaderTask {
 
         if(!LauncherPreferences.PREF_VERIFY_FILES) return;
 
-        // No need to try and obtain the hash if the file is qualified for rapid start check skip
-        if(LauncherPreferences.PREF_RAPID_START && mMetadata.size != -1 && mMetadata.path.length() == mMetadata.size) return;
+        // Rapid Start skips the (network) hash fetch for an already-correct-size file ONLY when a
+        // local verification marker already proves it was SHA-1 verified and is unchanged.
+        if(LauncherPreferences.PREF_RAPID_START && mMetadata.size != -1
+                && mMetadata.path.length() == mMetadata.size
+                && Downloader.isVerifiedMarkerStillValid(mMetadata.path)) {
+            return;
+        }
 
         try {
             mMetadata.sha1Hash = mDownloader.downloadString(new URL(mMetadata.url + ".sha1"));

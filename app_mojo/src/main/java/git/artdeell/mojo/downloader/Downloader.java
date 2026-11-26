@@ -1,5 +1,8 @@
 package git.artdeell.mojo.downloader;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.kdt.mcgui.ProgressLayout;
 
 import git.artdeell.mojo.R;
@@ -15,10 +18,13 @@ import git.artdeell.mojo.utils.ZyroxHttpClient;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -35,15 +41,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Downloader {
     private static final double ONE_MEGABYTE = (1024d * 1024d);
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 30_000;
     private static final int MAX_STRING_RESPONSE_BYTES = 32 * 1024 * 1024; // 32 MiB cap
+    /** Maximum time between progress/UI refreshes; workers wake the loop early on completion/error. */
+    private static final long PROGRESS_TICK_MS = 100L;
+    /**
+     * Striped locks keyed by destination path. Different {@link Downloader} batches can run at the
+     * same time (e.g. a modpack install while the game downloads) and may target the same file, which
+     * maps to the same .part file. Holding the stripe for that path serializes those writers.
+     */
+    private static final ReentrantLock[] sPathLocks = new ReentrantLock[256];
+    static {
+        for (int i = 0; i < sPathLocks.length; i++) sPathLocks[i] = new ReentrantLock();
+    }
 
     private static final ThreadLocal<byte[]> sThreadLocalBuffer = new ThreadLocal<>();
-    protected static final File sPartFileDir = new File(Tools.DIR_GAME_HOME, "partfiles");
+    /**
+     * Resolved on every call: a static final captured at class-load time would freeze the
+     * pre-init placeholder root if this class loads before {@code Tools.initStorageConstants}.
+     */
+    @NonNull
+    protected static File partFileDir() {
+        return new File(Tools.DIR_GAME_HOME, "partfiles");
+    }
 
     private final String mProgressKey;
     private final AtomicReference<IOException> mThreadException = new AtomicReference<>();
@@ -52,6 +77,7 @@ public class Downloader {
     private final AtomicLong mInternetUsageCounter = new AtomicLong();
     private final AtomicBoolean mUseSizeProgress = new AtomicBoolean(true);
     private final SpeedCalculator mSpeedCalculator = new SpeedCalculator();
+    private final Object mProgressSignal = new Object();
     private ExecutorService mDownloadService;
     private ExecutorService mVerifyService;
     private volatile DownloadQueueManager.DownloadRecord mQueueRecord;
@@ -61,7 +87,7 @@ public class Downloader {
     }
 
     protected void runDownloads(ArrayList<? extends TaskMetadata> downloads) throws IOException, InterruptedException {
-        FileUtils.ensureDirectory(sPartFileDir);
+        FileUtils.ensureDirectory(partFileDir());
         ArrayList<TaskMetadata> deduplicated = deduplicateDownloads(downloads);
         if (deduplicated.isEmpty()) return;
 
@@ -184,7 +210,7 @@ public class Downloader {
                         speedBytes
                 );
             }
-            Thread.sleep(40L);
+            awaitProgressSignal(totalCount);
         }
         mDownloadService.shutdown();
         mVerifyService.shutdown();
@@ -201,13 +227,20 @@ public class Downloader {
             reducedList.add(element);
         }
         if (reducedList.isEmpty()) return;
-        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        // Metadata completion is network-bound (HEAD + .sha1 requests): honor the user's thread setting.
+        int metadataThreads = Math.min(reducedList.size(),
+                DownloadQueueManager.clampConcurrency(LauncherPreferences.PREF_ZYROX_DOWNLOAD_THREADS));
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.max(1, metadataThreads), r -> {
+            Thread t = new Thread(r, "zyrox-metadata-worker");
+            t.setDaemon(true);
+            return t;
+        });
         try {
             for (TaskMetadata element : reducedList) {
                 executorService.submit(new CompleteMetadataTask(element, this));
             }
             executorService.shutdown();
-            while (!executorService.awaitTermination(40, TimeUnit.MILLISECONDS)) {
+            while (!executorService.awaitTermination(PROGRESS_TICK_MS, TimeUnit.MILLISECONDS)) {
                 if (mQueueRecord != null && mQueueRecord.isCancelRequested()) {
                     throw new InterruptedException("Download canceled by user");
                 }
@@ -241,6 +274,39 @@ public class Downloader {
 
     protected void taskException(IOException e) {
         mThreadException.compareAndSet(null, e);
+        signalProgress();
+    }
+
+    /** Wakes the coordinator loop immediately (file finished, error raised). */
+    private void signalProgress() {
+        synchronized (mProgressSignal) {
+            mProgressSignal.notifyAll();
+        }
+    }
+
+    /**
+     * Blocks the coordinator until a worker signals or {@link #PROGRESS_TICK_MS} elapses, replacing the
+     * old fixed 40 ms sleep-poll: errors and completion are now handled instantly, and idle wakeups
+     * drop from 25/s to 10/s.
+     */
+    private void awaitProgressSignal(int totalCount) throws InterruptedException {
+        synchronized (mProgressSignal) {
+            if (mDownloadedFileCounter.get() < totalCount && mThreadException.get() == null) {
+                mProgressSignal.wait(PROGRESS_TICK_MS);
+            }
+        }
+    }
+
+    /**
+     * Lock guarding all writes to {@code destination} (and its derived .part file). A
+     * {@link ReentrantLock} (acquired with {@code lockInterruptibly}) rather than a monitor, so a
+     * worker waiting on a busy path still responds to cancellation / {@code shutdownNow()}.
+     */
+    @NonNull
+    static ReentrantLock lockForPath(@NonNull File destination) {
+        int h = destination.getAbsolutePath().hashCode();
+        h ^= (h >>> 16);
+        return sPathLocks[h & (sPathLocks.length - 1)];
     }
 
     protected void disableSizeCounter() {
@@ -257,6 +323,7 @@ public class Downloader {
 
     protected void fileComplete() {
         mDownloadedFileCounter.getAndIncrement();
+        signalProgress();
     }
 
     protected void addSize(long bytes) {
@@ -445,8 +512,72 @@ public class Downloader {
         return buffer;
     }
 
+    /**
+     * Sidecar verification marker proving a data file previously passed SHA-1 verification. It stores
+     * the expected hash plus the file's size and last-modified time, so Rapid Start can trust an
+     * unchanged file without re-hashing it or re-fetching the server hash. Any modification
+     * (size or last-modified change) invalidates the marker and forces a fresh integrity check,
+     * which closes the previous gap where Rapid Start trusted files by byte-size alone.
+     */
+    @NonNull
+    public static File verificationMarkerFor(@NonNull File dataFile) {
+        File parent = dataFile.getParentFile();
+        if (parent == null) parent = new File(".");
+        return new File(parent, dataFile.getName() + ".zyrox.verified");
+    }
+
+    public static void writeVerifiedMarker(@NonNull File dataFile, @NonNull String sha1) throws IOException {
+        File marker = verificationMarkerFor(dataFile);
+        String payload = sha1 + " " + dataFile.length() + " " + dataFile.lastModified() + "\n";
+        try (FileOutputStream out = new FileOutputStream(marker, false)) {
+            out.write(payload.getBytes(StandardCharsets.UTF_8));
+            out.getFD().sync();
+        }
+    }
+
+    /** True only when a marker exists and the data file's size + last-modified time still match it. */
+    public static boolean isVerifiedMarkerStillValid(@NonNull File dataFile) {
+        File marker = verificationMarkerFor(dataFile);
+        if (!marker.isFile()) return false;
+        String line;
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                new FileInputStream(marker), StandardCharsets.UTF_8))) {
+            line = br.readLine();
+        } catch (IOException e) {
+            return false;
+        }
+        if (line == null) return false;
+        String[] parts = line.trim().split(" ");
+        if (parts.length < 2) return false;
+        try {
+            long len = Long.parseLong(parts[1]);
+            long mtime = parts.length >= 3 ? Long.parseLong(parts[2]) : -1L;
+            return len == dataFile.length()
+                    && (mtime < 0L || mtime == dataFile.lastModified());
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** Reads the stored expected hash from a verification marker, or {@code null} if absent/unreadable. */
+    @Nullable
+    public static String readVerifiedMarkerHash(@NonNull File dataFile) {
+        File marker = verificationMarkerFor(dataFile);
+        if (!marker.isFile()) return null;
+        String line;
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(
+                new FileInputStream(marker), StandardCharsets.UTF_8))) {
+            line = br.readLine();
+        } catch (IOException e) {
+            return null;
+        }
+        if (line == null) return null;
+        String[] parts = line.trim().split(" ");
+        return parts.length >= 1 ? parts[0] : null;
+    }
+
     public static double calculateCacheSizeMegabytes() {
-        File[] files = Downloader.sPartFileDir.listFiles();
+        File[] files = Downloader.partFileDir().listFiles();
         if (files == null || files.length == 0) return 0d;
         long usedSpace = 0L;
         for (File f : files) {
@@ -459,7 +590,7 @@ public class Downloader {
     }
 
     public static void clearCache() throws IOException {
-        File[] files = Downloader.sPartFileDir.listFiles();
+        File[] files = Downloader.partFileDir().listFiles();
         if (files == null) return;
         for (File f : files) {
             if (f.isDirectory()) continue;

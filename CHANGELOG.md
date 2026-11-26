@@ -2,6 +2,26 @@
 
 All notable changes to **Zyrox Launcher** are documented in this file.
 
+## [Unreleased]
+
+### Security
+- **Rapid Start integrity gap closed:** cached files are no longer trusted by byte size alone. A file is skipped only if a `.zyrox.verified` sidecar marker shows it previously passed SHA-1 verification and its size/last-modified time haven't changed since (`CheckFileOnDiskTask`, `CompleteMetadataTask`, `Downloader`).
+- **Account token vault fails closed (API 23+):** if Keystore encryption fails, the vault drops and regenerates a corrupted key once, then stores the `"0"` sentinel (re-login required). It no longer falls back to writing the token in plaintext (`AccountTokenCipher`).
+
+### Fixed
+- **Download retries are now a bounded loop:** a failure deep in the retry chain could be caught by an earlier attempt and restart the retry budget. Progress accounting is rolled back exactly once per attempt, truncated bodies are retried, and servers that ignore `Range` fall back to a full download without spending a retry (`DownloadFileTask`).
+- **Downloader coordination:** a signal-driven progress loop replaces the 40 ms sleep-poll, the metadata pool honors the thread setting, and a per-path lock stops concurrent batches from writing the same `.part` file. The part-file directory is resolved lazily rather than captured before storage init.
+- **Crash auto-fix safety:** culprit extraction no longer reads mod names from ordinary prose (`Exception in thread "main"`). Quarantine refuses ambiguous matches, never touches core/library jars, and never overwrites an existing `.disabled` copy (`ZyroxCrashAnalyzer`).
+- **ExtraCore:** duplicate listener registration is ignored, per-key list creation is race-free, `setValue` can't NPE on a just-collected listener, and `consumeValue` is atomic.
+
+### Changed
+- Lint now gates CI through a baseline (`app_mojo/lint-baseline.xml`): new issues and security checks fail the build. The deprecated `lintOptions` blocks were merged into one `lint {}` block.
+- The deprecated `Environment.getExternalStorageDirectory()` is isolated in one documented helper, used only on API < 29.
+- README/SECURITY now describe Rapid Start accurately. Removed a stale `mojolauncher.ru` link from `README_RU.md`.
+
+### Tests
+- Added `AccountTokenCipherTest`, `CheckFileOnDiskTaskTest`, `DownloadQueueManagerTest`, `ZyroxCrashAnalyzerAutoFixTest`, and `ExtraCoreTest`.
+
 ## [2.0.0] — 2026-11-16
 
 ### Highlights

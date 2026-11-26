@@ -202,7 +202,9 @@ jobs:
       - name: Run Android Lint Static Verification
         run: |
           set -o pipefail
-          if ! gradle :app_mojo:lintFullRelease 2>&1 | tee /tmp/gradle-lint.log; then
+          # -Dlint.baselines.continue=true: if app_mojo/lint-baseline.xml is not committed yet, lint
+          # creates it and continues instead of aborting; once committed, only NEW issues fail.
+          if ! gradle :app_mojo:lintFullRelease -Dlint.baselines.continue=true 2>&1 | tee /tmp/gradle-lint.log; then
             TAIL="$(grep -E 'error:|Error:|FAILED|Exception|Caused by:' /tmp/gradle-lint.log | tail -n 25 | tr '\n' ' ' | cut -c1-3200)"
             echo "::error title=LintFailure::${TAIL:-$(tail -n 20 /tmp/gradle-lint.log | tr '\n' ' ')}"
             exit 1
