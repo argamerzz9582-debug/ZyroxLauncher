@@ -6,21 +6,23 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,8 +32,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Exercises the real {@link Downloader} HTTP paths against an in-process JDK {@link HttpServer}
- * fake: full bodies, 404/500, honoured and ignored {@code Range} resumes, and truncated bodies.
+ * Exercises the real {@link Downloader} HTTP paths against a tiny in-process HTTP/1.1 fake built
+ * on {@link ServerSocket} ({@code com.sun.net.httpserver} is not on the Android unit-test
+ * bootclasspath): full bodies, 404/500, honoured and ignored {@code Range} resumes, and truncated bodies.
  * Uses loopback {@code http://} only, so it runs offline and in well under a second.
  */
 public class DownloaderHttpFakeTest {
@@ -45,73 +48,97 @@ public class DownloaderHttpFakeTest {
         for (int i = 0; i < PAYLOAD.length; i++) PAYLOAD[i] = (byte) (i * 31 + 7);
     }
 
-    private HttpServer server;
+    private ServerSocket server;
+    private Thread acceptor;
     private String base;
     private final AtomicInteger requests = new AtomicInteger();
     private final AtomicReference<String> lastRange = new AtomicReference<>();
 
     @Before
     public void startServer() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        server.createContext("/ok", ex -> {
-            count(ex);
-            send(ex, 200, PAYLOAD, PAYLOAD.length);
-        });
-        server.createContext("/missing", ex -> {
-            count(ex);
-            send(ex, 404, "nope".getBytes(), 4);
-        });
-        server.createContext("/boom", ex -> {
-            count(ex);
-            send(ex, 500, "err".getBytes(), 3);
-        });
-        server.createContext("/range", ex -> {
-            count(ex);
-            Matcher m = Pattern.compile("bytes=(\\d+)-(\\d+)").matcher(String.valueOf(lastRange.get()));
-            if (!m.matches()) {
-                send(ex, 200, PAYLOAD, PAYLOAD.length);
-                return;
+        server = new ServerSocket(0, 16, InetAddress.getLoopbackAddress());
+        acceptor = new Thread(() -> {
+            while (!server.isClosed()) {
+                try (Socket socket = server.accept()) {
+                    socket.setSoTimeout(10_000);
+                    handle(socket);
+                } catch (SocketException closed) {
+                    return;
+                } catch (IOException ignored) {
+                    // a broken client connection must not stop the fake
+                }
             }
-            int from = Integer.parseInt(m.group(1));
-            int to = Integer.parseInt(m.group(2));
-            byte[] slice = Arrays.copyOfRange(PAYLOAD, from, to + 1);
-            ex.getResponseHeaders().add("Content-Range", "bytes " + from + "-" + to + "/" + PAYLOAD.length);
-            send(ex, 206, slice, slice.length);
-        });
-        server.createContext("/norange", ex -> {
-            count(ex);
-            send(ex, 200, PAYLOAD, PAYLOAD.length); // server ignores Range
-        });
-        server.createContext("/truncated", ex -> {
-            count(ex);
-            // Promise the full length, deliver 40 %, then drop the connection.
-            ex.sendResponseHeaders(200, PAYLOAD.length);
-            OutputStream os = ex.getResponseBody();
-            os.write(PAYLOAD, 0, PAYLOAD.length * 2 / 5);
-            os.flush();
-            ex.close();
-        });
-        server.start();
-        base = "http://" + InetAddress.getLoopbackAddress().getHostAddress() + ":"
-                + server.getAddress().getPort();
+        }, "http-fake");
+        acceptor.setDaemon(true);
+        acceptor.start();
+        base = "http://" + InetAddress.getLoopbackAddress().getHostAddress() + ":" + server.getLocalPort();
     }
 
     @After
-    public void stopServer() {
-        if (server != null) server.stop(0);
+    public void stopServer() throws Exception {
+        if (server != null) server.close();
+        if (acceptor != null) acceptor.join(5_000L);
     }
 
-    private void count(HttpExchange ex) throws IOException {
-        requests.incrementAndGet();
-        lastRange.set(ex.getRequestHeaders().getFirst("Range"));
-        ex.getRequestBody().close();
-    }
-
-    private static void send(HttpExchange ex, int code, byte[] body, int len) throws IOException {
-        ex.sendResponseHeaders(code, len);
-        try (OutputStream os = ex.getResponseBody()) {
-            os.write(body, 0, len);
+    private void handle(Socket socket) throws IOException {
+        BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.ISO_8859_1));
+        String requestLine = in.readLine();
+        if (requestLine == null) return;
+        String range = null;
+        for (String h = in.readLine(); h != null && !h.isEmpty(); h = in.readLine()) {
+            int colon = h.indexOf(':');
+            if (colon > 0 && h.substring(0, colon).trim().equalsIgnoreCase("Range")) {
+                range = h.substring(colon + 1).trim();
+            }
         }
+        requests.incrementAndGet();
+        lastRange.set(range);
+        String path = requestLine.split(" ")[1];
+        OutputStream out = socket.getOutputStream();
+        switch (path) {
+            case "/ok":
+            case "/norange": // ignores Range on purpose
+                send(out, 200, "OK", PAYLOAD, 0, PAYLOAD.length, PAYLOAD.length, null);
+                break;
+            case "/missing":
+                send(out, 404, "Not Found", "nope".getBytes(StandardCharsets.US_ASCII), 0, 4, 4, null);
+                break;
+            case "/boom":
+                send(out, 500, "Internal Server Error", "err".getBytes(StandardCharsets.US_ASCII), 0, 3, 3, null);
+                break;
+            case "/range": {
+                Matcher m = Pattern.compile("bytes=(\\d+)-(\\d+)").matcher(String.valueOf(range));
+                if (!m.matches()) {
+                    send(out, 200, "OK", PAYLOAD, 0, PAYLOAD.length, PAYLOAD.length, null);
+                } else {
+                    int from = Integer.parseInt(m.group(1));
+                    int to = Integer.parseInt(m.group(2));
+                    send(out, 206, "Partial Content", PAYLOAD, from, to - from + 1, to - from + 1,
+                            "Content-Range: bytes " + from + "-" + to + "/" + PAYLOAD.length);
+                }
+                break;
+            }
+            case "/truncated":
+                // Promise the full length, deliver 40 %, then drop the connection.
+                send(out, 200, "OK", PAYLOAD, 0, PAYLOAD.length * 2 / 5, PAYLOAD.length, null);
+                break;
+            default:
+                send(out, 404, "Not Found", new byte[0], 0, 0, 0, null);
+        }
+    }
+
+    private static void send(OutputStream out, int code, String reason, byte[] body, int off, int len,
+                             long declaredLength, String extraHeader) throws IOException {
+        StringBuilder head = new StringBuilder()
+                .append("HTTP/1.1 ").append(code).append(' ').append(reason).append("\r\n")
+                .append("Content-Length: ").append(declaredLength).append("\r\n")
+                .append("Content-Type: application/octet-stream\r\n")
+                .append("Connection: close\r\n");
+        if (extraHeader != null) head.append(extraHeader).append("\r\n");
+        head.append("\r\n");
+        out.write(head.toString().getBytes(StandardCharsets.ISO_8859_1));
+        out.write(body, off, len);
+        out.flush();
     }
 
     private static final class Counter implements BytesCopiedListener {
