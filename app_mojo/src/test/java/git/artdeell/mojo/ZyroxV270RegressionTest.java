@@ -157,6 +157,6 @@ public class ZyroxV270RegressionTest {
 
         assertEquals(15L * 60_000L, AppUpdateChecker.WARM_RESUME_CHECK_INTERVAL_MS);
         assertTrue(AppUpdateChecker.compareSemVer("v2.7.0", "2.6.0") > 0);
-        assertTrue(ZyroxHttpClient.USER_AGENT.startsWith("ZyroxLauncher/2.7.0"));
+        assertTrue(ZyroxHttpClient.USER_AGENT.startsWith("ZyroxLauncher/2.8.0"));
     }
 }

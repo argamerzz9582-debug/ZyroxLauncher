@@ -2,7 +2,7 @@
 
 All notable changes to **Zyrox Launcher** are documented in this file.
 
-## [Unreleased]
+## [2.8.0] — 2026-11-26
 
 ### Security
 - **Rapid Start integrity gap closed:** cached files are no longer trusted by byte size alone. A file is skipped only if a `.zyrox.verified` sidecar marker shows it previously passed SHA-1 verification and its size/last-modified time haven't changed since (`CheckFileOnDiskTask`, `CompleteMetadataTask`, `Downloader`).
