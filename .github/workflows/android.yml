@@ -120,6 +120,21 @@ jobs:
                       if re.search(pattern, content):
                           failures.append(f"Forbidden pattern [{name}] in {path}")
 
+          # 7. Wiring guards for invariants that are behavior-tested via pure helpers
+          #    (LaunchOnboardingAndDefaultFabricTest); these ensure the helpers stay wired in.
+          wiring = [
+              ("app_mojo/src/main/java/git/artdeell/mojo/game/GameActivity.java", r"launcherGLView\.start\(localBinder\.claimConnection\(\)\)", True),
+              ("app_mojo/src/main/java/git/artdeell/mojo/services/GameService.java", r"mLocalBinder\.isActive\s*=\s*true", False),
+              ("app_mojo/src/main/java/git/artdeell/mojo/LauncherActivity.java", r"OnboardingWizardFragment\.resolveAuthRoute\(", True),
+              ("app_mojo/src/main/java/com/kdt/mcgui/AccountSpinner.java", r"shouldCreateAccountFromSelection\(", True),
+              ("app_mojo/src/main/java/git/artdeell/mojo/fragments/MainMenuFragment.java", r"ProgressKeeper\.waitUntilDone", True),
+              ("app_mojo/src/main/java/git/artdeell/mojo/instances/Instances.java", r"internalCreateInstance\(\s*Instances::applyFirstTimeDefaults", True),
+          ]
+          for path, pattern, required in wiring:
+              found = re.search(pattern, open(path, errors="ignore").read()) is not None
+              if found != required:
+                  failures.append(f"Wiring guard {'missing' if required else 'forbidden'} /{pattern}/ in {path}")
+
           if failures:
               for item in failures[:15]:
                   print(f"::error title=SecurityGateFailure::{item}")

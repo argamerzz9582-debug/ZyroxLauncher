@@ -200,20 +200,23 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         FragmentManager manager = getSupportFragmentManager();
         if (!value || manager.isStateSaved()) return false;
         Fragment fragment = manager.findFragmentById(mFragmentView.getId());
-        if (fragment instanceof SelectAuthFragment
-                || fragment instanceof OnboardingWizardFragment) {
-            return false;
-        }
-        if (!(fragment instanceof MainMenuFragment)) return false;
-
+        boolean onAuthScreen = fragment instanceof SelectAuthFragment
+                || fragment instanceof OnboardingWizardFragment;
+        boolean onHome = fragment instanceof MainMenuFragment;
         // Guarantee a single unified first-time login flow (never stack SelectAuth + Onboarding)
-        if (OnboardingWizardFragment.shouldLaunchOnboarding()) {
-            Tools.swapFragment(this,
-                    OnboardingWizardFragment.class, OnboardingWizardFragment.TAG, null);
-            return false;
+        switch (OnboardingWizardFragment.resolveAuthRoute(onAuthScreen, onHome,
+                onHome && !onAuthScreen && OnboardingWizardFragment.shouldLaunchOnboarding())) {
+            case ONBOARDING:
+                Tools.swapFragment(this,
+                        OnboardingWizardFragment.class, OnboardingWizardFragment.TAG, null);
+                break;
+            case SELECT_AUTH:
+                Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
+                break;
+            case NONE:
+            default:
+                break;
         }
-
-        Tools.swapFragment(this, SelectAuthFragment.class, SelectAuthFragment.TAG, null);
         return false;
     };
 

@@ -283,6 +283,16 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         mMaxSteps = max;
     }
 
+    /**
+     * Decides whether selecting the "add account" row (position 0) should open login.
+     * Programmatic reloads are suppressed. When the list holds only that row (count == 1),
+     * the direct tap listener handles it, so a layout-time selection never opens a second
+     * login screen on first launch.
+     */
+    public static boolean shouldCreateAccountFromSelection(boolean suppressed, int position, int count) {
+        return !suppressed && position == 0 && count > 1;
+    }
+
     @Override
     public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
         if (mSuppressSelectionCallback) {
@@ -291,10 +301,7 @@ public class AccountSpinner extends AppCompatSpinner implements LoginListener, A
         Account account = mAdapter.getItem(i);
         if(account == null) {
             if(i == 0) {
-                // Only trigger createAccount when explicitly picked from a populated dropdown;
-                // when empty (count == 1), populateView's click listener handles direct user taps
-                // without spuriously opening a second login screen on Activity/layout start.
-                if (mAdapter.getCount() > 1) {
+                if (shouldCreateAccountFromSelection(false, i, mAdapter.getCount())) {
                     createAccount();
                 }
             }else {
