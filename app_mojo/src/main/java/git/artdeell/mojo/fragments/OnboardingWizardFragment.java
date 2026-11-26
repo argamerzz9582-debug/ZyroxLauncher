@@ -133,6 +133,19 @@ public class OnboardingWizardFragment extends Fragment {
      * compatibility: existing users who already have at least one saved account (or an active
      * in-flight sign-in) keep their setup undisturbed and never see duplicate login screens.
      */
+    /** Where an "add account / sign in" request should navigate. */
+    public enum AuthRoute { NONE, ONBOARDING, SELECT_AUTH }
+
+    /**
+     * Pure routing rule for sign-in requests. Requests are ignored when an auth screen is already
+     * showing or the user is not on Home. On first run they coalesce into the onboarding wizard,
+     * so SelectAuth and Onboarding are never stacked.
+     */
+    public static AuthRoute resolveAuthRoute(boolean onAuthScreen, boolean onHome, boolean needsOnboarding) {
+        if (onAuthScreen || !onHome) return AuthRoute.NONE;
+        return needsOnboarding ? AuthRoute.ONBOARDING : AuthRoute.SELECT_AUTH;
+    }
+
     public static boolean shouldLaunchOnboarding() {
         if (LauncherPreferences.PREF_ZYROX_ONBOARDING_DONE
                 || sWizardCurrentlyActive

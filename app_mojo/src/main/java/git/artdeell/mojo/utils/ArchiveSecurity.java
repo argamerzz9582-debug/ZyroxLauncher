@@ -107,7 +107,7 @@ public final class ArchiveSecurity {
 
     private static void rejectSymlinkChain(@NonNull File canonicalRoot, @NonNull File target)
             throws IOException {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        if (!SdkLevel.atLeast(Build.VERSION_CODES.O)) return;
         File cur = target;
         while (cur != null && !cur.equals(canonicalRoot)) {
             try {

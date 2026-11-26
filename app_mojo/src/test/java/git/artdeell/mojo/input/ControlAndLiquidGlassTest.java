@@ -116,7 +116,7 @@ public class ControlAndLiquidGlassTest {
         }
         assertTrue(new File(resDir, "drawable/ic_launcher_monochrome.xml").isFile());
         assertTrue(new File(resDir, "drawable/ic_zyrox_sakura_emblem.xml").isFile());
-        assertTrue(new File(resDir, "drawable-nodpi/bg_zyrox_shader_scene.webp").isFile());
+        assertTrue(new File(resDir, "drawable-nodpi/bg_zyrox_backdrop_snow.webp").isFile());
 
         try (FileInputStream in = new FileInputStream(new File(resDir, "mipmap-anydpi-v26/ic_launcher.xml"))) {
             String adaptive = new String(ArchiveSecurity.readBytesBounded(in, 8192), StandardCharsets.UTF_8);

@@ -1,5 +1,6 @@
 package git.artdeell.mojo.performance;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
@@ -417,10 +418,10 @@ public final class GameOptimizer {
 
         // 2. Promote window to highest native-resolution display refresh rate (90 / 120 / 144 Hz)
         int selectedHz = 60;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.M)) {
             try {
                 Window window = activity.getWindow();
-                Display display = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                Display display = SdkLevel.atLeast(Build.VERSION_CODES.R)
                         ? activity.getDisplay()
                         : window.getWindowManager().getDefaultDisplay();
                 if (display != null) {
@@ -606,7 +607,7 @@ public final class GameOptimizer {
                 return;
             }
             mRunning = true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mPowerManager != null) {
+            if (SdkLevel.atLeast(Build.VERSION_CODES.Q) && mPowerManager != null) {
                 try {
                     mLastThermalStatus = mPowerManager.getCurrentThermalStatus();
                     android.os.PowerManager.OnThermalStatusChangedListener tl = status -> {
@@ -639,7 +640,7 @@ public final class GameOptimizer {
             if (!mRunning) return;
             mRunning = false;
             mMainHandler.removeCallbacksAndMessages(null);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+            if (SdkLevel.atLeast(Build.VERSION_CODES.Q)
                     && mPowerManager != null && mThermalListenerObj != null) {
                 try {
                     mPowerManager.removeThermalStatusListener(
@@ -660,7 +661,7 @@ public final class GameOptimizer {
                 }
                 return;
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mPowerManager != null) {
+            if (SdkLevel.atLeast(Build.VERSION_CODES.Q) && mPowerManager != null) {
                 try {
                     mLastThermalStatus = mPowerManager.getCurrentThermalStatus();
                 } catch (Throwable ignored) {

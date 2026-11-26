@@ -2,6 +2,27 @@
 
 All notable changes to **Zyrox Launcher** are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Minecraft backdrops:** *Snowy Peaks* (Home) and *Diamond Forge* (Loading) are seamless 1080p30 loops with first-frame posters. The two clips total 14.8 MB and replace 36 MB of non-Minecraft clips. Sources and licenses are listed in `docs/BACKDROP_CREDITS.md`.
+- **Settings → Miscellaneous:** pick the Home and Loading backdrop, set a dim level (0–70 %) that keeps text readable, and choose whether the backdrop pauses to save battery.
+- A weekly on-device smoke test (`android-smoke.yml`) cold-starts the app on an API 34 emulator.
+
+### Changed
+- **Smooth playback:** the first live video frame fades in over the poster (260 ms; instant with reduced motion), and loops end on the frame before frame 0, so playback never visibly jumps.
+- **Battery & heat aware:** the backdrop video and live glass blur hold a still frame while Battery Saver is on or the device is thermally throttling (SEVERE or worse). Glass blur is also never applied inside scrolling list rows.
+- **Backups:** backup stamps have millisecond precision and only ever increase, archive names never overwrite an existing file, and ordering is by stamp rather than file mtime (`InstanceBackupService`, `InstanceContentManager`).
+
+### Security
+- **App updates fail closed:** an update archive is trusted only if its signing certificates match the installed app. Unreadable signatures are rejected on API 28+, and key rotation is checked against the signer set (`AppUpdateChecker`).
+
+### Tests
+- New suites: `AppUpdateTrustTest`, `SdkLevelAwareSecurityTest`, `InstanceBackupOrderingTest`, `ZyroxBackdropsTest`, and `DownloaderHttpFakeTest` (in-process HTTP fake).
+- API-level branches can now be tested: `SdkLevel` lets host tests pin API 26, 31, or 34 instead of always seeing `SDK_INT == 0`.
+- No more `Thread.sleep` in tests, and metadata tests use fixed clocks. Assertions that read Java source text were replaced by behavior tests plus CI wiring guards.
+- CI publishes a JaCoCo unit-test coverage report.
+
 ## [2.8.0] — 2026-11-26
 
 ### Security

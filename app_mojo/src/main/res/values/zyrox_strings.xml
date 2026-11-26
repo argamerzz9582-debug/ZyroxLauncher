@@ -126,8 +126,8 @@
     <string name="zyrox_cat_security">SECURITY &amp; GPU</string>
     <string name="zyrox_pref_optimizer_title">Zyrox Game Optimizer</string>
     <string name="zyrox_pref_optimizer_summary">Tune G1GC low-pause JVM flags, high-Hz display pacing, LMK memory guard, and safe options.txt defaults.</string>
-    <string name="zyrox_pref_animated_bg_title">Animated Starlight backdrop</string>
-    <string name="zyrox_pref_animated_bg_summary">Play the seamless Starlight Firefly lakeside scene or your custom .gif / .mp4 backdrop loop.</string>
+    <string name="zyrox_pref_animated_bg_title">Animated Minecraft backdrop</string>
+    <string name="zyrox_pref_animated_bg_summary">Play the seamless Minecraft backdrop loop (or your custom .gif / .mp4). When off, a still frame is shown.</string>
     <string name="zyrox_pref_reduced_motion_title">Reduced motion</string>
     <string name="zyrox_pref_reduced_motion_summary">Disable launcher transition animations, parallax movement, and button spring motion.</string>
     <string name="zyrox_pref_low_effects_title">Low visual effects mode</string>
@@ -224,4 +224,22 @@
     <string name="zyrox_installer_running">Executing Java Runtime &amp; Mod Installer…</string>
     <string name="zyrox_toggle_console">CONSOLE</string>
     <string name="zyrox_hide_card">SHOW GUI</string>
+
+    <!-- Minecraft-theme backdrops (sources & licenses: docs/BACKDROP_CREDITS.md) -->
+    <string name="zyrox_backdrop_snow">Snowy Peaks</string>
+    <string name="zyrox_backdrop_diamond">Diamond Forge</string>
+    <string-array name="zyrox_backdrop_names">
+        <item>@string/zyrox_backdrop_snow</item>
+        <item>@string/zyrox_backdrop_diamond</item>
+    </string-array>
+    <string-array name="zyrox_backdrop_values" translatable="false">
+        <item>snow</item>
+        <item>diamond</item>
+    </string-array>
+    <string name="zyrox_pref_home_backdrop_title">Home backdrop</string>
+    <string name="zyrox_pref_loading_backdrop_title">Loading screen backdrop</string>
+    <string name="zyrox_pref_backdrop_dim_title">Backdrop dim</string>
+    <string name="zyrox_pref_backdrop_dim_summary">Darken the backdrop so text and buttons stay easy to read.</string>
+    <string name="zyrox_pref_backdrop_power_title">Pause backdrop to save battery</string>
+    <string name="zyrox_pref_backdrop_power_summary">Show a still frame while Battery Saver is on or the phone is overheating.</string>
 </resources>

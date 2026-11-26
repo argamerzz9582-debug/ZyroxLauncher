@@ -228,14 +228,17 @@ public class Instances {
     public static final String DEFAULT_FABRIC_PLACEHOLDER_NAME = "Fabric (Latest)";
 
     private static void createFirstTimeInstance() throws IOException {
-        Instance created = internalCreateInstance(instance -> {
-            instance.sharedData = true;
-            instance.versionId = Instance.VERSION_LATEST_FABRIC;
-            instance.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
-            instance.icon = "fabric";
-        }, "fabric-latest");
+        Instance created = internalCreateInstance(Instances::applyFirstTimeDefaults, "fabric-latest");
         setSelectedInstance(created);
         markDefaultFabricInitialized();
+    }
+
+    /** First-launch profile: shared game dir, symbolic latest-stable Fabric, Fabric icon. */
+    public static void applyFirstTimeDefaults(Instance instance) {
+        instance.sharedData = true;
+        instance.versionId = Instance.VERSION_LATEST_FABRIC;
+        instance.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
+        instance.icon = "fabric";
     }
 
     public static Instance createDefaultInstance() throws IOException {
@@ -297,12 +300,8 @@ public class Instances {
                             selected.write();
                             all = loadAllInstances();
                         } else {
-                            Instance fabricDefault = internalCreateInstance(inst -> {
-                                inst.sharedData = true;
-                                inst.versionId = Instance.VERSION_LATEST_FABRIC;
-                                inst.name = DEFAULT_FABRIC_PLACEHOLDER_NAME;
-                                inst.icon = "fabric";
-                            }, "fabric-latest");
+                            Instance fabricDefault = internalCreateInstance(
+                                    Instances::applyFirstTimeDefaults, "fabric-latest");
                             setSelectedInstance(fabricDefault);
                             all = loadAllInstances();
                         }

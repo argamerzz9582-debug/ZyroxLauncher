@@ -1020,8 +1020,7 @@ public class GameActivity extends BaseActivity
     public void onServiceConnected(ComponentName name, IBinder service) {
         GameService.LocalBinder localBinder = (GameService.LocalBinder) service;
         mServiceBinder = localBinder;
-        launcherGLView.start(localBinder.isActive);
-        localBinder.isActive = true;
+        launcherGLView.start(localBinder.claimConnection());
     }
 
     @Override

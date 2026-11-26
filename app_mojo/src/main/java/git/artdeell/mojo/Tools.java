@@ -1,5 +1,6 @@
 package git.artdeell.mojo;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import static android.os.Build.VERSION.SDK_INT;
 import static git.artdeell.mojo.MojoApplication.sExecutorService;
 
@@ -112,7 +113,7 @@ public final class Tools {
      * context-derived root. Code must not cache paths derived from this value in static finals.
      */
     private static String resolveInitialGameHome() {
-        if (SDK_INT < 29) {
+        if (!SdkLevel.atLeast(29)) {
             try {
                 File ext = legacyExternalStorageDirectory();
                 if (ext != null) {
@@ -149,7 +150,7 @@ public final class Tools {
 
 
     private static @Nullable File getAppStorageRoot(Context ctx) {
-        if(SDK_INT >= 29) {
+        if(SdkLevel.atLeast(29)) {
             return ctx.getExternalFilesDir(null);
         }
         File externalStorageDirectory = legacyExternalStorageDirectory();
@@ -220,7 +221,7 @@ public final class Tools {
     }
 
     public static void buildNotificationChannel(Context context){
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        if(!SdkLevel.atLeast(Build.VERSION_CODES.O)) return;
         NotificationChannel channel = new NotificationChannel(
                 context.getString(R.string.notif_channel_id),
                 context.getString(R.string.notif_channel_name), NotificationManager.IMPORTANCE_DEFAULT);
@@ -367,7 +368,7 @@ public final class Tools {
     }
 
     public static boolean isAndroid8OrHigher() {
-        return SDK_INT >= 26;
+        return SdkLevel.atLeast(26);
     }
 
     public static void fullyExit() {

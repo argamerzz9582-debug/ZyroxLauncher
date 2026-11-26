@@ -122,8 +122,8 @@ public final class InstanceBackupService {
         String safeReason = FileUtils.escapeFileName(reason);
         if (safeReason.isEmpty()) safeReason = "mod-change";
         if (safeReason.length() > 28) safeReason = safeReason.substring(0, 28);
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date());
-        File finalZip = new File(snapshotRoot, PRE_MOD_SNAPSHOT_PREFIX + stamp + "_" + safeReason + ".zip");
+        String stamp = formatStamp(nextMonotonicStampMs());
+        File finalZip = uniqueArchiveFile(snapshotRoot, PRE_MOD_SNAPSHOT_PREFIX + stamp, "_" + safeReason + ".zip");
         File tempZip = new File(snapshotRoot, finalZip.getName() + ".tmp");
 
         int[] fileCounter = new int[]{0};
@@ -197,10 +197,7 @@ public final class InstanceBackupService {
         File[] zips = dir.listFiles((d, name) ->
                 name.startsWith(PRE_MOD_SNAPSHOT_PREFIX) && name.endsWith(".zip"));
         if (zips == null || zips.length == 0) return list;
-        Arrays.sort(zips, (a, b) -> {
-            int cmp = Long.compare(b.lastModified(), a.lastModified());
-            return cmp != 0 ? cmp : b.getName().compareTo(a.getName());
-        });
+        Arrays.sort(zips, newestFirst(PRE_MOD_SNAPSHOT_PREFIX));
         for (File zip : zips) {
             String base = zip.getName().substring(0, zip.getName().length() - 4);
             int us = base.indexOf('_');
@@ -370,8 +367,8 @@ public final class InstanceBackupService {
         String safeLabel = FileUtils.escapeFileName(
                 Tools.isValidString(instance.name) ? instance.name : instance.versionId);
         if (safeLabel.isEmpty()) safeLabel = "instance";
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
-        File finalZip = new File(backupsDir, safeLabel + "-" + stamp + ".zip");
+        String stamp = formatStamp(nextMonotonicStampMs());
+        File finalZip = uniqueArchiveFile(backupsDir, safeLabel + "-" + stamp, ".zip");
         File tempZip = new File(backupsDir, finalZip.getName() + ".tmp");
 
         int[] fileCounter = new int[]{0};
@@ -465,12 +462,74 @@ public final class InstanceBackupService {
         }
     }
 
+    private static final java.util.concurrent.atomic.AtomicLong sLastStampMs =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * Wall-clock milliseconds that strictly increase within the process, so two archives created
+     * in the same millisecond still get distinct names that sort chronologically.
+     */
+    public static long nextMonotonicStampMs() {
+        while (true) {
+            long last = sLastStampMs.get();
+            long next = Math.max(System.currentTimeMillis(), last + 1L);
+            if (sLastStampMs.compareAndSet(last, next)) return next;
+        }
+    }
+
+    @NonNull
+    public static String formatStamp(long epochMs) {
+        return new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date(epochMs));
+    }
+
+    /** Never overwrite an existing archive (e.g. another process in the same ms): add -2, -3, … */
+    @NonNull
+    public static File uniqueArchiveFile(@NonNull File dir, @NonNull String stem, @NonNull String suffix) {
+        File candidate = new File(dir, stem + suffix);
+        for (int i = 2; candidate.exists() || new File(dir, candidate.getName() + ".tmp").exists(); i++) {
+            candidate = new File(dir, stem + "-" + i + suffix);
+        }
+        return candidate;
+    }
+
+    /**
+     * Orders archives newest-first by the timestamp embedded in their name. File mtimes are only
+     * a tie-breaker: they can have 1–2 s granularity (FAT/sdcardfs) and change when users copy
+     * backups around, which used to let pruning delete the newest archive.
+     */
+    @NonNull
+    public static java.util.Comparator<File> newestFirst(@NonNull String prefix) {
+        return (a, b) -> {
+            int cmp = stampSortKey(b.getName(), prefix).compareTo(stampSortKey(a.getName(), prefix));
+            if (cmp != 0) return cmp;
+            cmp = Long.compare(b.lastModified(), a.lastModified());
+            return cmp != 0 ? cmp : b.getName().compareTo(a.getName());
+        };
+    }
+
+    /** Digits of the stamp (+ optional -N collision suffix) right-padded to a fixed width. */
+    @NonNull
+    public static String stampSortKey(@NonNull String fileName, @NonNull String prefix) {
+        String rest = fileName.startsWith(prefix) ? fileName.substring(prefix.length()) : fileName;
+        StringBuilder digits = new StringBuilder(24);
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits.append(c);
+            } else if (c != '-') {
+                break; // '_' (snapshot reason) or '.' (extension) ends the stamp
+            }
+        }
+        while (digits.length() < 24) digits.append('0');
+        return digits.toString();
+    }
+
     public static void pruneOldBackups(@NonNull File dir, @NonNull String prefix, int keepCount) {
         if (keepCount < 1 || !dir.isDirectory()) return;
         File[] zips = dir.listFiles(
                 f -> f.isFile() && f.getName().startsWith(prefix) && f.getName().endsWith(".zip"));
         if (zips == null || zips.length <= keepCount) return;
-        Arrays.sort(zips, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        Arrays.sort(zips, newestFirst(prefix));
         for (int i = keepCount; i < zips.length; i++) {
             File old = zips[i];
             File sha = new File(dir, old.getName() + ".sha256");

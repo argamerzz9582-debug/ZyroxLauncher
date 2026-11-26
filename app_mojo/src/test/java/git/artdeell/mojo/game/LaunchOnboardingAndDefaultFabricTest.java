@@ -12,8 +12,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,7 +29,6 @@ import git.artdeell.mojo.modding.fabric.FabricVersion;
 import git.artdeell.mojo.modding.fabric.FabriclikeUtils;
 import git.artdeell.mojo.prefs.LauncherPreferences;
 import git.artdeell.mojo.services.GameService;
-import git.artdeell.mojo.utils.ArchiveSecurity;
 import git.artdeell.mojo.utils.GameOptionsUtils;
 
 /**
@@ -54,41 +51,33 @@ public class LaunchOnboardingAndDefaultFabricTest {
         assertFalse("Fresh LocalBinder.isActive MUST be false so GameView.realStart() launches JVM",
                 binder.isActive);
 
-        String svcSrc = readUtf8(resolveFile(
-                "src/main/java/git/artdeell/mojo/services/GameService.java"));
-        assertFalse("GameService must never pre-set mLocalBinder.isActive = true in onStartCommand",
-                svcSrc.contains("mLocalBinder.isActive = true"));
-        assertTrue("GameService must track service lifetime via dedicated mServiceRunning flag",
-                svcSrc.contains("mServiceRunning = true"));
-
-        String actSrc = readUtf8(resolveFile(
-                "src/main/java/git/artdeell/mojo/game/GameActivity.java"));
-        int startIdx = actSrc.indexOf("launcherGLView.start(localBinder.isActive)");
-        int setIdx = actSrc.indexOf("localBinder.isActive = true");
-        assertTrue("GameActivity.onServiceConnected must call launcherGLView.start before flipping isActive",
-                startIdx > 0 && setIdx > startIdx);
+        // First activity connection must boot the JVM (start(false)); reconnections re-attach.
+        assertFalse("first connection must report 'not yet running'", binder.claimConnection());
+        assertTrue(binder.isActive);
+        assertTrue("re-connection must re-attach instead of booting a second JVM", binder.claimConnection());
+        binder.isActive = false; // GameService.onDestroy / GameActivity exit
+        assertFalse(binder.claimConnection());
     }
 
     @Test
     public void singleUnifiedFirstLaunchLoginNeverDuplicatesSelectAuthAndOnboarding() throws Exception {
-        String spinnerSrc = readUtf8(resolveFile(
-                "src/main/java/com/kdt/mcgui/AccountSpinner.java"));
-        assertTrue("AccountSpinner must suppress programmatic reload selection callbacks",
-                spinnerSrc.contains("mSuppressSelectionCallback"));
-        assertTrue("AccountSpinner must only call createAccount from dropdown when populated",
-                spinnerSrc.contains("if (mAdapter.getCount() > 1)"));
+        // Add-account row only opens login from a populated dropdown, never from programmatic
+        // reloads or the layout-time selection of a single-row (empty) list.
+        assertTrue(AccountSpinner.shouldCreateAccountFromSelection(false, 0, 3));
+        assertFalse(AccountSpinner.shouldCreateAccountFromSelection(true, 0, 3));
+        assertFalse(AccountSpinner.shouldCreateAccountFromSelection(false, 0, 1));
+        assertFalse(AccountSpinner.shouldCreateAccountFromSelection(false, 2, 3));
         assertFalse(AccountSpinner.isLoginInFlight());
 
-        String mainMenuSrc = readUtf8(resolveFile(
-                "src/main/java/git/artdeell/mojo/fragments/MainMenuFragment.java"));
-        assertTrue("MainMenuFragment must wait for initial asset extraction before showing onboarding",
-                mainMenuSrc.contains("ProgressKeeper.waitUntilDone"));
-
-        String launcherSrc = readUtf8(resolveFile(
-                "src/main/java/git/artdeell/mojo/LauncherActivity.java"));
-        assertTrue("LauncherActivity auth route must coalesce into OnboardingWizardFragment on first run",
-                launcherSrc.contains("fragment instanceof OnboardingWizardFragment")
-                        && launcherSrc.contains("OnboardingWizardFragment.shouldLaunchOnboarding()"));
+        // Sign-in requests coalesce into a single screen.
+        assertEquals(OnboardingWizardFragment.AuthRoute.ONBOARDING,
+                OnboardingWizardFragment.resolveAuthRoute(false, true, true));
+        assertEquals(OnboardingWizardFragment.AuthRoute.SELECT_AUTH,
+                OnboardingWizardFragment.resolveAuthRoute(false, true, false));
+        assertEquals("never stack a second auth screen", OnboardingWizardFragment.AuthRoute.NONE,
+                OnboardingWizardFragment.resolveAuthRoute(true, true, true));
+        assertEquals(OnboardingWizardFragment.AuthRoute.NONE,
+                OnboardingWizardFragment.resolveAuthRoute(false, false, true));
 
         // Verify OAuth return state toggles cleanly without lingering
         OnboardingWizardFragment.cancelPendingOAuthReturn();
@@ -151,12 +140,13 @@ public class LaunchOnboardingAndDefaultFabricTest {
         assertTrue(Instance.isSymbolicVersionId("latest-release"));
         assertEquals("Fabric (Latest)", Instances.DEFAULT_FABRIC_PLACEHOLDER_NAME);
 
-        String instancesSrc = readUtf8(resolveFile(
-                "src/main/java/git/artdeell/mojo/instances/Instances.java"));
-        assertTrue("First-time default instance must select VERSION_LATEST_FABRIC with fabric icon",
-                instancesSrc.contains("instance.versionId = Instance.VERSION_LATEST_FABRIC")
-                        && instancesSrc.contains("instance.icon = \"fabric\"")
-                        && instancesSrc.contains("ensureDefaultLatestFabricAsync"));
+        Instance firstTime = new Instance() { };
+        Instances.applyFirstTimeDefaults(firstTime);
+        assertEquals("First-time default instance must target latest stable Fabric",
+                Instance.VERSION_LATEST_FABRIC, firstTime.versionId);
+        assertEquals("fabric", firstTime.icon);
+        assertEquals(Instances.DEFAULT_FABRIC_PLACEHOLDER_NAME, firstTime.name);
+        assertTrue(firstTime.sharedData);
 
         // Verify JavaRuntimeAdvisor & ModrinthContentInstaller for 1.21.x, 26.x, and latest_fabric
         assertEquals(21, JavaRuntimeAdvisor.resolveRequiredJava(null, Instance.VERSION_LATEST_FABRIC));
@@ -201,18 +191,5 @@ public class LaunchOnboardingAndDefaultFabricTest {
         fv.version = ver;
         fv.stable = stable;
         return fv;
-    }
-
-    private static File resolveFile(String rel) {
-        File direct = new File(rel);
-        if (direct.exists()) return direct;
-        return new File("app_mojo/" + rel);
-    }
-
-    private static String readUtf8(File file) throws Exception {
-        try (FileInputStream in = new FileInputStream(file)) {
-            return new String(ArchiveSecurity.readBytesBounded(in, 2 * 1024 * 1024),
-                    StandardCharsets.UTF_8);
-        }
     }
 }

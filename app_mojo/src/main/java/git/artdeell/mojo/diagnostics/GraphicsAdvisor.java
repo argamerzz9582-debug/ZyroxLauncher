@@ -22,6 +22,7 @@ import git.artdeell.mojo.utils.GpuUtils.GpuArchitecture;
 import git.artdeell.mojo.vulkan.DriverManager;
 import git.artdeell.mojo.vulkan.driver.BuiltinDriver;
 import git.artdeell.mojo.vulkan.driver.Driver;
+import git.artdeell.mojo.utils.SdkLevel;
 
 /**
  * Zyrox Graphics Center &amp; Hardware Architecture Auto-Preset Advisor.
@@ -438,7 +439,7 @@ public final class GraphicsAdvisor {
                                                     @Nullable String versionId) {
         GpuUtils.GLInfo gl = GpuUtils.getGlInfo();
         boolean vulkan = GpuUtils.checkVulkanSupport(context.getPackageManager());
-        boolean hasMesa = Build.VERSION.SDK_INT >= 29
+        boolean hasMesa = SdkLevel.atLeast(Build.VERSION_CODES.Q)
                 && Tools.NATIVE_LIB_DIR != null
                 && new File(Tools.NATIVE_LIB_DIR, "libEGL_mesa.so").exists();
 
@@ -578,7 +579,7 @@ public final class GraphicsAdvisor {
                                                                @Nullable String resolvedVersionId) {
         GpuUtils.GLInfo gl = GpuUtils.getGlInfo();
         boolean vulkan = GpuUtils.checkVulkanSupport(context.getPackageManager());
-        boolean hasMesa = Build.VERSION.SDK_INT >= 29
+        boolean hasMesa = SdkLevel.atLeast(Build.VERSION_CODES.Q)
                 && Tools.NATIVE_LIB_DIR != null
                 && new File(Tools.NATIVE_LIB_DIR, "libEGL_mesa.so").exists();
 
@@ -684,7 +685,7 @@ public final class GraphicsAdvisor {
     public static String buildDiagnosticsSummary(@NonNull Context context) {
         GpuUtils.GLInfo gl = GpuUtils.getGlInfo();
         boolean vulkan = GpuUtils.checkVulkanSupport(context.getPackageManager());
-        boolean hasMesa = Build.VERSION.SDK_INT >= 29
+        boolean hasMesa = SdkLevel.atLeast(Build.VERSION_CODES.Q)
                 && Tools.NATIVE_LIB_DIR != null
                 && new File(Tools.NATIVE_LIB_DIR, "libEGL_mesa.so").exists();
         Driver activeDriver = DriverManager.getPreferredDriver();

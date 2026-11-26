@@ -1,0 +1,5 @@
+# key	start_s	loop_s	raw_name	poster_name
+# Pixabay #99299 (dark, slow sword bob) - default Loading backdrop
+diamond	0	15	zyrox_backdrop_diamond	bg_zyrox_backdrop_diamond
+# Pixabay #168653 (calm snowy peaks) - default Home backdrop
+snow	4	24	zyrox_backdrop_snow	bg_zyrox_backdrop_snow

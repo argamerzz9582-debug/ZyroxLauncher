@@ -148,6 +148,18 @@ public class GameService extends Service {
     }
 
     public static class LocalBinder extends Binder {
+        /** True once a {@link GameActivity} has attached and started the JVM in this process. */
         public boolean isActive;
+
+        /**
+         * Atomically records that an activity connected and reports whether the game was
+         * already running. The first connection gets {@code false} (so {@code GameView}
+         * boots the JVM), and every reconnection gets {@code true} (it re-attaches).
+         */
+        public synchronized boolean claimConnection() {
+            boolean wasActive = isActive;
+            isActive = true;
+            return wasActive;
+        }
     }
 }

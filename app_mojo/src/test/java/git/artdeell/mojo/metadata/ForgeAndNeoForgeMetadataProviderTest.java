@@ -17,6 +17,9 @@ import java.util.Map;
 import git.artdeell.mojo.utils.DownloadUtils;
 
 public class ForgeAndNeoForgeMetadataProviderTest {
+
+    /** Deterministic clock: cache freshness must never depend on the CI machine's wall time. */
+    private static final long FIXED_NOW_MS = 1_767_225_600_000L; // 2026-01-01T00:00:00Z
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -54,7 +57,7 @@ public class ForgeAndNeoForgeMetadataProviderTest {
                     }
                     return new LocalMetadataCache.HttpResponse(404, null, null, null, null, "Not Found");
                 },
-                System::currentTimeMillis,
+                () -> FIXED_NOW_MS,
                 ms -> {},
                 "ZyroxTest/1.0.3",
                 5_000,

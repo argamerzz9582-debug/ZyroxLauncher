@@ -86,6 +86,11 @@ public class LauncherPreferenceMiscellaneousFragment extends LauncherPreferenceB
         mVisibilityUpdater = this::updateVisibility;
         addPreferencesFromResource(R.xml.pref_misc);
 
+        Preference dimPref = findPreference(git.artdeell.mojo.ui.ZyroxBackdrops.PREF_DIM);
+        if (dimPref instanceof git.artdeell.mojo.prefs.CustomSeekBarPreference) {
+            ((git.artdeell.mojo.prefs.CustomSeekBarPreference) dimPref).setSuffix(" %");
+        }
+
         Preference checkUpdatesPref = findPreference("zyroxCheckUpdatesNow");
         if (checkUpdatesPref != null) {
             git.artdeell.mojo.updater.AppUpdateChecker.ReleaseInfo avail =

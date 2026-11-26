@@ -15,6 +15,9 @@ import java.io.IOException;
 import git.artdeell.mojo.modding.fabric.FabricVersion;
 
 public class FabricAndQuiltMetadataProviderTest {
+
+    /** Deterministic clock: cache freshness must never depend on the CI machine's wall time. */
+    private static final long FIXED_NOW_MS = 1_767_225_600_000L; // 2026-01-01T00:00:00Z
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();
 
@@ -51,7 +54,7 @@ public class FabricAndQuiltMetadataProviderTest {
                     }
                     return new LocalMetadataCache.HttpResponse(200, "[]", "\"empty\"", null, null, "OK");
                 },
-                System::currentTimeMillis,
+                () -> FIXED_NOW_MS,
                 ms -> {},
                 "ZyroxTest/1.0.3",
                 5_000,
@@ -124,7 +127,7 @@ public class FabricAndQuiltMetadataProviderTest {
         LocalMetadataCache cache = new LocalMetadataCache(
                 tempFolder.newFolder("quilt"),
                 (url, headers, cto, rto) -> new LocalMetadataCache.HttpResponse(200, quiltLoaders, "\"q1\"", null, null, "OK"),
-                System::currentTimeMillis,
+                () -> FIXED_NOW_MS,
                 ms -> {},
                 "ZyroxTest/1.0.3",
                 5_000,

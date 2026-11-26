@@ -29,6 +29,7 @@ import git.artdeell.mojo.vulkan.driver.AdrenoDriver;
 import git.artdeell.mojo.vulkan.driver.BuiltinDriver;
 import git.artdeell.mojo.vulkan.driver.DisplayDriver;
 import git.artdeell.mojo.vulkan.driver.Driver;
+import git.artdeell.mojo.utils.SdkLevel;
 
 /**
  * AdrenoTools Turnip ({@code .adpkg} / {@code .adpkg.zip} / {@code .zip}) Vulkan driver manager
@@ -55,7 +56,7 @@ public class DriverManager {
 
     public static boolean isSupportedByDevice() {
         return supported == null
-                ? (supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                ? (supported = SdkLevel.atLeast(Build.VERSION_CODES.P))
                 : supported;
     }
 
@@ -198,7 +199,7 @@ public class DriverManager {
                     && !sb.toString().contains(ad.driverVersion)) {
                 sb.append(" (").append(ad.driverVersion).append(')');
             }
-            if (ad.minApi > 0 && Build.VERSION.SDK_INT < ad.minApi) {
+            if (ad.minApi > 0 && SdkLevel.get() < ad.minApi) {
                 sb.append(" [API ").append(ad.minApi).append("+]");
             }
             return sb.toString();
@@ -321,9 +322,9 @@ public class DriverManager {
             return false;
         }
         if (!driver.libraryName.endsWith(".so")) return false;
-        if (driver.minApi > 0 && Build.VERSION.SDK_INT < driver.minApi) {
+        if (driver.minApi > 0 && SdkLevel.get() < driver.minApi) {
             Log.w(TAG, "Driver requires Android API " + driver.minApi
-                    + " (current " + Build.VERSION.SDK_INT + ")");
+                    + " (current " + SdkLevel.get() + ")");
             return false;
         }
         return driver.getHash() != null && !driver.getHash().isEmpty();

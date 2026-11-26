@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:src="@drawable/bg_zyrox_shader_scene"
+        android:src="@drawable/bg_zyrox_backdrop_snow"
         android:contentDescription="@string/app_short_name" />
 
     <View

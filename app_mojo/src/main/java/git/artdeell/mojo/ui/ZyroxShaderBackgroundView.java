@@ -21,9 +21,10 @@ import git.artdeell.mojo.prefs.LauncherPreferences;
 /**
  * Blur-isolated, full-resolution edge-to-edge Zyrox Launcher Home &amp; sub-page live backdrop:
  * <ol>
- *   <li>Default: Hardware-accelerated Full HD 1080p looping {@link ZyroxLoopingVideoView} playing
- *       {@code R.raw.zyrox_home_scene} with an instant frame-0 WebP poster ({@code bg_zyrox_shader_scene})
- *       and zero audio focus interruption.</li>
+ *   <li>Default: Hardware-accelerated Full HD 1080p looping {@link ZyroxLoopingVideoView} playing the
+ *       Minecraft-theme backdrop chosen in Settings ({@link ZyroxBackdrops}) with an instant frame-0
+ *       WebP poster, an adjustable dim scrim, and zero audio focus interruption. With power-aware
+ *       mode on it holds the poster during Battery Saver or thermal throttling.</li>
  *   <li>Custom MP4 override: Plays user-imported {@code zyrox_bg.mp4} through the same zero-flash
  *       hardware pipeline.</li>
  *   <li>Custom GIF override: Lazily instantiates {@link ZyroxSeamlessGifView} only when the user
@@ -75,7 +76,12 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
     @Nullable
     private ZyroxSeamlessGifView mCustomGifView;
     private View mContrastVeilView;
+    private View mDimScrimView;
     private boolean mResumed = false;
+    @Nullable
+    private android.content.BroadcastReceiver mPowerSaveReceiver;
+    @Nullable
+    private Object mThermalListener;
 
     public ZyroxShaderBackgroundView(@NonNull Context context) {
         super(context);
@@ -106,9 +112,18 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         // Layer 1: Full-HD 1080p hardware-accelerated Home screen.mp4 backdrop + instant poster
         mHomeVideoView = new ZyroxLoopingVideoView(context);
         mHomeVideoView.setLauncherBackdropRole(true);
-        mHomeVideoView.setPosterResource(R.drawable.bg_zyrox_shader_scene);
+        mHomeVideoView.setPosterResource(currentBackdrop().posterRes);
         mHomeVideoView.setPlaybackEnabled(false);
         addView(mHomeVideoView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+
+        // Layer 1b: user-adjustable dim scrim so white text stays readable on bright scenes (snow)
+        mDimScrimView = new View(context);
+        mDimScrimView.setClickable(false);
+        mDimScrimView.setFocusable(false);
+        mDimScrimView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        mDimScrimView.setBackgroundColor(
+                ZyroxBackdrops.dimPercentToScrimColor(LauncherPreferences.PREF_ZYROX_BACKDROP_DIM));
+        addView(mDimScrimView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         synchronized (ACTIVE_BACKDROPS) {
             ACTIVE_BACKDROPS.add(new java.lang.ref.WeakReference<>(this));
@@ -193,11 +208,32 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
         return null;
     }
 
+    @NonNull
+    private static ZyroxBackdrops.Backdrop currentBackdrop() {
+        return ZyroxBackdrops.fromId(LauncherPreferences.PREF_ZYROX_HOME_BACKDROP,
+                ZyroxBackdrops.DEFAULT_HOME);
+    }
+
+    /** Animation policy: user prefs + reduced motion + (optional) Battery Saver / thermal state. */
+    private boolean shouldAnimateNow() {
+        Context ctx = getContext();
+        return ZyroxBackdrops.shouldAnimate(
+                LauncherPreferences.PREF_ZYROX_ANIMATED_BG,
+                LauncherPreferences.isReducedMotionEnabled(ctx),
+                LauncherPreferences.PREF_ZYROX_BACKDROP_POWER_AWARE,
+                ZyroxBackdrops.isPowerSaveMode(ctx),
+                ZyroxBackdrops.thermalStatus(ctx));
+    }
+
     public void refreshBackgroundState() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             clearRenderEffectApi31();
         }
-        boolean animated = LauncherPreferences.PREF_ZYROX_ANIMATED_BG;
+        if (mDimScrimView != null) {
+            mDimScrimView.setBackgroundColor(
+                    ZyroxBackdrops.dimPercentToScrimColor(LauncherPreferences.PREF_ZYROX_BACKDROP_DIM));
+        }
+        boolean animated = shouldAnimateNow();
         File customGif = resolveCustomGifFile();
 
         if (customGif != null) {
@@ -224,26 +260,102 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
 
         mHomeVideoView.setVisibility(View.VISIBLE);
         File customVideo = resolveCustomVideoFile();
+        ZyroxBackdrops.Backdrop backdrop = currentBackdrop();
         if (animated && mResumed) {
             if (customVideo != null) {
-                mHomeVideoView.setVideoFile(customVideo, R.drawable.bg_zyrox_shader_scene);
+                mHomeVideoView.setVideoFile(customVideo, backdrop.posterRes);
             } else {
-                mHomeVideoView.setVideoResource(R.raw.zyrox_home_scene, R.drawable.bg_zyrox_shader_scene);
+                mHomeVideoView.setVideoResource(backdrop.videoRes, backdrop.posterRes);
             }
             mHomeVideoView.resumeAnimation();
         } else {
-            mHomeVideoView.setPosterResource(R.drawable.bg_zyrox_shader_scene);
+            mHomeVideoView.setPosterResource(backdrop.posterRes);
             mHomeVideoView.setPlaybackEnabled(false);
         }
     }
 
     public void onResume() {
         mResumed = true;
+        registerPowerListeners();
         refreshBackgroundState();
+    }
+
+    /**
+     * Battery Saver / thermal changes while the launcher is visible re-evaluate the policy, so the
+     * backdrop drops to its poster immediately (and resumes once the device recovers).
+     */
+    private void registerPowerListeners() {
+        Context ctx = getContext().getApplicationContext();
+        if (mPowerSaveReceiver == null) {
+            mPowerSaveReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(Context c, android.content.Intent i) {
+                    if (mResumed) refreshBackgroundState();
+                }
+            };
+            try {
+                android.content.IntentFilter filter =
+                        new android.content.IntentFilter(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // Protected system broadcast: still delivered to a non-exported receiver.
+                    ctx.registerReceiver(mPowerSaveReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    ctx.registerReceiver(mPowerSaveReceiver, filter);
+                }
+            } catch (Throwable t) {
+                mPowerSaveReceiver = null;
+            }
+        }
+        if (mThermalListener == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            mThermalListener = registerThermalListenerApi29(ctx);
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    @Nullable
+    private Object registerThermalListenerApi29(@NonNull Context ctx) {
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return null;
+            android.os.PowerManager.OnThermalStatusChangedListener l = status -> {
+                if (mResumed) refreshBackgroundState();
+            };
+            pm.addThermalStatusListener(ctx.getMainExecutor(), l);
+            return l;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private void unregisterPowerListeners() {
+        Context ctx = getContext().getApplicationContext();
+        if (mPowerSaveReceiver != null) {
+            try {
+                ctx.unregisterReceiver(mPowerSaveReceiver);
+            } catch (Throwable ignored) {
+            }
+            mPowerSaveReceiver = null;
+        }
+        if (mThermalListener != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            unregisterThermalListenerApi29(ctx, mThermalListener);
+        }
+        mThermalListener = null;
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private static void unregisterThermalListenerApi29(@NonNull Context ctx, @NonNull Object listener) {
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                pm.removeThermalStatusListener((android.os.PowerManager.OnThermalStatusChangedListener) listener);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     public void onPause() {
         mResumed = false;
+        unregisterPowerListeners();
         mHomeVideoView.pauseAnimation();
         if (mCustomGifView != null) {
             mCustomGifView.pauseAnimation();
@@ -256,6 +368,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
      */
     public void onStop() {
         mResumed = false;
+        unregisterPowerListeners();
         ZyroxGifDecoder.cancelAllActiveDecodes();
         mHomeVideoView.suspendForBackground(true);
         if (mCustomGifView != null) {
@@ -268,6 +381,7 @@ public class ZyroxShaderBackgroundView extends FrameLayout {
 
     public void onDestroy() {
         mResumed = false;
+        unregisterPowerListeners();
         synchronized (ACTIVE_BACKDROPS) {
             for (int i = ACTIVE_BACKDROPS.size() - 1; i >= 0; i--) {
                 ZyroxShaderBackgroundView cur = ACTIVE_BACKDROPS.get(i).get();
