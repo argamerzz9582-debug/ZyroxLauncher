@@ -41,6 +41,16 @@ public class SdkLevelAwareSecurityTest {
         assertEquals("host JVM falls back to the stub value", 0, SdkLevel.get());
     }
 
+    @Test
+    public void toolsApiGateFollowsPinnedLevel() {
+        SdkLevel.overrideForTests(25);
+        assertFalse(git.artdeell.mojo.Tools.isAndroid8OrHigher());
+        SdkLevel.overrideForTests(26);
+        assertTrue(git.artdeell.mojo.Tools.isAndroid8OrHigher());
+        SdkLevel.overrideForTests(36);
+        assertTrue(git.artdeell.mojo.Tools.isAndroid8OrHigher());
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void negativeOverrideIsRejected() {
         SdkLevel.overrideForTests(-5);

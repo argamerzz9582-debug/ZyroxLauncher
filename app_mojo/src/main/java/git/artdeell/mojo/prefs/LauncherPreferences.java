@@ -1,6 +1,6 @@
 package git.artdeell.mojo.prefs;
 
-import static android.os.Build.VERSION.SDK_INT;
+import git.artdeell.mojo.utils.SdkLevel;
 import static android.os.Build.VERSION_CODES.P;
 
 import static git.artdeell.mojo.Architecture.is32BitsDevice;
@@ -309,7 +309,7 @@ public class LauncherPreferences {
     /// Check if the device is considered powerful.
     /// Powerful devices will have some energy saving tweaks enabled by default
     private static boolean isDevicePowerful(Context context) {
-        if (SDK_INT < Build.VERSION_CODES.Q) return false;
+        if (!SdkLevel.atLeast(Build.VERSION_CODES.Q)) return false;
         if (Tools.getTotalDeviceMemory(context) <= 4096) return false;
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         if (Math.min(metrics.widthPixels, metrics.heightPixels) < 1080) return false;
@@ -332,10 +332,10 @@ public class LauncherPreferences {
 
     /** Check if the device has a display cutout */
     public static boolean hasNotch(Activity activity) {
-        if (Build.VERSION.SDK_INT < P) return false;
+        if (!SdkLevel.atLeast(P)) return false;
         try {
             final Rect cutout;
-            if(SDK_INT >= Build.VERSION_CODES.S){
+            if(SdkLevel.atLeast(Build.VERSION_CODES.S)){
                 cutout = activity.getWindowManager().getCurrentWindowMetrics().getWindowInsets().getDisplayCutout().getBoundingRects().get(0);
             } else {
                 cutout = activity.getWindow().getDecorView().getRootWindowInsets().getDisplayCutout().getBoundingRects().get(0);
@@ -357,7 +357,7 @@ public class LauncherPreferences {
      */
     public static boolean isReducedMotionEnabled() {
         if (PREF_ZYROX_REDUCED_MOTION) return true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.O)) {
             return !android.animation.ValueAnimator.areAnimatorsEnabled();
         }
         return false;

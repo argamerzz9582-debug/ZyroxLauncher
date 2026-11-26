@@ -1,5 +1,6 @@
 package git.artdeell.mojo.instances;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.util.Log;
@@ -258,7 +259,7 @@ public class Instance extends DisplayInstance {
     public void encodeNewIcon(Bitmap bitmap) throws IOException {
         try (FileOutputStream fileOutputStream = new FileOutputStream(getInstanceIconLocation())) {
             bitmap.compress(
-                    Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                    !SdkLevel.atLeast(Build.VERSION_CODES.R)
                             ? Bitmap.CompressFormat.WEBP
                             : Bitmap.CompressFormat.WEBP_LOSSY,
                     60,

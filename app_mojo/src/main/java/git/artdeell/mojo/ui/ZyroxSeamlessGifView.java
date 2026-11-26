@@ -1,5 +1,6 @@
 package git.artdeell.mojo.ui;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -240,10 +241,10 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
         setFocusable(false);
         setWillNotDraw(false);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.S)) {
             clearAnyRenderEffectApi31();
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.TIRAMISU)) {
             initBicubicShaderApi33();
         }
         syncScalingFilterFromPreferences();
@@ -310,7 +311,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
             mHardwareDrawable.setFilterBitmap(filterBitmap);
             mHardwareDrawable.setDither(false);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P) && mAnimatedDrawable != null) {
             mAnimatedDrawable.setFilterBitmap(filterBitmap);
         }
         invalidate();
@@ -471,7 +472,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
                               @NonNull AtomicBoolean cancelFlag) {
         // Primary Path (API 28+): Hardware-accelerated ImageDecoder + AnimatedImageDrawable
         // at strictly 1:1 native resolution (setTargetSampleSize(1), ALLOCATOR_HARDWARE, no RGB_565).
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P)) {
             try {
                 ZyroxGifDecoder.HardwareGifResult hw = (customFile != null)
                         ? ZyroxGifDecoder.decodeHardwareFile(customFile, nearest)
@@ -721,7 +722,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.S)) {
             clearAnyRenderEffectApi31();
         }
         if (!mReleased && getVisibility() == VISIBLE) {
@@ -766,7 +767,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
                 && getVisibility() == VISIBLE
                 && getWindowVisibility() == VISIBLE;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P) && mAnimatedDrawable != null) {
             stopChoreographer();
             if (visibleAndLive) {
                 if (!mAnimatedDrawable.isRunning()) {
@@ -789,7 +790,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     }
 
     private void stopActivePlayback() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P) && mAnimatedDrawable != null) {
             try {
                 if (mAnimatedDrawable.isRunning()) {
                     mAnimatedDrawable.stop();
@@ -884,7 +885,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
 
     private void drawCrispBitmap(@NonNull Canvas canvas, @NonNull Bitmap bmp, int vw, int vh) {
         if (mScalingFilter == ScalingFilter.BICUBIC
-                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && SdkLevel.atLeast(Build.VERSION_CODES.TIRAMISU)
                 && mBicubicRuntimeShader != null
                 && canvas.isHardwareAccelerated()) {
             if (drawWithBicubicShaderApi33(canvas, bmp, vw, vh)) {
@@ -926,7 +927,7 @@ public class ZyroxSeamlessGifView extends View implements Choreographer.FrameCal
     }
 
     private void recycleAllOnUiThread() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && mAnimatedDrawable != null) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P) && mAnimatedDrawable != null) {
             try {
                 mAnimatedDrawable.stop();
             } catch (Throwable ignored) {

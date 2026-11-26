@@ -1,5 +1,6 @@
 package git.artdeell.mojo.content;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -855,8 +856,8 @@ public final class InstanceContentManager {
             if (linkPath.isFile()) return true;
         } catch (Throwable ignored) {
         }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O
-                || android.os.Build.VERSION.SDK_INT == 0) {
+        if (SdkLevel.atLeast(android.os.Build.VERSION_CODES.O)
+                || SdkLevel.get() == 0 /* host JVM unit tests: no Android runtime */) {
             try {
                 java.nio.file.Files.createLink(linkPath.toPath(), blob.toPath());
                 if (linkPath.isFile()) return true;

@@ -56,7 +56,7 @@ public class DriverManager {
 
     public static boolean isSupportedByDevice() {
         return supported == null
-                ? (supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                ? (supported = SdkLevel.atLeast(Build.VERSION_CODES.P))
                 : supported;
     }
 

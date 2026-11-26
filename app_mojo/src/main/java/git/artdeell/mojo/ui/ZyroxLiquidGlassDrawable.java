@@ -1,5 +1,6 @@
 package git.artdeell.mojo.ui;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
@@ -670,7 +671,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             int ramMb = git.artdeell.mojo.Tools.getTotalDeviceMemory(context);
             git.artdeell.mojo.utils.GpuUtils.GLInfo gl = git.artdeell.mojo.utils.GpuUtils.getGlInfo();
             return resolveGlassBlurTier(
-                    android.os.Build.VERSION.SDK_INT,
+                    SdkLevel.get(),
                     ramMb,
                     gl != null ? gl.architecture : null,
                     LauncherPreferences.PREF_ZYROX_LOW_EFFECTS);
@@ -689,7 +690,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
                                                         @NonNull android.content.Context context,
                                                         float radiusDp) {
         if (blurUnderlayView == null) return false;
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
+        if (!SdkLevel.atLeast(android.os.Build.VERSION_CODES.S)) {
             return false;
         }
         if (!isEligibleForForegroundBlur(blurUnderlayView)
@@ -713,7 +714,7 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
                                                  float density,
                                                  boolean hudSurfaceMode) {
         if (!isEligibleForForegroundBlur(cardView)) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            if (SdkLevel.atLeast(android.os.Build.VERSION_CODES.S)) {
                 cardView.setRenderEffect(null);
             }
             return;

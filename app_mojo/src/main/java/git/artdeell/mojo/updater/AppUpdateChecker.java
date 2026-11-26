@@ -1,5 +1,6 @@
 package git.artdeell.mojo.updater;
 
+import git.artdeell.mojo.utils.SdkLevel;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -492,7 +493,7 @@ public final class AppUpdateChecker {
             android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
                     context.getSystemService(Context.CONNECTIVITY_SERVICE);
             if (cm == null) return true;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (SdkLevel.atLeast(Build.VERSION_CODES.M)) {
                 android.net.Network active = cm.getActiveNetwork();
                 if (active == null) return false;
                 android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(active);
@@ -1312,7 +1313,7 @@ public final class AppUpdateChecker {
 
     /** Verifies Android 8.0+ {@code REQUEST_INSTALL_PACKAGES} permission state. */
     public static boolean canInstallPackages(@NonNull Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.O)) {
             return context.getPackageManager().canRequestPackageInstalls();
         }
         return true;
@@ -1321,7 +1322,7 @@ public final class AppUpdateChecker {
     /** Creates the system settings intent allowing this app to install its own verified updates. */
     @NonNull
     public static Intent createInstallPermissionSettingsIntent(@NonNull Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.O)) {
             return new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                     Uri.parse("package:" + context.getPackageName()));
         }
@@ -1430,7 +1431,7 @@ public final class AppUpdateChecker {
             PackageManager pm = context.getPackageManager();
             PackageInfo archive = readPackageInfo(pm, apkFile.getAbsolutePath(), null);
             PackageInfo self = readPackageInfo(pm, null, context.getPackageName());
-            return isTrustedUpdateArchive(Build.VERSION.SDK_INT,
+            return isTrustedUpdateArchive(SdkLevel.get(),
                     context.getPackageName(),
                     archive != null ? archive.packageName : null,
                     signerSha256Set(archive),
@@ -1449,13 +1450,13 @@ public final class AppUpdateChecker {
                                                @Nullable String apkPath,
                                                @Nullable String installedPackage)
             throws PackageManager.NameNotFoundException {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.TIRAMISU)) {
             PackageManager.PackageInfoFlags flags =
                     PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES);
             return apkPath != null ? pm.getPackageArchiveInfo(apkPath, flags)
                     : pm.getPackageInfo(installedPackage, flags);
         }
-        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+        int flags = SdkLevel.atLeast(Build.VERSION_CODES.P)
                 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         return apkPath != null ? pm.getPackageArchiveInfo(apkPath, flags)
                 : pm.getPackageInfo(installedPackage, flags);
@@ -1467,7 +1468,7 @@ public final class AppUpdateChecker {
     private static java.util.Set<String> signerSha256Set(@Nullable PackageInfo info) {
         if (info == null) return null;
         android.content.pm.Signature[] signers = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null) {
+        if (SdkLevel.atLeast(Build.VERSION_CODES.P) && info.signingInfo != null) {
             signers = info.signingInfo.hasMultipleSigners()
                     ? info.signingInfo.getApkContentsSigners()
                     : info.signingInfo.getSigningCertificateHistory();
