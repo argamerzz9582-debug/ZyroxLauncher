@@ -2,7 +2,7 @@
 
 All notable changes to **Zyrox Launcher** are documented in this file.
 
-## [Unreleased]
+## [2.9.0] — 2026-11-26
 
 ### Added
 - **Minecraft backdrops:** *Snowy Peaks* (Home) and *Diamond Forge* (Loading) are seamless 1080p30 loops with first-frame posters. The two clips total 14.8 MB and replace 36 MB of non-Minecraft clips. Sources and licenses are listed in `docs/BACKDROP_CREDITS.md`.
