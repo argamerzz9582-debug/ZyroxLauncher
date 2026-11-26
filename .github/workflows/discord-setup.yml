@@ -1,0 +1,25 @@
+name: Set up Zyrox Discord
+on:
+  workflow_dispatch:
+    inputs:
+      guild:
+        description: 'Confirm server ID (1573020729371398144)'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency: zyrox-discord-setup
+jobs:
+  setup:
+    if: inputs.guild == '1573020729371398144'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install discord.py==2.5.2
+      - run: python scripts/setup-discord.py
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CONFIRMED_GUILD_ID: ${{ inputs.guild }}
