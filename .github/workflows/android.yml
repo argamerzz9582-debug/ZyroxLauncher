@@ -214,6 +214,49 @@ jobs:
           print(f"::notice title=UnitTestsPassed::{total} tests passed, {failed} failures, {errors} errors across {', '.join(suites)}")
           PY
 
+      - name: Unit-test coverage report (JaCoCo, non-blocking)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          gradle :app_mojo:jacocoUnitTestReport 2>&1 | tail -n 15
+          python3 - <<'PY'
+          import os, xml.etree.ElementTree as ET
+          xf = "app_mojo/build/reports/jacoco/jacocoUnitTestReport/jacocoUnitTestReport.xml"
+          if not os.path.isfile(xf):
+              print("::warning title=Coverage::JaCoCo XML report not produced")
+              raise SystemExit(0)
+          root = ET.parse(xf).getroot()
+          totals = {c.get("type"): c for c in root.findall("counter")}
+          def pct(kind):
+              c = totals.get(kind)
+              if c is None: return "n/a"
+              cov, miss = int(c.get("covered")), int(c.get("missed"))
+              return f"{100.0 * cov / max(1, cov + miss):.1f}% ({cov}/{cov + miss})"
+          pkgs = []
+          for p in root.findall("package"):
+              line = next((c for c in p.findall("counter") if c.get("type") == "LINE"), None)
+              if line is not None:
+                  cov, miss = int(line.get("covered")), int(line.get("missed"))
+                  if cov + miss >= 200:
+                      pkgs.append((100.0 * cov / (cov + miss), p.get("name").replace("/", ".")))
+          worst = ", ".join(f"{n.split('.')[-1]} {v:.0f}%" for v, n in sorted(pkgs)[:6])
+          print(f"::notice title=UnitTestCoverage::lines {pct('LINE')}, branches {pct('BRANCH')}; least-covered packages: {worst}")
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a") as fh:
+                  fh.write(f"### Unit-test coverage\n\n| Metric | Coverage |\n|---|---|\n| Lines | {pct('LINE')} |\n| Branches | {pct('BRANCH')} |\n| Methods | {pct('METHOD')} |\n\nLeast-covered packages: {worst}\n")
+          PY
+
+      - name: Upload coverage report
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unit-test-coverage
+          path: app_mojo/build/reports/jacoco/jacocoUnitTestReport/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Run Android Lint Static Verification
         run: |
           set -o pipefail

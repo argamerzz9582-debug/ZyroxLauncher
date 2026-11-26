@@ -94,6 +94,8 @@ android {
         versionName getVersionName()
         // Native ART multidex (minSdk 21) supports modern OkHttp HTTP/2, Gson & Commons Maven artifacts
         multiDexEnabled true
+        // On-device smoke tests (src/androidTest), run weekly by .github/workflows/android-smoke.yml
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         resValue 'string', 'curseforge_api_key', getCFApiKey()
         resValue 'string', 'group_id', 'com.zyrox'
     }
@@ -386,4 +388,45 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.aar'])
 
     testImplementation 'junit:junit:4.13.2'
+
+    androidTestImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}
+
+// ---------------------------------------------------------------------------------------------
+// Unit-test coverage (JaCoCo). Runs alongside :app_mojo:testFullReleaseUnitTest and produces
+// app_mojo/build/reports/jacoco/jacocoUnitTestReport/{html,jacocoUnitTestReport.xml}.
+// CI publishes the HTML report as an artifact and prints a line/branch summary.
+// ---------------------------------------------------------------------------------------------
+apply plugin: 'jacoco'
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.withType(Test).configureEach {
+    jacoco {
+        includeNoLocationClasses = true
+        excludes = ['jdk.internal.*']
+    }
+}
+
+tasks.register('jacocoUnitTestReport', JacocoReport) {
+    group = 'verification'
+    description = 'Line/branch coverage for the fullRelease JVM unit tests.'
+    dependsOn 'testFullReleaseUnitTest'
+    def excludes = ['**/R.class', '**/R$*.class', '**/BuildConfig.*', '**/Manifest*.*']
+    classDirectories.setFrom(files(
+            fileTree(dir: layout.buildDirectory.dir('intermediates/javac/fullRelease/compileFullReleaseJavaWithJavac/classes'),
+                    excludes: excludes)))
+    sourceDirectories.setFrom(files('src/main/java'))
+    executionData.setFrom(fileTree(dir: layout.buildDirectory, includes: ['jacoco/testFullReleaseUnitTest.exec',
+                                                                          'outputs/unit_test_code_coverage/**/*.exec']))
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
 }
