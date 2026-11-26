@@ -81,6 +81,10 @@ public class LauncherPreferences {
     public static boolean PREF_DISABLE_BLOCKLIST = false;
     public static String PREF_VULKAN_DRIVER = null;
     public static boolean PREF_ZYROX_ANIMATED_BG = true;
+    public static String PREF_ZYROX_HOME_BACKDROP = "snow";
+    public static String PREF_ZYROX_LOADING_BACKDROP = "diamond";
+    public static int PREF_ZYROX_BACKDROP_DIM = git.artdeell.mojo.ui.ZyroxBackdrops.DEFAULT_DIM_PERCENT;
+    public static boolean PREF_ZYROX_BACKDROP_POWER_AWARE = true;
     public static boolean PREF_ZYROX_REDUCED_MOTION = false;
     public static boolean PREF_ZYROX_LOW_EFFECTS = false;
     public static boolean PREF_ZYROX_PERF_HUD = false;
@@ -198,6 +202,17 @@ public class LauncherPreferences {
         PREF_DISABLE_BLOCKLIST = DEFAULT_PREF.getBoolean("disableServerBlocklist", true);
         PREF_VULKAN_DRIVER = DEFAULT_PREF.getString("customVulkanDriver", null);
         PREF_ZYROX_ANIMATED_BG = DEFAULT_PREF.getBoolean("zyroxAnimatedBg", true);
+        PREF_ZYROX_HOME_BACKDROP = git.artdeell.mojo.ui.ZyroxBackdrops.fromId(
+                DEFAULT_PREF.getString(git.artdeell.mojo.ui.ZyroxBackdrops.PREF_HOME, null),
+                git.artdeell.mojo.ui.ZyroxBackdrops.DEFAULT_HOME).id;
+        PREF_ZYROX_LOADING_BACKDROP = git.artdeell.mojo.ui.ZyroxBackdrops.fromId(
+                DEFAULT_PREF.getString(git.artdeell.mojo.ui.ZyroxBackdrops.PREF_LOADING, null),
+                git.artdeell.mojo.ui.ZyroxBackdrops.DEFAULT_LOADING).id;
+        PREF_ZYROX_BACKDROP_DIM = Math.max(0, Math.min(git.artdeell.mojo.ui.ZyroxBackdrops.MAX_DIM_PERCENT,
+                DEFAULT_PREF.getInt(git.artdeell.mojo.ui.ZyroxBackdrops.PREF_DIM,
+                        git.artdeell.mojo.ui.ZyroxBackdrops.DEFAULT_DIM_PERCENT)));
+        PREF_ZYROX_BACKDROP_POWER_AWARE = DEFAULT_PREF.getBoolean(
+                git.artdeell.mojo.ui.ZyroxBackdrops.PREF_POWER_AWARE, true);
         PREF_ZYROX_REDUCED_MOTION = DEFAULT_PREF.getBoolean("zyroxReducedMotion", false);
         PREF_ZYROX_LOW_EFFECTS = DEFAULT_PREF.getBoolean("zyroxLowEffects", false);
         PREF_ZYROX_PERF_HUD = DEFAULT_PREF.getBoolean("zyroxPerfHud", false);

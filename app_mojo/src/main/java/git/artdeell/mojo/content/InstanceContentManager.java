@@ -15,11 +15,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.zip.ZipFile;
@@ -191,8 +189,10 @@ public final class InstanceContentManager {
         File modsDir = new File(gameDir, "mods");
         File snapDir = new File(gameDir, ".zyrox_mod_snapshots");
         FileUtils.ensureDirectory(snapDir);
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
-        File snapFile = new File(snapDir, "mods-snapshot-" + stamp + ".json");
+        String stamp = git.artdeell.mojo.instances.InstanceBackupService.formatStamp(
+                git.artdeell.mojo.instances.InstanceBackupService.nextMonotonicStampMs());
+        File snapFile = git.artdeell.mojo.instances.InstanceBackupService.uniqueArchiveFile(
+                snapDir, "mods-snapshot-" + stamp, ".json");
 
         JsonObject root = new JsonObject();
         root.addProperty("format", "zyrox-mod-snapshot-v1");
@@ -229,7 +229,7 @@ public final class InstanceContentManager {
         if (snaps == null || snaps.length == 0) {
             throw new IOException("No saved mod state snapshots found for this instance");
         }
-        Arrays.sort(snaps, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        Arrays.sort(snaps, git.artdeell.mojo.instances.InstanceBackupService.newestFirst("mods-snapshot-"));
         File latest = snaps[0];
         String text;
         try (FileInputStream in = new FileInputStream(latest)) {

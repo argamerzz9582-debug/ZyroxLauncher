@@ -18,8 +18,8 @@ import git.artdeell.mojo.ui.ZyroxGifDecoder;
 import git.artdeell.mojo.utils.ArchiveSecurity;
 
 /**
- * Unit and resource regression tests for {@link MojangSplashDetector} and the pure full-bleed
- * cherry-blossom GIF loading screen ({@code R.raw.zyrox_loading_scene}).
+ * Unit and resource regression tests for {@link MojangSplashDetector} and the bundled
+ * Minecraft-theme backdrop loops used by the Home and Loading screens.
  */
 public class MojangSplashAndLoadingScreenTest {
 
@@ -116,19 +116,34 @@ public class MojangSplashAndLoadingScreenTest {
 
     @Test
     public void verifiesBundledFullHdLoadingAndHomeVideosAndProgressHud() throws Exception {
-        // 1. Verify both Full-HD 1080p MP4 backdrops (ftyp + faststart moov before mdat + H.264 avc1 + muted)
-        verifyFastStartH264Mp4("src/main/res/raw/zyrox_loading_scene.mp4");
-        verifyFastStartH264Mp4("src/main/res/raw/zyrox_home_scene.mp4");
+        // 1. Every bundled Minecraft backdrop (res/raw/zyrox_backdrop_*.mp4) must be a fast-start,
+        //    muted 1080p H.264 loop with a matching first-frame WebP poster.
+        File rawDir = resolveModuleFile("src/main/res/raw");
+        File[] clips = rawDir.listFiles((d, n) -> n.startsWith("zyrox_backdrop_") && n.endsWith(".mp4"));
+        assertTrue("At least the default home (snow) and loading (diamond) backdrops must ship",
+                clips != null && clips.length >= 2);
+        long totalBytes = 0L;
+        for (File clip : clips) {
+            verifyFastStartH264Mp4("src/main/res/raw/" + clip.getName());
+            totalBytes += clip.length();
+            String id = clip.getName().substring("zyrox_backdrop_".length(), clip.getName().length() - 4);
+            File poster = resolveModuleFile("src/main/res/drawable-nodpi/bg_zyrox_backdrop_" + id + ".webp");
+            assertTrue("poster for " + id + " must exist", poster.isFile() && poster.length() > 10_000L);
+        }
+        assertTrue("default backdrops must exist",
+                resolveModuleFile("src/main/res/raw/zyrox_backdrop_snow.mp4").isFile()
+                        && resolveModuleFile("src/main/res/raw/zyrox_backdrop_diamond.mp4").isFile());
+        assertTrue("Backdrop clips must stay within a 40 MB APK budget (was 36 MB for two clips)",
+                totalBytes < 40_000_000L);
 
-        // Verify instant zero-black-frame WebP posters exist for both backdrops
-        File loadPoster = resolveModuleFile("src/main/res/drawable-nodpi/bg_zyrox_loading_poster.webp");
-        File homePoster = resolveModuleFile("src/main/res/drawable-nodpi/bg_zyrox_shader_scene.webp");
-        assertTrue("bg_zyrox_loading_poster.webp must exist", loadPoster.isFile() && loadPoster.length() > 10_000L);
-        assertTrue("bg_zyrox_shader_scene.webp must exist", homePoster.isFile() && homePoster.length() > 10_000L);
-
-        // Verify obsolete low-res default GIFs are removed so APK carries zero dead weight
-        assertFalse(resolveModuleFile("src/main/res/raw/zyrox_loading_scene.gif").exists());
-        assertFalse(resolveModuleFile("src/main/res/raw/zyrox_home_scene.gif").exists());
+        // Obsolete non-Minecraft clips/posters and low-res GIFs must be gone (zero dead weight)
+        for (String obsolete : new String[]{
+                "src/main/res/raw/zyrox_home_scene.mp4", "src/main/res/raw/zyrox_loading_scene.mp4",
+                "src/main/res/raw/zyrox_home_scene.gif", "src/main/res/raw/zyrox_loading_scene.gif",
+                "src/main/res/drawable-nodpi/bg_zyrox_shader_scene.webp",
+                "src/main/res/drawable-nodpi/bg_zyrox_loading_poster.webp"}) {
+            assertFalse(obsolete + " must be removed", resolveModuleFile(obsolete).exists());
+        }
 
         // Verify activity_basemain.xml renders full-bleed Loading MP4 + Zyrox logo + progress HUD
         File baseLayout = resolveModuleFile("src/main/res/layout/activity_basemain.xml");
@@ -189,8 +204,8 @@ public class MojangSplashAndLoadingScreenTest {
     private static void verifyFastStartH264Mp4(String relPath) throws Exception {
         File mp4 = resolveModuleFile(relPath);
         assertTrue(relPath + " must be bundled in res/raw", mp4.isFile());
-        assertTrue(relPath + " must be a rich Full-HD H.264 video (> 5 MB)", mp4.length() > 5_000_000L);
-        assertTrue(relPath + " must stay under 45 MB for fast APK streaming", mp4.length() < 45_000_000L);
+        assertTrue(relPath + " must be a rich Full-HD H.264 video (> 2 MB)", mp4.length() > 2_000_000L);
+        assertTrue(relPath + " must stay under 15 MB (short seamless loop)", mp4.length() < 15_000_000L);
 
         try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(mp4, "r")) {
             long fileLen = raf.length();

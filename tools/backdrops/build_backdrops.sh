@@ -10,6 +10,8 @@
 #   tools/backdrops/build_backdrops.sh preview   # contact sheets with timestamps -> tools/backdrops/preview/
 #   tools/backdrops/build_backdrops.sh encode    # final clips + posters -> app_mojo/src/main/res/...
 #
+# A locally provided source at .backdrop-work/<key>.src.mp4 always takes precedence over downloading.
+#
 # The segment plan lives in tools/backdrops/plan.tsv. Requirements: ffmpeg (with libx264, libwebp, drawtext),
 # yt-dlp, curl.
 #
@@ -38,8 +40,10 @@ declare -A SRC=(
 )
 
 fetch() {
-  local key="$1" spec="${SRC[$1]}" out="$WORK/$1.src.mp4"
-  [[ -s "$out" ]] && { echo "$out"; return 0; }
+  local key="$1" out="$WORK/$1.src.mp4"
+  [[ -s "$out" ]] && { echo "$out"; return 0; }   # pre-placed local source (e.g. an uploaded clip)
+  local spec="${SRC[$1]:-}"
+  [[ -n "$spec" ]] || { echo "no source configured for '$key' (place it at $out)" >&2; return 1; }
   case "$spec" in
     yt:*)
       local id="${spec#yt:}" ok=0

@@ -292,13 +292,10 @@ public class ZyroxPhase1To4EcosystemTest {
 
         // Mutate config & world across 3 more snapshots -> rolling limit must stay == 3
         writeUtf8(cfgFile, "{\"quality\":\"broken-2\"}");
-        Thread.sleep(5L);
         InstanceBackupService.createPreModSnapshot(inst, "mod-2");
-        Thread.sleep(5L);
         InstanceBackupService.createPreModSnapshot(inst, "mod-3");
         writeUtf8(cfgFile, "{\"quality\":\"good-checkpoint\"}");
         writeUtf8(worldFile, "SAFE_WORLD_CHECKPOINT");
-        Thread.sleep(5L);
         File latest = InstanceBackupService.createPreModSnapshot(inst, "mod-4");
         assertNotNull(latest);
 

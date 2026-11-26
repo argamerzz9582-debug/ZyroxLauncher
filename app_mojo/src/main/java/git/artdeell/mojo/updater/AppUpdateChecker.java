@@ -1181,7 +1181,7 @@ public final class AppUpdateChecker {
                 if (finalApk.isFile() && finalApk.length() > 65536L
                         && expectedSha256 != null
                         && expectedSha256.equalsIgnoreCase(computeFileSha256(finalApk))
-                        && verifyDownloadedApkArchive(appCtx, finalApk)) {
+                        && verifyDownloadedApkArchive(appCtx, finalApk, true)) {
                     Tools.runOnUiThread(() -> listener.onCompleted(finalApk, true));
                     return;
                 }
@@ -1294,7 +1294,7 @@ public final class AppUpdateChecker {
                 }
                 partFile = null;
 
-                if (!verifyDownloadedApkArchive(appCtx, finalApk)) {
+                if (!verifyDownloadedApkArchive(appCtx, finalApk, checksumVerified)) {
                     //noinspection ResultOfMethodCallIgnored
                     finalApk.delete();
                     throw new IOException("Downloaded APK failed package or signing verification");
@@ -1383,74 +1383,109 @@ public final class AppUpdateChecker {
         }
     }
 
-    @SuppressWarnings("deprecation")
-    private static boolean verifyDownloadedApkArchive(@NonNull Context context,
-                                                      @NonNull File apkFile) {
-        try {
-            PackageManager pm = context.getPackageManager();
-            PackageInfo pkgInfo;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(),
-                        PackageManager.PackageInfoFlags.of(
-                                PackageManager.GET_SIGNING_CERTIFICATES));
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(),
-                        PackageManager.GET_SIGNING_CERTIFICATES);
-            } else {
-                pkgInfo = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(), 0);
-            }
-            if (pkgInfo == null || !context.getPackageName().equals(pkgInfo.packageName)) {
-                return false;
-            }
-            // Enforce APK Signature Scheme v2/v3 signing-certificate continuity on Android 9+
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                String archiveCert = extractFirstSignerSha256(pkgInfo);
-                String installedCert = extractInstalledSignerSha256(context, pm);
-                if (archiveCert != null && installedCert != null) {
-                    return installedCert.equalsIgnoreCase(archiveCert);
+    /**
+     * Pure, fail-closed trust decision for a downloaded update archive (unit-tested on the host JVM).
+     *
+     * <ul>
+     *   <li>The archive must declare exactly this app's package name.</li>
+     *   <li>When signing certificates can be read (always on API 28+, usually on older releases via
+     *       legacy signatures), the archive must share at least one signer with the installed app.
+     *       Comparing sets keeps APK Signature Scheme v3 key rotation working, because rotated
+     *       archives still carry the original certificate in their lineage.</li>
+     *   <li>On API 28+ unreadable certificates are a hard failure: the platform always exposes them,
+     *       so {@code null} means a malformed or tampered archive.</li>
+     *   <li>Below API 28 some ROMs return no archive signatures at all; then the update is only
+     *       accepted if its SHA-256 matched the published checksum.</li>
+     * </ul>
+     */
+    static boolean isTrustedUpdateArchive(int sdkInt,
+                                          @Nullable String selfPackage,
+                                          @Nullable String archivePackage,
+                                          @Nullable java.util.Set<String> archiveSignerSha256,
+                                          @Nullable java.util.Set<String> installedSignerSha256,
+                                          boolean checksumVerified) {
+        if (selfPackage == null || selfPackage.isEmpty() || !selfPackage.equals(archivePackage)) {
+            return false;
+        }
+        boolean haveArchive = archiveSignerSha256 != null && !archiveSignerSha256.isEmpty();
+        boolean haveInstalled = installedSignerSha256 != null && !installedSignerSha256.isEmpty();
+        if (haveArchive && haveInstalled) {
+            for (String cert : archiveSignerSha256) {
+                if (cert != null && installedSignerSha256.contains(cert.toLowerCase(Locale.ROOT))) {
+                    return true;
                 }
             }
-            return true;
+            return false;
+        }
+        if (sdkInt >= Build.VERSION_CODES.P) {
+            return false;
+        }
+        return checksumVerified;
+    }
+
+    private static boolean verifyDownloadedApkArchive(@NonNull Context context,
+                                                      @NonNull File apkFile,
+                                                      boolean checksumVerified) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            PackageInfo archive = readPackageInfo(pm, apkFile.getAbsolutePath(), null);
+            PackageInfo self = readPackageInfo(pm, null, context.getPackageName());
+            return isTrustedUpdateArchive(Build.VERSION.SDK_INT,
+                    context.getPackageName(),
+                    archive != null ? archive.packageName : null,
+                    signerSha256Set(archive),
+                    signerSha256Set(self),
+                    checksumVerified);
         } catch (Throwable t) {
             return false;
         }
     }
 
+    /** Reads either an archive ({@code apkPath}) or an installed package with its signing certificates. */
     @Nullable
     @SuppressWarnings("deprecation")
-    private static String extractInstalledSignerSha256(@NonNull Context context,
-                                                       @NonNull PackageManager pm) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null;
-        try {
-            PackageInfo self = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                    ? pm.getPackageInfo(context.getPackageName(),
-                        PackageManager.PackageInfoFlags.of(
-                                PackageManager.GET_SIGNING_CERTIFICATES))
-                    : pm.getPackageInfo(context.getPackageName(),
-                        PackageManager.GET_SIGNING_CERTIFICATES);
-            return extractFirstSignerSha256(self);
-        } catch (Throwable ignored) {
-            return null;
+    @android.annotation.SuppressLint("PackageManagerGetSignatures") // compared against our own signer only
+    private static PackageInfo readPackageInfo(@NonNull PackageManager pm,
+                                               @Nullable String apkPath,
+                                               @Nullable String installedPackage)
+            throws PackageManager.NameNotFoundException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PackageManager.PackageInfoFlags flags =
+                    PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES);
+            return apkPath != null ? pm.getPackageArchiveInfo(apkPath, flags)
+                    : pm.getPackageInfo(installedPackage, flags);
         }
+        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        return apkPath != null ? pm.getPackageArchiveInfo(apkPath, flags)
+                : pm.getPackageInfo(installedPackage, flags);
     }
 
+    /** SHA-256 (lower-case hex) of every signer / lineage certificate exposed by {@code info}. */
     @Nullable
-    private static String extractFirstSignerSha256(@Nullable PackageInfo info) {
-        if (info == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P
-                || info.signingInfo == null) {
-            return null;
-        }
-        try {
-            android.content.pm.Signature[] signers = info.signingInfo.hasMultipleSigners()
+    @SuppressWarnings("deprecation")
+    private static java.util.Set<String> signerSha256Set(@Nullable PackageInfo info) {
+        if (info == null) return null;
+        android.content.pm.Signature[] signers = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null) {
+            signers = info.signingInfo.hasMultipleSigners()
                     ? info.signingInfo.getApkContentsSigners()
                     : info.signingInfo.getSigningCertificateHistory();
-            if (signers == null || signers.length == 0 || signers[0] == null) {
-                return null;
+        } else if (info.signatures != null) {
+            signers = info.signatures;
+        }
+        if (signers == null || signers.length == 0) return null;
+        java.util.Set<String> out = new java.util.HashSet<>();
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            for (android.content.pm.Signature sig : signers) {
+                if (sig == null) continue;
+                out.add(toLowerHex(md.digest(sig.toByteArray())));
             }
-            return toLowerHex(MessageDigest.getInstance("SHA-256").digest(signers[0].toByteArray()));
-        } catch (Throwable ignored) {
+        } catch (NoSuchAlgorithmException e) {
             return null;
         }
+        return out.isEmpty() ? null : out;
     }
 
     @NonNull

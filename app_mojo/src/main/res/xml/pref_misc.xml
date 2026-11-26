@@ -26,6 +26,43 @@
             android:summary="@string/zyrox_pref_animated_bg_summary" />
 
         <androidx.preference.ListPreference
+            android:defaultValue="snow"
+            android:icon="@drawable/ic_px_image"
+            android:key="zyroxHomeBackdrop"
+            android:entries="@array/zyrox_backdrop_names"
+            android:entryValues="@array/zyrox_backdrop_values"
+            android:title="@string/zyrox_pref_home_backdrop_title"
+            app2:useSimpleSummaryProvider="true" />
+
+        <androidx.preference.ListPreference
+            android:defaultValue="diamond"
+            android:icon="@drawable/ic_px_image"
+            android:key="zyroxLoadingBackdrop"
+            android:entries="@array/zyrox_backdrop_names"
+            android:entryValues="@array/zyrox_backdrop_values"
+            android:title="@string/zyrox_pref_loading_backdrop_title"
+            app2:useSimpleSummaryProvider="true" />
+
+        <git.artdeell.mojo.prefs.CustomSeekBarPreference
+            android:defaultValue="25"
+            android:icon="@drawable/ic_px_alt_sliders"
+            android:key="zyroxBackdropDim"
+            android:max="70"
+            app2:min="0"
+            app2:seekBarIncrement="5"
+            app2:showSeekBarValue="true"
+            app2:selectable="false"
+            android:title="@string/zyrox_pref_backdrop_dim_title"
+            android:summary="@string/zyrox_pref_backdrop_dim_summary" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:icon="@drawable/ic_px_zap"
+            android:key="zyroxBackdropPowerAware"
+            android:title="@string/zyrox_pref_backdrop_power_title"
+            android:summary="@string/zyrox_pref_backdrop_power_summary" />
+
+        <androidx.preference.ListPreference
             android:defaultValue="bicubic"
             android:icon="@drawable/ic_px_image"
             android:key="zyroxGifFilter"

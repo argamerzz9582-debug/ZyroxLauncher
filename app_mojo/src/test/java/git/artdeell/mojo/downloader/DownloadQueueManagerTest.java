@@ -23,6 +23,21 @@ public class DownloadQueueManagerTest {
     @Rule
     public TemporaryFolder tmp = new TemporaryFolder();
 
+    /**
+     * Deterministically waits until {@code t} is parked in wait()/park() instead of sleeping for a
+     * guessed duration. Yields between polls, so there is no wall-clock dependency.
+     */
+    private static void awaitParked(Thread t, long timeoutMs) {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+        while (System.nanoTime() < deadline) {
+            Thread.State st = t.getState();
+            if (st == Thread.State.WAITING || st == Thread.State.TIMED_WAITING) return;
+            if (st == Thread.State.TERMINATED) fail("worker exited before blocking on pause");
+            Thread.yield();
+        }
+        fail("worker never blocked on the paused record");
+    }
+
     private static DownloadQueueManager.DownloadRecord enqueue(DownloadQueueManager q, String key) {
         return q.enqueue(key, "Title " + key, DownloadQueueManager.Category.MOD, true, null, null);
     }
@@ -99,7 +114,7 @@ public class DownloadQueueManagerTest {
         });
         worker.start();
         assertTrue(blocked.await(2, TimeUnit.SECONDS));
-        Thread.sleep(50L);
+        awaitParked(worker, 3_000L);
         assertTrue(q.requestCancel(r.id));
         worker.join(3_000L);
 

@@ -29,8 +29,8 @@ import java.util.concurrent.Executors;
 
 /**
  * Hardware-accelerated, blur-isolated, zero-black-flash full-bleed looping MP4 backdrop view used
- * on both the Zyrox Home screen ({@code R.raw.zyrox_home_scene}) and the Minecraft Loading screen
- * ({@code R.raw.zyrox_loading_scene}).
+ * on both the Zyrox Home screen and the Minecraft Loading screen (clips listed in
+ * {@link ZyroxBackdrops}).
  *
  * <h3>Smoothness &amp; Memory Architecture</h3>
  * <ul>

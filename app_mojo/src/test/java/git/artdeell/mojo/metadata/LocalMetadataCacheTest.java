@@ -29,6 +29,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import git.artdeell.mojo.utils.DownloadUtils;
 
 public class LocalMetadataCacheTest {
+
+    /** Deterministic clock: cache freshness must never depend on the CI machine's wall time. */
+    private static final long FIXED_NOW_MS = 1_767_225_600_000L; // 2026-01-01T00:00:00Z
     private static final String TEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
     @Rule
@@ -209,7 +212,7 @@ public class LocalMetadataCacheTest {
         LocalMetadataCache cache = new LocalMetadataCache(
                 dir,
                 (url, headers, cto, rto) -> new LocalMetadataCache.HttpResponse(200, "safe", "\"e\"", null, null, "OK"),
-                System::currentTimeMillis,
+                () -> FIXED_NOW_MS,
                 ms -> {},
                 "ZyroxTest/1.0.3",
                 5_000,

@@ -17,6 +17,9 @@ import git.artdeell.mojo.JVersionList;
 import git.artdeell.mojo.utils.DownloadUtils;
 
 public class MojangVersionProviderTest {
+
+    /** Deterministic clock: cache freshness must never depend on the CI machine's wall time. */
+    private static final long FIXED_NOW_MS = 1_767_225_600_000L; // 2026-01-01T00:00:00Z
     private static final String SHA_A = "0123456789abcdef0123456789abcdef01234567";
     private static final String SHA_B = "fedcba9876543210fedcba9876543210fedcba98";
 
@@ -128,7 +131,7 @@ public class MojangVersionProviderTest {
                     String body = revision.get() == 1 ? v1 : v2;
                     return new LocalMetadataCache.HttpResponse(200, body, "\"rev-" + revision.get() + "\"", null, null, "OK");
                 },
-                System::currentTimeMillis,
+                () -> FIXED_NOW_MS,
                 ms -> {},
                 "ZyroxTest/1.0.3",
                 5_000,

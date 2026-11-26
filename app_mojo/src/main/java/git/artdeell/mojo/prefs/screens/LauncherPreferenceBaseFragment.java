@@ -63,7 +63,11 @@ public abstract class LauncherPreferenceBaseFragment extends PreferenceFragmentC
     @Override
     public void onSharedPreferenceChanged(SharedPreferences p, String s) {
         LauncherPreferences.loadPreferences(getContext());
-        if ("zyroxAnimatedBg".equals(s) || "zyroxReducedMotion".equals(s) || "zyroxLowEffects".equals(s)) {
+        if ("zyroxAnimatedBg".equals(s) || "zyroxReducedMotion".equals(s) || "zyroxLowEffects".equals(s)
+                || git.artdeell.mojo.ui.ZyroxBackdrops.PREF_HOME.equals(s)
+                || git.artdeell.mojo.ui.ZyroxBackdrops.PREF_LOADING.equals(s)
+                || git.artdeell.mojo.ui.ZyroxBackdrops.PREF_DIM.equals(s)
+                || git.artdeell.mojo.ui.ZyroxBackdrops.PREF_POWER_AWARE.equals(s)) {
             ExtraCore.setValue(ExtraConstants.REFRESH_BG_VIDEO, true);
         }
     }
