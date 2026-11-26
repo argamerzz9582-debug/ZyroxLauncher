@@ -53,9 +53,57 @@ fetch() {
           ok=1; break
         fi
         echo "yt-dlp client=$client failed for $id: $(grep -m2 -i 'error' "$WORK/$key.ytlog" | cut -c1-220 | tr '\n' ' ')" >&2
-        echo "  [$key client=$client] $(grep -m1 -i 'error' "$WORK/$key.ytlog" | cut -c1-220)" >> "$WORK/yt_errors.txt"
+        echo "  [$key client=$client] $(grep -m1 -i 'error' "$WORK/$key.ytlog" | cut -c1-90)" >> "$WORK/yt_errors.txt"
       done
-      [[ $ok == 1 ]] || return 1
+      if [[ $ok == 0 && -n "${SOURCE_DIR:-}" && -s "$SOURCE_DIR/$key.mp4" ]]; then
+        cp "$SOURCE_DIR/$key.mp4" "$out"; echo "$out"; return 0
+      fi
+      if [[ $ok == 0 ]]; then
+        # Fallback: public Invidious / Piped mirrors that proxy the stream themselves.
+        for inst in https://inv.nadeko.net https://yewtu.be https://invidious.nerdvpn.de https://invidious.f5.si; do
+          u="$(curl -fsSL -m 20 -A "$UA" "$inst/api/v1/videos/$id?local=true" 2>/dev/null | python3 -c '
+import json,sys
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+best=None
+for f in d.get("adaptiveFormats",[]):
+    t=f.get("type","")
+    if t.startswith("video/mp4") and "avc1" in t:
+        h=int((f.get("resolution") or "0p").rstrip("p") or 0)
+        if h<=1080 and (best is None or h>best[0]): best=(h,f["url"])
+print(best[1] if best else "")' 2>/dev/null)"
+          if [[ -n "$u" ]]; then
+            [[ "$u" == /* ]] && u="$inst$u"
+            if curl -fsSL -m 600 -A "$UA" -o "$out" "$u" && [[ $(stat -c%s "$out") -gt 1000000 ]]; then
+              echo "  [$key] fetched via $inst" >> "$WORK/yt_errors.txt"; ok=1; break
+            fi
+          fi
+          echo "  [$key] mirror $inst failed" >> "$WORK/yt_errors.txt"
+        done
+        [[ $ok == 1 ]] && { echo "$out"; return 0; }
+        for api in https://pipedapi.kavin.rocks https://pipedapi.adminforge.de; do
+          u="$(curl -fsSL -m 20 -A "$UA" "$api/streams/$id" 2>/dev/null | python3 -c '
+import json,sys
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+best=None
+for f in d.get("videoStreams",[]):
+    if f.get("videoOnly") and "avc1" in (f.get("codec") or ""):
+        h=int(f.get("height") or 0)
+        if h<=1080 and (best is None or h>best[0]): best=(h,f["url"])
+print(best[1] if best else "")' 2>/dev/null)"
+          if [[ -n "$u" ]] && curl -fsSL -m 600 -A "$UA" -o "$out" "$u" && [[ $(stat -c%s "$out") -gt 1000000 ]]; then
+            echo "  [$key] fetched via $api" >> "$WORK/yt_errors.txt"; ok=1; break
+          fi
+          echo "  [$key] piped $api failed" >> "$WORK/yt_errors.txt"
+        done
+        [[ $ok == 1 ]] && { echo "$out"; return 0; }
+        return 1
+      fi
       mv "$(ls "$WORK/$key".dl.* | head -1)" "$out"
       ;;
     url:*)
@@ -86,6 +134,7 @@ if [[ "$MODE" == "preview" ]]; then
 fi
 
 if [[ "$MODE" == "encode" ]]; then
+  : > "$WORK/yt_errors.txt"
   # plan.tsv columns: key  start_seconds  loop_seconds  output_raw_name  poster_name(or -)
   grep -v '^\s*#' "$PLAN" | while IFS=$'\t' read -r key start len rawname poster; do
     [[ -z "${key:-}" ]] && continue

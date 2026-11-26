@@ -38,7 +38,7 @@ jobs:
         run: |
           MODE="$(cat tools/backdrops/mode 2>/dev/null || echo preview)"
           export KEYS="$(cat tools/backdrops/keys 2>/dev/null || echo spirit shaders diamond snow)"
-          bash tools/backdrops/build_backdrops.sh "$MODE"
+          for m in $MODE; do bash tools/backdrops/build_backdrops.sh "$m"; done
       - name: Commit results
         run: |
           git config user.name "zyrox-backdrop-bot"
