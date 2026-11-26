@@ -17,7 +17,7 @@ static def getDateSeconds() {
 }
 
 def getVersionName = {
-    return "2.7.0"
+    return "2.8.0"
 }
 
 def getCFApiKey = {
@@ -43,8 +43,17 @@ android {
 
     compileSdk = 36
 
-    lintOptions {
-        abortOnError false
+    lint {
+        // Lint now gates builds. Pre-existing issues are frozen in lint-baseline.xml so only NEW
+        // problems fail CI. Regenerate after fixing debt with:
+        //   ./gradlew :app_mojo:updateLintBaselineFullRelease
+        abortOnError = true
+        // Release assembly stays decoupled from lint; CI gates via the dedicated lintFullRelease step.
+        checkReleaseBuilds = false
+        baseline = file("lint-baseline.xml")
+        // Security regressions are always fatal (new occurrences are not covered by the baseline).
+        fatal += ["TrustAllX509TrustManager", "BadHostnameVerifier", "AllowAllHostnameVerifier",
+                  "HardcodedDebugMode", "UnsafeProtectedBroadcastReceiver", "SecureRandom", "GetInstance"]
     }
 
     testOptions {
@@ -193,14 +202,6 @@ android {
         buildConfig true
     }
 
-    testOptions {
-        unitTests.returnDefaultValues = true
-    }
-
-    lintOptions {
-        abortOnError false
-        checkReleaseBuilds false
-    }
 }
 
 class AssetTaskRegistrar {

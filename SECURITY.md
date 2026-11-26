@@ -46,7 +46,7 @@ Zyrox Launcher takes a strictly legitimate, transparent security posture:
 
 ## Security Architecture Highlights (v2.0.0)
 
-1. **Network & TLS Hardening:** `android:usesCleartextTraffic="false"`, explicit connect/read timeouts, bounded response buffers, SHA-1/SHA-256 file verification, atomic `.part` rename writes, and no `TrustManager` or `HostnameVerifier` bypasses.
+1. **Network & TLS Hardening:** `android:usesCleartextTraffic="false"`, explicit connect/read timeouts, bounded response buffers, SHA-1/SHA-256 file verification (Rapid Start trusts only files with a valid local verification marker — previously SHA-1 verified and unmodified since; it never trusts files by size alone), atomic `.part` rename writes, and no `TrustManager` or `HostnameVerifier` bypasses.
 2. **Archive & Path Safety (`ArchiveSecurity`):** Canonical-path containment against Zip-Slip (`../`, backslashes, drive prefixes, absolute paths, NUL bytes), entry-count/size/compression-ratio bomb guards, and zero-execution static mod/pack metadata parsing.
 3. **Credential & Log Redaction (`LogRedactor`):** Launch CLI logs, crash reports, clipboard copies, and shared log files automatically redact Microsoft/Minecraft/Ely.by access tokens, refresh tokens, JWTs, Bearer/XBL headers, OAuth URL query parameters, email addresses, and UUIDs.
 4. **Minimal Justified Android Permissions:**

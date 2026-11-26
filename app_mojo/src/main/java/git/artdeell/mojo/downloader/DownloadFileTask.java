@@ -8,6 +8,7 @@ import java.io.InterruptedIOException;
 
 import java.net.URL;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 import git.artdeell.mojo.tasks.mojson.mirrors.DownloadMirror;
 import git.artdeell.mojo.utils.FileUtils;
@@ -22,14 +23,27 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
 
     DownloadFileTask(TaskMetadata mMetadata, Downloader mHostDownloader) {
         super(mMetadata, mHostDownloader);
-        mPartFile = new File(Downloader.sPartFileDir, partFileName());
+        mPartFile = new File(Downloader.partFileDir(), partFileName());
     }
 
     @Override
     protected void performTask() throws IOException {
         try {
-            tryDownload(0, true);
-            movePartFileAtomically();
+            ReentrantLock pathLock = Downloader.lockForPath(mMetadata.path);
+            try {
+                pathLock.lockInterruptibly();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                InterruptedIOException ioe = new InterruptedIOException("Canceled while waiting for file lock");
+                ioe.initCause(ie);
+                throw ioe;
+            }
+            try {
+                tryDownload(0, true);
+                movePartFileAtomically();
+            } finally {
+                pathLock.unlock();
+            }
             mDownloader.submitFileForRecheck(mMetadata);
         } catch (InterruptedIOException e) {
             // Keep resumable .part only if paused; remove corrupt/zero-byte leftovers
@@ -41,21 +55,28 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
         }
     }
 
-    private void performRetry(int attempt, boolean rangeAllowed) throws IOException {
-        mDownloader.addSize(-mBytesDownloaded);
-        mBytesDownloaded = 0L;
-        if (!rangeAllowed && mPartFile.exists()) {
-            //noinspection ResultOfMethodCallIgnored
-            mPartFile.delete();
+    /**
+     * Removes this task's bytes from the shared progress counter. Every byte reported through
+     * {@link #onBytesCopied} or the resume pre-credit is tracked in {@link #mBytesDownloaded}, so
+     * subtracting exactly that amount keeps the batch counter consistent across retries and can
+     * never drive it below the bytes other tasks have contributed.
+     */
+    private void rollbackProgress() {
+        if (mBytesDownloaded > 0L) {
+            mDownloader.addSize(-mBytesDownloaded);
         }
+        mBytesDownloaded = 0L;
+    }
+
+    private static void sleepBeforeRetry(int attempt) throws InterruptedIOException {
         try {
             NetworkPolicyHelper.sleepBackoff(attempt);
         } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
             InterruptedIOException ioe = new InterruptedIOException("Retry interrupted");
             ioe.initCause(ie);
             throw ioe;
         }
-        tryDownload(attempt + 1, rangeAllowed);
     }
 
     private String partFileName() {
@@ -72,6 +93,9 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
     private void movePartFileAtomically() throws IOException {
         File destination = mMetadata.path;
         FileUtils.ensureParentDirectory(destination);
+        // Any previous Rapid Start verification marker describes the old file; drop it.
+        //noinspection ResultOfMethodCallIgnored
+        Downloader.verificationMarkerFor(destination).delete();
         if (destination.exists() && !destination.delete()) {
             throw new IOException("Failed to replace existing file: " + destination.getName());
         }
@@ -119,50 +143,88 @@ public class DownloadFileTask extends DownloaderTask implements BytesCopiedListe
         return mMetadata.url;
     }
 
-    private void tryDownload(int attempt, boolean rangeAllowed) throws IOException {
-        URL activeUrl = selectCandidateUrl(attempt);
-        try {
-            mDownloader.checkQueueControl();
-            if (!mPartFile.exists() || !rangeAllowed) {
-                mBytesDownloaded = 0L;
+    /**
+     * Downloads into the .part file with at most {@link #MAX_RETRIES} retries after the first
+     * attempt. Iterative (not recursive) so a failure in a later attempt can never be re-caught by
+     * an earlier frame and restart the retry budget.
+     */
+    private void tryDownload(int firstAttempt, boolean rangeAllowedInitially) throws IOException {
+        boolean rangeAllowed = rangeAllowedInitially;
+        int attempt = firstAttempt;
+        while (true) {
+            URL activeUrl = selectCandidateUrl(attempt);
+            if (activeUrl == null) {
+                throw new IOException("No download URL for " + mMetadata.path.getName());
+            }
+            try {
+                mDownloader.checkQueueControl();
+                if (rangeAllowed && mPartFile.exists()) {
+                    ResumeOutcome outcome = tryResume(activeUrl);
+                    if (outcome == ResumeOutcome.DONE) {
+                        DownloadMirror.recordEndpointSuccess(activeUrl.toString());
+                        return;
+                    }
+                    if (outcome == ResumeOutcome.UNSUPPORTED) {
+                        // Server ignored the Range request; this is not a network failure, so fall
+                        // straight back to a full download without consuming a retry or sleeping.
+                        rollbackProgress();
+                        rangeAllowed = false;
+                        continue;
+                    }
+                    // outcome == FULL_DOWNLOAD_NEEDED: fall through
+                }
+                rollbackProgress();
+                if (mPartFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    mPartFile.delete();
+                }
                 mDownloader.downloadFile(mPartFile, activeUrl, this);
+                verifyDownloadedLength();
                 DownloadMirror.recordEndpointSuccess(activeUrl.toString());
                 return;
-            }
-
-            long alreadyDownloaded = mPartFile.length();
-            // Discard corrupt oversized partial file or unknown-size partial file safely
-            if (mMetadata.size <= 0L || alreadyDownloaded > mMetadata.size || alreadyDownloaded == 0L) {
-                //noinspection ResultOfMethodCallIgnored
-                mPartFile.delete();
-                mBytesDownloaded = 0L;
-                mDownloader.downloadFile(mPartFile, activeUrl, this);
-                DownloadMirror.recordEndpointSuccess(activeUrl.toString());
-                return;
-            }
-
-            mBytesDownloaded = alreadyDownloaded;
-            mDownloader.addSize(alreadyDownloaded);
-            if (alreadyDownloaded == mMetadata.size) {
-                return;
-            }
-
-            boolean resumed = mDownloader.tryContinueDownload(mPartFile, mMetadata.size, activeUrl, this);
-            if (!resumed) {
-                performRetry(attempt, false);
-            } else {
-                DownloadMirror.recordEndpointSuccess(activeUrl.toString());
-            }
-        } catch (InterruptedIOException e) {
-            throw e;
-        } catch (IOException e) {
-            if (activeUrl != null) {
-                DownloadMirror.recordEndpointFailure(activeUrl.toString());
-            }
-            if (attempt >= MAX_RETRIES) {
+            } catch (InterruptedIOException e) {
                 throw e;
+            } catch (IOException e) {
+                DownloadMirror.recordEndpointFailure(activeUrl.toString());
+                rollbackProgress();
+                if (attempt - firstAttempt >= MAX_RETRIES) {
+                    throw e;
+                }
+                sleepBeforeRetry(attempt);
+                attempt++;
             }
-            performRetry(attempt, rangeAllowed);
+        }
+    }
+
+    private enum ResumeOutcome { DONE, UNSUPPORTED, FULL_DOWNLOAD_NEEDED }
+
+    private ResumeOutcome tryResume(URL activeUrl) throws IOException {
+        long alreadyDownloaded = mPartFile.length();
+        // Unknown size, empty, or oversized (corrupt) partial files cannot be resumed safely.
+        if (mMetadata.size <= 0L || alreadyDownloaded == 0L || alreadyDownloaded > mMetadata.size) {
+            return ResumeOutcome.FULL_DOWNLOAD_NEEDED;
+        }
+        rollbackProgress();
+        mBytesDownloaded = alreadyDownloaded;
+        mDownloader.addSize(alreadyDownloaded);
+        if (alreadyDownloaded == mMetadata.size) {
+            return ResumeOutcome.DONE;
+        }
+        if (!mDownloader.tryContinueDownload(mPartFile, mMetadata.size, activeUrl, this)) {
+            return ResumeOutcome.UNSUPPORTED;
+        }
+        verifyDownloadedLength();
+        return ResumeOutcome.DONE;
+    }
+
+    /** A truncated/oversized body is treated as a transient failure so it is retried within budget. */
+    private void verifyDownloadedLength() throws IOException {
+        if (mMetadata.size > 0L && mPartFile.length() != mMetadata.size) {
+            long actual = mPartFile.length();
+            //noinspection ResultOfMethodCallIgnored
+            mPartFile.delete();
+            throw new IOException("Size mismatch for " + mMetadata.path.getName()
+                    + ": expected " + mMetadata.size + " bytes, got " + actual);
         }
     }
 

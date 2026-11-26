@@ -171,10 +171,12 @@ public final class ZyroxCrashAnalyzer {
     private static final Pattern CLASS_VERSION_PATTERN = Pattern.compile(
             "class file version\\s+(\\d+)(?:\\.\\d+)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern MOD_JAR_PATTERN = Pattern.compile(
-            "(?:Mod File:|mods[/\\\\]|~\\[)([A-Za-z0-9._+\\-]{2,96}\\.jar)",
+            "(?:Mod File:\\s*|mods[/\\\\]|~\\[)([A-Za-z0-9._+\\-]{2,96}\\.jar)",
             Pattern.CASE_INSENSITIVE);
+    // Only explicit mod attributions. The previous "in\s+<word>" alternative matched ordinary
+    // English ("Exception in thread", "in main") and produced bogus culprits for auto-disable.
     private static final Pattern MIXIN_FROM_MOD_PATTERN = Pattern.compile(
-            "(?:from mod|in\\s+)([a-z0-9_\\-]{3,48})(?:\\.mixins\\.json|\\b)",
+            "(?:from mod\\s+'?([a-z0-9_\\-]{3,48})'?|\\b([a-z0-9_\\-]{3,48})\\.mixins\\.json)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern FABRIC_MOD_ID_PATTERN = Pattern.compile(
             "(?:Mod\\s+'|mod\\s+'|Provided by\\s+')([a-z0-9_\\-]{3,48})'",
@@ -182,7 +184,8 @@ public final class ZyroxCrashAnalyzer {
 
     private static final List<String> PROTECTED_CORE_TOKENS = Arrays.asList(
             "minecraft", "java", "fabricloader", "fabric-loader", "quilt_loader",
-            "forge", "neoforge", "fml", "mixin", "sponge", "lwjgl", "client");
+            "forge", "neoforge", "fml", "mixin", "mixinextras", "sponge", "lwjgl", "client",
+            "authlib", "jopt-simple", "guava", "gson", "netty", "log4j", "slf4j");
 
     private ZyroxCrashAnalyzer() {
     }
@@ -204,7 +207,7 @@ public final class ZyroxCrashAnalyzer {
         }
         Matcher mixinMatcher = MIXIN_FROM_MOD_PATTERN.matcher(logText);
         while (mixinMatcher.find()) {
-            String modId = mixinMatcher.group(1);
+            String modId = mixinMatcher.group(1) != null ? mixinMatcher.group(1) : mixinMatcher.group(2);
             if (modId != null && !isProtectedCoreToken(modId)) {
                 return modId;
             }
@@ -790,32 +793,71 @@ public final class ZyroxCrashAnalyzer {
      */
     @Nullable
     public static File disableMatchingModInDir(@Nullable File modsDir, @NonNull String token) {
+        File target = findUniqueModMatch(modsDir, token);
+        if (target == null) return null;
+        File dst = uniqueDisabledName(modsDir, target.getName());
+        return target.renameTo(dst) ? dst : null;
+    }
+
+    /**
+     * Finds the single {@code .jar} matching {@code token}. Matching is tiered — exact filename,
+     * then normalized prefix, then normalized substring (min 4 chars) — and a tier only wins if it
+     * yields exactly ONE jar. Ambiguous matches return {@code null} so auto-fix never guesses which
+     * mod to disable. Protected core/loader jars are never returned.
+     */
+    @Nullable
+    static File findUniqueModMatch(@Nullable File modsDir, @NonNull String token) {
         if (modsDir == null || !modsDir.isDirectory()) return null;
         File[] files = modsDir.listFiles(f -> f.isFile()
                 && f.getName().toLowerCase(Locale.ROOT).endsWith(".jar"));
         if (files == null || files.length == 0) return null;
 
         String needle = token.trim().toLowerCase(Locale.ROOT);
-        String needleNormalized = needle.replace(".jar", "")
-                .replace("_", "").replace("-", "");
+        if (needle.isEmpty() || isProtectedCoreToken(needle)) return null;
+        String needleNormalized = normalizeModName(needle);
+        if (needleNormalized.length() < 3) return null;
 
-        File best = null;
+        List<File> exact = new ArrayList<>();
+        List<File> prefix = new ArrayList<>();
+        List<File> contains = new ArrayList<>();
         for (File f : files) {
             String lowName = f.getName().toLowerCase(Locale.ROOT);
-            if (lowName.equals(needle)) {
-                best = f;
-                break;
-            }
-            String normName = lowName.replace(".jar", "")
-                    .replace("_", "").replace("-", "");
-            if (normName.startsWith(needleNormalized)
-                    || (needleNormalized.length() >= 4 && normName.contains(needleNormalized))) {
-                best = f;
+            if (isProtectedCoreToken(lowName)) continue;
+            String normName = normalizeModName(lowName);
+            if (lowName.equals(needle) || lowName.equals(needle + ".jar")) {
+                exact.add(f);
+            } else if (normName.startsWith(needleNormalized)) {
+                prefix.add(f);
+            } else if (needleNormalized.length() >= 4 && normName.contains(needleNormalized)) {
+                contains.add(f);
             }
         }
-        if (best == null) return null;
-        File dst = new File(modsDir, best.getName() + ".disabled");
-        return best.renameTo(dst) ? dst : null;
+        if (exact.size() == 1) return exact.get(0);
+        if (!exact.isEmpty()) return null;
+        if (prefix.size() == 1) return prefix.get(0);
+        if (!prefix.isEmpty()) return null;
+        return contains.size() == 1 ? contains.get(0) : null;
+    }
+
+    @NonNull
+    private static String normalizeModName(@NonNull String lowName) {
+        String n = lowName.endsWith(".jar") ? lowName.substring(0, lowName.length() - 4) : lowName;
+        return n.replace("_", "").replace("-", "").replace(" ", "");
+    }
+
+    /** Never overwrite an existing quarantined copy (File.renameTo replaces targets on Linux). */
+    @NonNull
+    private static File uniqueDisabledName(@NonNull File modsDir, @NonNull String jarName) {
+        File dst = new File(modsDir, jarName + ".disabled");
+        String base = jarName.toLowerCase(Locale.ROOT).endsWith(".jar")
+                ? jarName.substring(0, jarName.length() - 4) : jarName;
+        int i = 1;
+        while (dst.exists()) {
+            // Keeps the ".jar.disabled" suffix so Mod Manager can still re-enable it as a .jar.
+            dst = new File(modsDir, base + "~" + i + ".jar.disabled");
+            i++;
+        }
+        return dst;
     }
 
     @NonNull
