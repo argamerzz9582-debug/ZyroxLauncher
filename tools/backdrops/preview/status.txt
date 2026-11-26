@@ -1,0 +1,4 @@
+spirit: DOWNLOAD FAILED
+shaders: DOWNLOAD FAILED
+diamond: ok duration=16.625000s video=h264,1920,1080,24/1
+snow: ok duration=36.633333s video=h264,1920,1080,30/1
