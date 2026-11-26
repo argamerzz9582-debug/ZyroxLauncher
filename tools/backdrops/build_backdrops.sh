@@ -142,6 +142,8 @@ if [[ "$MODE" == "encode" ]]; then
     fade=1.2
     total="$(python3 -c "print($len+$fade)")"
     offset="$(python3 -c "print($len-$fade)")"
+    # transition ends exactly on the last frame (progress 1.0) -> last frame == frame preceding frame 0
+    xdur="$(python3 -c "print(round($fade-1/30,5))")"
     out="$RAW_DIR/$rawname.mp4"
     echo "encoding $key [$start +${len}s] -> $out"
     # Seamless loop: body = [fade, len+fade), head = [0, fade). Crossfading the body's tail into the head
@@ -150,7 +152,7 @@ if [[ "$MODE" == "encode" ]]; then
       [0:v]fps=30,scale=1920:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1920:1080,setsar=1,format=yuv420p,split[a][b];\
       [a]trim=start=$fade:end=$total,setpts=PTS-STARTPTS[body];\
       [b]trim=start=0:end=$fade,setpts=PTS-STARTPTS[head];\
-      [body][head]xfade=transition=fade:duration=$fade:offset=$offset,format=yuv420p[v]" \
+      [body][head]xfade=transition=fade:duration=$xdur:offset=$offset,format=yuv420p[v]" \
       -map "[v]" -an -sn -dn -map_metadata -1 \
       -c:v libx264 -preset veryslow -profile:v high -level:v 4.1 -pix_fmt yuv420p \
       -crf 21 -maxrate 3000k -bufsize 6000k -g 60 -keyint_min 30 -bf 3 \
