@@ -1,14 +1,26 @@
 spirit: DOWNLOAD FAILED
 shaders: DOWNLOAD FAILED
-  [spirit client=default] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [spirit client=tv_simply] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [spirit client=web_embedded] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [spirit client=tv,web_safari] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [spirit client=mweb] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [spirit client=android_vr] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=default] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=tv_simply] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=web_embedded] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=tv,web_safari] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=mweb] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
-  [shaders client=android_vr] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i
+  [spirit client=default] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit client=tv_simply] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit client=web_embedded] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit client=tv,web_safari] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit client=mweb] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit client=android_vr] ERROR: [youtube] sVHqVfh0b2M: Sign in to confirm you’re not a bot. This helps protect our 
+  [spirit] mirror https://inv.nadeko.net failed
+  [spirit] mirror https://yewtu.be failed
+  [spirit] mirror https://invidious.nerdvpn.de failed
+  [spirit] mirror https://invidious.f5.si failed
+  [spirit] piped https://pipedapi.kavin.rocks failed
+  [spirit] piped https://pipedapi.adminforge.de failed
+  [shaders client=default] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders client=tv_simply] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders client=web_embedded] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders client=tv,web_safari] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders client=mweb] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders client=android_vr] ERROR: [youtube] zG8NzqeT0ic: Sign in to confirm you’re not a bot. This helps protect our 
+  [shaders] mirror https://inv.nadeko.net failed
+  [shaders] mirror https://yewtu.be failed
+  [shaders] mirror https://invidious.nerdvpn.de failed
+  [shaders] mirror https://invidious.f5.si failed
+  [shaders] piped https://pipedapi.kavin.rocks failed
+  [shaders] piped https://pipedapi.adminforge.de failed
