@@ -594,10 +594,40 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         if (ZyroxSeamlessGifView.TAG_BLUR_ISOLATED_BACKDROP.equals(target.getTag())) {
             return false;
         }
+        if (isInsideScrollingList(target)) {
+            // Live blur on recycled scroll items means one RenderEffect pass per visible row per frame.
+            return false;
+        }
         if (target instanceof android.view.ViewGroup) {
             return !containsBackdropGif((android.view.ViewGroup) target);
         }
         return true;
+    }
+
+    /** True when {@code view} is a (descendant of a) row inside a ListView/GridView/RecyclerView. */
+    static boolean isInsideScrollingList(@NonNull android.view.View view) {
+        android.view.ViewParent parent = view.getParent();
+        while (parent != null) {
+            if (parent instanceof android.widget.AbsListView
+                    || isRecyclerViewClass(parent.getClass())) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+        return false;
+    }
+
+    static boolean isRecyclerViewClass(@Nullable Class<?> cls) {
+        // Matched by name so the drawable does not hard-depend on androidx.recyclerview.
+        while (cls != null && cls != Object.class) {
+            String name = cls.getName();
+            if ("androidx.recyclerview.widget.RecyclerView".equals(name)
+                    || "android.support.v7.widget.RecyclerView".equals(name)) {
+                return true;
+            }
+            cls = cls.getSuperclass();
+        }
+        return false;
     }
 
     private static boolean containsBackdropGif(@NonNull android.view.ViewGroup group) {
@@ -645,7 +675,22 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
             int totalRamMb,
             @Nullable git.artdeell.mojo.utils.GpuUtils.GpuArchitecture architecture,
             boolean lowEffectsPref) {
-        if (lowEffectsPref) {
+        return resolveGlassBlurTier(sdkInt, totalRamMb, architecture, lowEffectsPref, false);
+    }
+
+    /**
+     * Same as {@link #resolveGlassBlurTier(int, int, git.artdeell.mojo.utils.GpuUtils.GpuArchitecture, boolean)}, but also
+     * drops to the zero-cost gradient while the device is power-constrained (Battery Saver on, or
+     * thermal status SEVERE or worse, with the power-aware preference enabled). Live blur costs a
+     * full-screen GPU pass on every frame.
+     */
+    public static GlassBlurTier resolveGlassBlurTier(
+            int sdkInt,
+            int totalRamMb,
+            @Nullable git.artdeell.mojo.utils.GpuUtils.GpuArchitecture architecture,
+            boolean lowEffectsPref,
+            boolean powerConstrained) {
+        if (lowEffectsPref || powerConstrained) {
             return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
         }
         if (sdkInt < android.os.Build.VERSION_CODES.S) {
@@ -670,11 +715,17 @@ public class ZyroxLiquidGlassDrawable extends Drawable {
         try {
             int ramMb = git.artdeell.mojo.Tools.getTotalDeviceMemory(context);
             git.artdeell.mojo.utils.GpuUtils.GLInfo gl = git.artdeell.mojo.utils.GpuUtils.getGlInfo();
+            boolean powerConstrained = !ZyroxBackdrops.shouldAnimate(
+                    true, false,
+                    LauncherPreferences.PREF_ZYROX_BACKDROP_POWER_AWARE,
+                    ZyroxBackdrops.isPowerSaveMode(context),
+                    ZyroxBackdrops.thermalStatus(context));
             return resolveGlassBlurTier(
                     SdkLevel.get(),
                     ramMb,
                     gl != null ? gl.architecture : null,
-                    LauncherPreferences.PREF_ZYROX_LOW_EFFECTS);
+                    LauncherPreferences.PREF_ZYROX_LOW_EFFECTS,
+                    powerConstrained);
         } catch (Throwable ignored) {
             return GlassBlurTier.FROSTED_GRADIENT_FALLBACK;
         }

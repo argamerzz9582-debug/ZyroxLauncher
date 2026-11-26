@@ -295,12 +295,28 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
     /** Starts or resumes gapless muted hardware video playback. */
     public void resumeAnimation() {
         if (mReleased) return;
+        if (!isPlaybackAllowedByPolicy()) {
+            // Battery Saver / thermal / reduced motion: hold on the still poster, decoder idle.
+            pauseAnimation();
+            if (!mFirstFrameShown || mPosterView == null || mPosterView.getDrawable() == null) {
+                revealPoster();
+            }
+            return;
+        }
         mPlaybackDesired = true;
         if (!mFirstFrameShown && mPosterResId != 0
                 && mPosterView != null && mPosterView.getDrawable() == null) {
             revealPoster();
         }
         syncPlaybackState();
+    }
+
+    /**
+     * Policy hook evaluated on every {@link #resumeAnimation()}. Subclasses return {@code false} to
+     * keep the poster instead, for example on Battery Saver or under severe thermal throttling.
+     */
+    protected boolean isPlaybackAllowedByPolicy() {
+        return true;
     }
 
     /** Pauses video decoding immediately while preserving the current rendered frame on screen. */
@@ -342,6 +358,7 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
         mFirstFrameShown = false;
         mRenderedFrameCount = 0;
         if (mTextureView != null) {
+            mTextureView.animate().cancel();
             mTextureView.setAlpha(0f);
         }
         if (dropPosterBitmap) {
@@ -403,17 +420,37 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
             mPosterView.setVisibility(View.VISIBLE);
         }
         if (mTextureView != null) {
+            mTextureView.animate().cancel();
             mTextureView.setAlpha(0f);
         }
     }
 
+    /** Poster → live video crossfade length; short enough to feel instant, long enough to hide pops. */
+    static final long POSTER_CROSSFADE_MS = 260L;
+
     private void revealVideoFrame() {
         if (mFirstFrameShown || mReleased) return;
         mFirstFrameShown = true;
-        if (mTextureView != null) {
+        if (mTextureView == null) return;
+        mTextureView.animate().cancel();
+        boolean reducedMotion = git.artdeell.mojo.prefs.LauncherPreferences.isReducedMotionEnabled(getContext());
+        if (reducedMotion || mPosterView == null || mPosterView.getVisibility() != View.VISIBLE) {
             mTextureView.setAlpha(1f);
+            hidePosterUnderVideo();
+            return;
         }
-        if (mPosterView != null) {
+        // The video sits above the poster, so fading it in gives a seamless crossfade. This hides
+        // the jump when playback resumes mid-loop and the frame no longer matches the frame-0 poster.
+        mTextureView.animate()
+                .alpha(1f)
+                .setDuration(POSTER_CROSSFADE_MS)
+                .withEndAction(this::hidePosterUnderVideo)
+                .start();
+    }
+
+    private void hidePosterUnderVideo() {
+        if (mFirstFrameShown && !mReleased && mPosterView != null
+                && mTextureView != null && mTextureView.getAlpha() >= 0.999f) {
             // Hide underlying poster once opaque video frames are live to cut GPU overdraw to 1.0x.
             mPosterView.setVisibility(View.INVISIBLE);
         }
@@ -434,9 +471,9 @@ public class ZyroxLoopingVideoView extends FrameLayout implements TextureView.Su
                     if (!mMediaPlayer.isPlaying()) {
                         mMediaPlayer.start();
                     }
-                    if (mFirstFrameShown && mPosterView != null) {
+                    if (mFirstFrameShown && mPosterView != null
+                            && mTextureView.getAlpha() >= 0.999f) {
                         mPosterView.setVisibility(View.INVISIBLE);
-                        mTextureView.setAlpha(1f);
                     }
                 } catch (Throwable ignored) {
                     resetPlayerOnly(true);

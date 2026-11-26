@@ -77,4 +77,23 @@ public class ZyroxBackdropsTest {
         assertTrue(ZyroxBackdrops.DEFAULT_DIM_PERCENT > 0
                 && ZyroxBackdrops.DEFAULT_DIM_PERCENT <= ZyroxBackdrops.MAX_DIM_PERCENT);
     }
+
+    @Test
+    public void liveGlassBlurDropsToGradientWhilePowerConstrained() {
+        git.artdeell.mojo.utils.GpuUtils.GpuArchitecture adreno =
+                git.artdeell.mojo.utils.GpuUtils.GpuArchitecture.ADRENO_7XX;
+        assertSame(ZyroxLiquidGlassDrawable.GlassBlurTier.HARDWARE_RENDER_EFFECT,
+                ZyroxLiquidGlassDrawable.resolveGlassBlurTier(34, 8192, adreno, false, false));
+        assertSame(ZyroxLiquidGlassDrawable.GlassBlurTier.FROSTED_GRADIENT_FALLBACK,
+                ZyroxLiquidGlassDrawable.resolveGlassBlurTier(34, 8192, adreno, false, true));
+        // Same rule as the backdrop: power-constrained == !shouldAnimate(...)
+        assertFalse(ZyroxBackdrops.shouldAnimate(true, false, true, false, 4));
+    }
+
+    @Test
+    public void recyclerDetectionIsByNameAndIgnoresUnrelatedClasses() {
+        assertFalse(ZyroxLiquidGlassDrawable.isRecyclerViewClass(null));
+        assertFalse(ZyroxLiquidGlassDrawable.isRecyclerViewClass(Object.class));
+        assertFalse(ZyroxLiquidGlassDrawable.isRecyclerViewClass(java.util.ArrayList.class));
+    }
 }

@@ -34,5 +34,22 @@ public class MinecraftLoadingLandscapeView extends ZyroxLoopingVideoView {
         ZyroxBackdrops.Backdrop backdrop = ZyroxBackdrops.fromId(
                 LauncherPreferences.PREF_ZYROX_LOADING_BACKDROP, ZyroxBackdrops.DEFAULT_LOADING);
         setVideoResource(backdrop.videoRes, backdrop.posterRes);
+        setPlaybackEnabled(isPlaybackAllowedByPolicy());
+    }
+
+    /**
+     * The game is booting the JVM at the same time, so on Battery Saver or under severe thermal
+     * throttling the decoder is not started: the poster is shown instead and every CPU/GPU cycle
+     * goes to the game. Reduced motion is respected as well. Re-checked on every resume.
+     */
+    @Override
+    protected boolean isPlaybackAllowedByPolicy() {
+        Context context = getContext();
+        return ZyroxBackdrops.shouldAnimate(
+                true,
+                LauncherPreferences.isReducedMotionEnabled(context),
+                LauncherPreferences.PREF_ZYROX_BACKDROP_POWER_AWARE,
+                ZyroxBackdrops.isPowerSaveMode(context),
+                ZyroxBackdrops.thermalStatus(context));
     }
 }
