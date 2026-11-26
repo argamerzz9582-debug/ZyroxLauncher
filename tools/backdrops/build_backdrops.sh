@@ -125,7 +125,7 @@ if [[ "$MODE" == "preview" ]]; then
     # aim for ~30 thumbnails per sheet
     step="$(python3 -c "import math;print(max(1,math.ceil(float('$dur')/30)))")"
     rows="$(python3 -c "import math;print(math.ceil(float('$dur')/$step/6))")"
-    ffmpeg -v error -y -i "$src" -vf "fps=1/$step,scale=320:-2,drawtext=fontfile=$FONT:text='%{pts\:hms}':x=6:y=6:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.6,tile=6x$rows" \
+    ffmpeg -nostdin -v error -y -i "$src" -vf "fps=1/$step,scale=320:-2,drawtext=fontfile=$FONT:text='%{pts\:hms}':x=6:y=6:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.6,tile=6x$rows" \
       -frames:v 1 -q:v 4 "$OUT/$key.jpg"
   done
   cat "$WORK/yt_errors.txt" >> "$OUT/status.txt" || true
@@ -146,7 +146,7 @@ if [[ "$MODE" == "encode" ]]; then
     echo "encoding $key [$start +${len}s] -> $out"
     # Seamless loop: body = [fade, len+fade), head = [0, fade). Crossfading the body's tail into the head
     # makes the last frame flow into frame 0 of the body (== source time start+fade).
-    ffmpeg -v error -y -ss "$start" -t "$total" -i "$src" -filter_complex "\
+    ffmpeg -nostdin -v error -y -ss "$start" -t "$total" -i "$src" -filter_complex "\
       [0:v]fps=30,scale=1920:1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1920:1080,setsar=1,format=yuv420p,split[a][b];\
       [a]trim=start=$fade:end=$total,setpts=PTS-STARTPTS[body];\
       [b]trim=start=0:end=$fade,setpts=PTS-STARTPTS[head];\
@@ -156,7 +156,7 @@ if [[ "$MODE" == "encode" ]]; then
       -crf 21 -maxrate 3000k -bufsize 6000k -g 60 -keyint_min 30 -bf 3 \
       -tune film -movflags +faststart "$out"
     if [[ "$poster" != "-" ]]; then
-      ffmpeg -v error -y -i "$out" -frames:v 1 -vf "scale=1280:-2:flags=lanczos" -c:v libwebp -quality 82 \
+      ffmpeg -nostdin -v error -y -i "$out" -frames:v 1 -vf "scale=1280:-2:flags=lanczos" -c:v libwebp -quality 82 \
         "$POSTER_DIR/$poster.webp"
     fi
     ls -l "$out"
