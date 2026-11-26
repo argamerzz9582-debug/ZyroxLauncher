@@ -43,15 +43,17 @@ fetch() {
   case "$spec" in
     yt:*)
       local id="${spec#yt:}" ok=0
-      for client in "default" "tv,web_safari" "ios" "mweb" "android"; do
+      for client in "default" "tv_simply" "web_embedded" "tv,web_safari" "mweb" "android_vr"; do
         local extra=()
         [[ "$client" != "default" ]] && extra=(--extractor-args "youtube:player_client=$client")
-        if yt-dlp -q --no-warnings --no-playlist "${extra[@]}" \
+        if yt-dlp --no-progress --no-playlist "${extra[@]}" \
              -f "bv*[height<=1080][vcodec^=avc1]/bv*[height<=1080]/bv*[height<=1440]/b" \
-             --remux-video mp4 -o "$WORK/$key.dl.%(ext)s" "https://www.youtube.com/watch?v=$id" >&2; then
+             --remux-video mp4 -o "$WORK/$key.dl.%(ext)s" "https://www.youtube.com/watch?v=$id" \
+             > "$WORK/$key.ytlog" 2>&1; then
           ok=1; break
         fi
-        echo "yt-dlp client=$client failed for $id" >&2
+        echo "yt-dlp client=$client failed for $id: $(grep -m2 -i 'error' "$WORK/$key.ytlog" | cut -c1-220 | tr '\n' ' ')" >&2
+        echo "  [$key client=$client] $(grep -m1 -i 'error' "$WORK/$key.ytlog" | cut -c1-220)" >> "$WORK/yt_errors.txt"
       done
       [[ $ok == 1 ]] || return 1
       mv "$(ls "$WORK/$key".dl.* | head -1)" "$out"
@@ -66,8 +68,8 @@ fetch() {
 duration() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$1"; }
 
 if [[ "$MODE" == "preview" ]]; then
-  OUT="$ROOT/tools/backdrops/preview"; mkdir -p "$OUT"; : > "$OUT/status.txt"
-  for key in spirit shaders diamond snow; do
+  OUT="$ROOT/tools/backdrops/preview"; mkdir -p "$OUT"; : > "$OUT/status.txt"; : > "$WORK/yt_errors.txt"
+  for key in ${KEYS:-spirit shaders diamond snow}; do
     if ! src="$(fetch "$key")"; then echo "$key: DOWNLOAD FAILED" >> "$OUT/status.txt"; continue; fi
     dur="$(duration "$src")"
     info="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,codec_name -of csv=p=0 "$src")"
@@ -78,6 +80,7 @@ if [[ "$MODE" == "preview" ]]; then
     ffmpeg -v error -y -i "$src" -vf "fps=1/$step,scale=320:-2,drawtext=fontfile=$FONT:text='%{pts\:hms}':x=6:y=6:fontsize=20:fontcolor=white:box=1:boxcolor=black@0.6,tile=6x$rows" \
       -frames:v 1 -q:v 4 "$OUT/$key.jpg"
   done
+  cat "$WORK/yt_errors.txt" >> "$OUT/status.txt" || true
   cat "$OUT/status.txt"
   exit 0
 fi

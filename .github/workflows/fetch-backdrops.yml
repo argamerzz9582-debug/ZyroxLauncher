@@ -10,6 +10,7 @@ on:
       - ".github/workflows/fetch-backdrops.yml"
       - "tools/backdrops/plan.tsv"
       - "tools/backdrops/mode"
+      - "tools/backdrops/keys"
 
 permissions:
   contents: write
@@ -28,11 +29,15 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg fonts-dejavu-core > /dev/null
-          python3 -m pip install --quiet --upgrade yt-dlp
+          python3 -m pip install --quiet --upgrade "yt-dlp[default]"
+          curl -fsSL https://deno.land/install.sh | sh -s -- -y > /dev/null 2>&1 || true
+          echo "$HOME/.deno/bin" >> "$GITHUB_PATH"
+          yt-dlp --version
           ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "libx264|libwebp" || true
       - name: Run pipeline
         run: |
           MODE="$(cat tools/backdrops/mode 2>/dev/null || echo preview)"
+          export KEYS="$(cat tools/backdrops/keys 2>/dev/null || echo spirit shaders diamond snow)"
           bash tools/backdrops/build_backdrops.sh "$MODE"
       - name: Commit results
         run: |
