@@ -3,7 +3,7 @@
     <!-- Global Zyrox 2.2 Starlight Firefly Shell & Brand -->
     <string name="zyrox_brand_title">ZYROX</string>
     <string name="zyrox_brand_subtitle">STARLIGHT  •  LAUNCHER</string>
-    <string name="zyrox_engine_watermark">ZYROX LAUNCHER v2.9.0</string>
+    <string name="zyrox_engine_watermark">ZYROX LAUNCHER v2.10.0</string>
     <string name="zyrox_pref_auto_update_title">Automatic Update Popup on Startup</string>
     <string name="zyrox_pref_auto_update_summary">Automatically detect new Zyrox GitHub releases on launch and prompt for verified 1-tap in-app update.</string>
     <string name="zyrox_pref_check_updates_now_title">Check for Launcher Updates</string>
@@ -242,4 +242,13 @@
     <string name="zyrox_pref_backdrop_dim_summary">Darken the backdrop so text and buttons stay easy to read.</string>
     <string name="zyrox_pref_backdrop_power_title">Pause backdrop to save battery</string>
     <string name="zyrox_pref_backdrop_power_summary">Show a still frame while Battery Saver is on or the phone is overheating.</string>
+
+    <!-- AI Friend Studio, Local GGUF Manager & In-Game Companion Overlay -->
+    <string name="zyrox_nav_ai_friend" translatable="false">AI FRIEND  •  CO-OP BOT</string>
+    <string name="zyrox_title_ai_friend" translatable="false">AI FRIEND STUDIO</string>
+    <string name="zyrox_action_summon_ai" translatable="false">SUMMON BOT</string>
+    <string name="zyrox_action_dismiss_ai" translatable="false">DISMISS BOT</string>
+    <string name="zyrox_ai_friend_menu" translatable="false">AI Friend Co-Pilot &amp; Bot</string>
+    <string name="zyrox_quick_ai_friend_pill" translatable="false">AI Friend Floating HUD Pill</string>
+    <string name="zyrox_ai_friend_short" translatable="false">AI Friend</string>
 </resources>

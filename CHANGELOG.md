@@ -2,6 +2,20 @@
 
 All notable changes to **Zyrox Launcher** are documented in this file.
 
+## [2.10.0] — 2026-11-28
+
+### Added
+- **Zyrox AI Friend Studio (`AiFriendFragment`):** 4-tab Starlight × Liquid Glass workspace (*AI Brain*, *World & Bot Bridge*, *Persona & Safety*, *Test & Live Console*) accessible from the launcher shell and Server Manager.
+- **3 AI Brain Modes (`AiFriendManager`):**
+  1. **Free Anonymous Internet Router (`FREE_ANONYMOUS`, default):** Zero-account, zero-API-key multi-endpoint router across verified public endpoints (*Kilo AI Gateway*, *OVHcloud AI Endpoints*, *Pollinations Free*, *VLM Run Alpha Gateway*, and *AI Horde*) with per-route cooldown tracking, live `/models` discovery, and automatic failover.
+  2. **Free API Key & Gateway Mode (`ONLINE_API`):** 21 OpenAI-compatible presets (*OpenRouter :free*, *Groq*, *Google Gemini*, *Cerebras*, *Sambanova*, *Mistral*, *Cloudflare Workers AI*, *GitHub Models*, *NVIDIA NIM*, *Chutes*, *Hugging Face*, *Pollinations Keyed*, *OmniRoute Local Gateway*, and custom endpoints) with Android Keystore AES-256-GCM API key encryption (`AccountTokenCipher`) and HTTP 429 model cascade.
+  3. **Local Offline GGUF Engine (`LOCAL_GGUF`):** Device RAM tier advisor (`GgufRamAdvisor`), curated Q4_K_M `.gguf` catalog + SAF file import (`GgufModelManager`), binary GGUF header parser + `libzyrox_llama.so` JNI bridge (`LlamaCppRuntimeBridge`), and automatic model unload before JVM launch.
+- **In-Game AI HUD & Companion Bot Bridge (`AiFriendOverlayController`, `CompanionBotBridgeClient`, `tools/ai-friend-bridge/`):** Opt-in draggable `🤖 AI` pill + Quick Command card with 1-tap Brain & Role switchers, structured `{say, action}` parser (`AiResponseParser`), and NDJSON-over-TCP Mineflayer bot bridge for LAN worlds, saved `servers.dat` servers, and Zyrox `ZYX1-` rooms.
+
+### Security & Tests
+- Extended `LogRedactor` to scrub `sk-or-*`, `gsk_*`, `csk-*`, `nvapi-*`, `hf_*`, and `bridgeAuthToken` secrets from diagnostics and logs.
+- Added `AiFriendFeatureTest` JUnit 4 suite and Node worker protocol tests (`tools/ai-friend-bridge`).
+
 ## [2.9.0] — 2026-11-26
 
 ### Added

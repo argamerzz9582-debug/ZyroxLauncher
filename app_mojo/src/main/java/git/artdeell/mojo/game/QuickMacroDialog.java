@@ -402,6 +402,19 @@ public final class QuickMacroDialog {
                 showRadialSlotPickerDialog(ctx, radialSlots, wheelView));
         root.addView(editWheelBtn, ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 6)));
 
+        if (ctx instanceof android.app.Activity) {
+            Button aiFriendBtn = ZyroxStudioUi.createPrimaryButton(ctx, "AI Friend Co-Pilot & Bot Actions");
+            aiFriendBtn.setOnClickListener(v -> {
+                performHaptic(v);
+                if (holder[0] != null) holder[0].dismiss();
+                android.app.Activity act = (android.app.Activity) ctx;
+                String srv = (act instanceof GameActivity)
+                        ? ((GameActivity) act).getActiveServerAddress() : null;
+                new AiFriendOverlayController(act).showQuickCommandDialog(srv);
+            });
+            root.addView(aiFriendBtn, ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 6)));
+        }
+
         // 1. Instant Function Key Chords
         root.addView(ZyroxStudioUi.createSectionLabel(ctx, "INSTANT GAMEPLAY ACTIONS"),
                 ZyroxStudioUi.vParam(ZyroxStudioUi.dp(ctx, 10)));

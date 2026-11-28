@@ -34,6 +34,7 @@ import git.artdeell.mojo.extra.ExtraConstants;
 import git.artdeell.mojo.extra.ExtraCore;
 import git.artdeell.mojo.extra.ExtraListener;
 import git.artdeell.mojo.fragments.AboutSecurityFragment;
+import git.artdeell.mojo.fragments.AiFriendFragment;
 import git.artdeell.mojo.fragments.ContentManagerFragment;
 import git.artdeell.mojo.fragments.DownloadCenterFragment;
 import git.artdeell.mojo.fragments.ElyByLoginFragment;
@@ -162,8 +163,25 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
             mPageTitleView.setText(R.string.zyrox_title_downloads);
         } else if (f instanceof AboutSecurityFragment) {
             mPageTitleView.setText(R.string.zyrox_title_security);
+        } else if (f instanceof AiFriendFragment) {
+            mPageTitleView.setText(R.string.zyrox_title_ai_friend);
+            boolean botOpen = git.artdeell.mojo.ai.AiFriendManager.getInstance(this)
+                    .getBridgeClient().isBridgeSocketOpen();
+            mTopActionButton.setText(botOpen ? R.string.zyrox_action_dismiss_ai : R.string.zyrox_action_summon_ai);
+            mTopActionButton.setVisibility(View.VISIBLE);
+            mTopActionButton.setOnClickListener(v -> ((AiFriendFragment) f).onGlobalActionTriggered());
         } else {
             mPageTitleView.setText(R.string.app_short_name);
+        }
+    }
+
+    public void refreshGlobalHeaderActionLabel() {
+        if (mTopActionButton == null) return;
+        Fragment current = getSupportFragmentManager().findFragmentById(R.id.container_fragment);
+        if (current instanceof AiFriendFragment && mTopActionButton.getVisibility() == View.VISIBLE) {
+            boolean botOpen = git.artdeell.mojo.ai.AiFriendManager.getInstance(this)
+                    .getBridgeClient().isBridgeSocketOpen();
+            mTopActionButton.setText(botOpen ? R.string.zyrox_action_dismiss_ai : R.string.zyrox_action_summon_ai);
         }
     }
 
@@ -725,6 +743,9 @@ public class LauncherActivity extends BaseActivity implements PreferenceFragment
         ZyroxShaderBackgroundView.releaseAllForGameStart();
         git.artdeell.mojo.ui.ZyroxLoopingVideoView.suspendInactiveDecoders(true);
         git.artdeell.mojo.ui.ZyroxSeamlessGifView.purgeAllActiveInstances(permanent);
+        if (permanent) {
+            git.artdeell.mojo.ai.AiFriendManager.getInstance(this).onBeforeGameLaunch();
+        }
     }
 
     /**

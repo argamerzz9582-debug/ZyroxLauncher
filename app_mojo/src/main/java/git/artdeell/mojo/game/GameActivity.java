@@ -323,12 +323,13 @@ public class GameActivity extends BaseActivity
             setTitle("Zyrox Launcher (" + version + ")");
 
             String[] baseActions = getResources().getStringArray(R.array.menu_ingame);
-            String[] allActions = new String[baseActions.length + 4];
+            String[] allActions = new String[baseActions.length + 5];
             System.arraycopy(baseActions, 0, allActions, 0, baseActions.length);
             allActions[baseActions.length] = getString(R.string.zyrox_toggle_perf_hud);
             allActions[baseActions.length + 1] = getString(R.string.zyrox_quick_macros);
             allActions[baseActions.length + 2] = getString(R.string.zyrox_switch_control_profile);
             allActions[baseActions.length + 3] = getString(R.string.zyrox_waypoints_menu);
+            allActions[baseActions.length + 4] = getString(R.string.zyrox_ai_friend_menu);
             gameActionArrayAdapter = new ArrayAdapter<>(this,
                     R.layout.item_zyrox_ingame_menu, allActions);
             gameActionClickListener = (parent, view, position, id) -> {
@@ -349,6 +350,11 @@ public class GameActivity extends BaseActivity
                         break;
                     case 8:
                         if (mHudCoordinator != null) mHudCoordinator.showWaypointsManagerDialog();
+                        break;
+                    case 9:
+                        if (mHudCoordinator != null) {
+                            mHudCoordinator.showAiFriendQuickDialog(mActiveServerAddress);
+                        }
                         break;
                     default: break;
                 }
@@ -438,11 +444,18 @@ public class GameActivity extends BaseActivity
         }
     }
 
+    @androidx.annotation.Nullable
+    public String getActiveServerAddress() {
+        return mActiveServerAddress;
+    }
+
     private void onLiveGameLogLine(String line) {
         if (line == null || line.isEmpty()) return;
         if (mHudCoordinator != null) {
             mHudCoordinator.onGameLogLine(line);
         }
+        git.artdeell.mojo.ai.AiFriendManager.getInstance(getApplicationContext())
+                .onLiveGameLogLine(line);
         String connectingTarget =
                 git.artdeell.mojo.servers.ServerListManager.parseConnectingLogEndpoint(line);
         if (connectingTarget != null) {

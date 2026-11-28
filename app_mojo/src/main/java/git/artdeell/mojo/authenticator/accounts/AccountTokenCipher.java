@@ -33,19 +33,20 @@ import javax.crypto.spec.GCMParameterSpec;
  *   accounts directory only (sandboxed by the OS). This is a documented platform limitation.</li>
  * </ul>
  */
-final class AccountTokenCipher {
+public final class AccountTokenCipher {
     private static final String TAG = "AccountVault";
     private static final String STORE_PROVIDER = "AndroidKeyStore";
     private static final String VAULT_ALIAS = "zyrox_account_vault_v1";
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";
-    static final String PREFIX = "enc:v1:";
-    static final String NO_TOKEN = "0";
+    public static final String PREFIX = "enc:v1:";
+    public static final String NO_TOKEN = "0";
     static final int GCM_IV_LENGTH = 12;
     static final int GCM_TAG_BITS = 128;
 
     private AccountTokenCipher() {}
 
-    static String encrypt(@Nullable String plaintext) {
+    @NonNull
+    public static String encrypt(@Nullable String plaintext) {
         if (plaintext == null || plaintext.isEmpty() || NO_TOKEN.equals(plaintext)) {
             return plaintext == null ? NO_TOKEN : plaintext;
         }
@@ -72,7 +73,8 @@ final class AccountTokenCipher {
         }
     }
 
-    static String decrypt(@Nullable String stored) {
+    @NonNull
+    public static String decrypt(@Nullable String stored) {
         if (stored == null || stored.isEmpty()) {
             return NO_TOKEN;
         }

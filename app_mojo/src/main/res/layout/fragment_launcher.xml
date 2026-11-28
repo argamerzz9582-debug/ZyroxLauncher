@@ -225,6 +225,23 @@
                         android:text="@string/zyrox_nav_skins" />
                 </LinearLayout>
 
+                <!-- Featured Row: AI FRIEND CO-OP COMPANION -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <com.kdt.mcgui.LauncherMenuButton
+                        android:id="@+id/ai_friend_button"
+                        style="@style/LauncherMenuButton.Universal"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:drawableStart="@drawable/ic_px_ai_friend"
+                        app:drawableTint="@color/zyrox_lg_text"
+                        android:text="@string/zyrox_nav_ai_friend" />
+                </LinearLayout>
+
                 <!-- Row 4: INSTALL JAR | CONTROLS -->
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -538,7 +555,7 @@
             app:fontFamily="@font/noto_sans_bold"
             android:visibility="gone"
             tools:visibility="visible"
-            tools:text="⬆ UPDATE v2.9.0 READY  ·  TAP TO INSTALL" />
+            tools:text="⬆ UPDATE v2.10.0 READY  ·  TAP TO INSTALL" />
     </LinearLayout>
 
     <!-- 3. SUBTLE QUICK-JOIN SERVER CAPSULE (shown only when active instance has saved servers) -->

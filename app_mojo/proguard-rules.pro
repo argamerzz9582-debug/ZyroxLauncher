@@ -27,5 +27,11 @@
  -keep class git.artdeell.mojo.metadata.LocalMetadataCache$CacheMeta {*;}
  -keep class git.artdeell.mojo.modding.fabric.FabricVersion {*;}
  -keep class git.artdeell.mojo.modding.modpacks.models.** {*;}
+# AI Friend Gson config DTO, Fragment reflection instantiation & JNI bridge
+ -keep class git.artdeell.mojo.ai.AiFriendConfigStore$ConfigData {*;}
+ -keep class git.artdeell.mojo.fragments.AiFriendFragment {*;}
+ -keepclasseswithmembernames class git.artdeell.mojo.ai.LlamaCppRuntimeBridge {
+    native <methods>;
+ }
 
 

@@ -94,6 +94,18 @@ public class WorldManagerFragment extends Fragment {
         btnLan.setOnClickListener(v -> scanAndJoinLocalLanWorld());
         bar.addView(btnLan, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
 
+        Button btnAiFriend = ZyroxStudioUi.createSecondaryButton(ctx, "AI Friend", true);
+        btnAiFriend.setOnClickListener(v -> Tools.swapFragment(
+                requireActivity(),
+                AiFriendFragment.class,
+                AiFriendFragment.TAG,
+                AiFriendFragment.createPresetArgs(
+                        git.artdeell.mojo.ai.AiFriendModels.TargetConnectionMode.LAN_WORLD,
+                        null,
+                        null,
+                        AiFriendFragment.TAB_WORLD_BRIDGE)));
+        bar.addView(btnAiFriend, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));
+
         Button btnBackups = ZyroxStudioUi.createSecondaryButton(ctx, "Backups", true);
         btnBackups.setOnClickListener(v -> showBackupsDialog());
         bar.addView(btnBackups, ZyroxStudioUi.spacedParam(ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 6)));

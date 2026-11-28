@@ -74,3 +74,8 @@ add_library(awt_xawt SHARED
         awt_xawt/xawt_fake.c
 )
 target_link_libraries(awt_xawt PRIVATE awt_headless)
+
+add_library(zyrox_llama SHARED
+        ai_llama_bridge.c
+)
+target_link_libraries(zyrox_llama PRIVATE log dl)
