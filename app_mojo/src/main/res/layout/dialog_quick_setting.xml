@@ -499,6 +499,17 @@
         app:layout_constraintTop_toBottomOf="@id/checkboxWaypointPill"
         tools:ignore="HardcodedText" />
 
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/checkboxAiFriendPill"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:text="@string/zyrox_quick_ai_friend_pill"
+        android:textColor="@color/zyrox_text_primary"
+        android:thumb="@drawable/bg_zyrox_switch_thumb"
+        app:track="@drawable/bg_zyrox_switch_track"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/checkboxAutoReconnect" />
+
     <!-- Instant Quick Screenshot (F2) & Macros Row -->
     <LinearLayout
         android:id="@+id/quickAction_row"
@@ -508,7 +519,7 @@
         android:orientation="horizontal"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/checkboxAutoReconnect">
+        app:layout_constraintTop_toBottomOf="@id/checkboxAiFriendPill">
 
         <Button
             android:id="@+id/quickBtn_screenshot"

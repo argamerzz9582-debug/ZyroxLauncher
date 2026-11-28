@@ -90,6 +90,25 @@ public class ServerManagerFragment extends Fragment {
         topBar.addView(btnJoinRoom, ZyroxStudioUi.spacedParam(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
 
+        Button btnAiFriend = ZyroxStudioUi.createSecondaryButton(ctx, "AI Friend", true);
+        btnAiFriend.setOnClickListener(v -> {
+            ZyroxRoomBridge.HostSession activeRoom = ZyroxRoomBridge.getActiveHost();
+            Bundle args = activeRoom != null
+                    ? AiFriendFragment.createPresetArgs(
+                            git.artdeell.mojo.ai.AiFriendModels.TargetConnectionMode.ZYROX_SELF_HOSTED,
+                            null,
+                            activeRoom.fullShareCode,
+                            AiFriendFragment.TAB_WORLD_BRIDGE)
+                    : AiFriendFragment.createPresetArgs(
+                            git.artdeell.mojo.ai.AiFriendModels.TargetConnectionMode.SAVED_SERVER,
+                            null,
+                            null,
+                            AiFriendFragment.TAB_WORLD_BRIDGE);
+            Tools.swapFragment(requireActivity(), AiFriendFragment.class, AiFriendFragment.TAG, args);
+        });
+        topBar.addView(btnAiFriend, ZyroxStudioUi.spacedParam(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
+
         Button btnPingAll = ZyroxStudioUi.createSecondaryButton(ctx, "Ping All", true);
         btnPingAll.setOnClickListener(v -> pingAllServers());
         topBar.addView(btnPingAll, ZyroxStudioUi.spacedParam(
@@ -320,6 +339,19 @@ public class ServerManagerFragment extends Fragment {
                 row.addView(btnJoin, ZyroxStudioUi.spacedParam(
                         ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
             }
+
+            Button btnAiBot = ZyroxStudioUi.createSecondaryButton(ctx, "AI Bot", true);
+            btnAiBot.setOnClickListener(v -> Tools.swapFragment(
+                    requireActivity(),
+                    AiFriendFragment.class,
+                    AiFriendFragment.TAG,
+                    AiFriendFragment.createPresetArgs(
+                            git.artdeell.mojo.ai.AiFriendModels.TargetConnectionMode.SAVED_SERVER,
+                            s.address,
+                            null,
+                            AiFriendFragment.TAB_WORLD_BRIDGE)));
+            row.addView(btnAiBot, ZyroxStudioUi.spacedParam(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ZyroxStudioUi.dp(ctx, 34), ZyroxStudioUi.dp(ctx, 5)));
 
             card.addView(row);
             mListContainer.addView(card);

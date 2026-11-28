@@ -1,0 +1,24 @@
+{
+  "name": "zyrox-ai-friend-bridge",
+  "version": "1.0.0",
+  "description": "Minecraft Companion Bot Bridge worker (Mineflayer + Zyrox NDJSON-over-TCP v1 + ZYX-XXXX Room Tunnel) for ZyroxLauncher AI Friend.",
+  "main": "zyrox-bot-bridge.js",
+  "bin": {
+    "zyrox-bot-bridge": "./zyrox-bot-bridge.js"
+  },
+  "scripts": {
+    "start": "node zyrox-bot-bridge.js",
+    "test": "node --test test/bridge.test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "mineflayer": "^4.23.0",
+    "mineflayer-collectblock": "^1.4.1",
+    "mineflayer-pathfinder": "^2.4.5",
+    "mineflayer-pvp": "^1.3.2",
+    "vec3": "^0.1.10"
+  },
+  "license": "GPL-3.0"
+}

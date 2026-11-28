@@ -57,6 +57,7 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
                 git.artdeell.mojo.ui.ZyroxLoopingVideoView.suspendInactiveDecoders(true);
                 git.artdeell.mojo.ui.ZyroxSeamlessGifView.purgeAllActiveInstances(true);
             }
+            git.artdeell.mojo.ai.AiFriendManager.getInstance(activity.getApplicationContext()).onBeforeGameLaunch();
             git.artdeell.mojo.servers.ZyroxRoomBridge.stopClientTunnel();
             Intent gameStartIntent = createGameStartIntent(activity);
             activity.startActivity(gameStartIntent);
@@ -70,6 +71,7 @@ public class ContextAwareDoneListener implements MoJsonExtras.DoneListener, Cont
 
     @Override
     public void executeWithApplication(Context context) {
+        git.artdeell.mojo.ai.AiFriendManager.getInstance(context.getApplicationContext()).onBeforeGameLaunch();
         Intent gameStartIntent = createGameStartIntent(context);
         // Since the game is a separate process anyway, it does not matter if it gets invoked
         // from somewhere other than the launcher activity.

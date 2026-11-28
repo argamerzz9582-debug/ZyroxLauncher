@@ -242,4 +242,13 @@
     <string name="zyrox_pref_backdrop_dim_summary">Darken the backdrop so text and buttons stay easy to read.</string>
     <string name="zyrox_pref_backdrop_power_title">Pause backdrop to save battery</string>
     <string name="zyrox_pref_backdrop_power_summary">Show a still frame while Battery Saver is on or the phone is overheating.</string>
+
+    <!-- AI Friend Studio, Local GGUF Manager & In-Game Companion Overlay -->
+    <string name="zyrox_nav_ai_friend" translatable="false">AI FRIEND  •  CO-OP BOT</string>
+    <string name="zyrox_title_ai_friend" translatable="false">AI FRIEND STUDIO</string>
+    <string name="zyrox_action_summon_ai" translatable="false">SUMMON BOT</string>
+    <string name="zyrox_action_dismiss_ai" translatable="false">DISMISS BOT</string>
+    <string name="zyrox_ai_friend_menu" translatable="false">AI Friend Co-Pilot &amp; Bot</string>
+    <string name="zyrox_quick_ai_friend_pill" translatable="false">AI Friend Floating HUD Pill</string>
+    <string name="zyrox_ai_friend_short" translatable="false">AI Friend</string>
 </resources>

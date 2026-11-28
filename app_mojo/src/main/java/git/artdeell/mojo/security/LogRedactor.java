@@ -75,12 +75,13 @@ public final class LogRedactor {
             "(?i)(-Dauthlibinjector\\.yggdrasil\\.prefetched=)([^\\s,\\]\\\"']+)"
     );
 
-    // JSON / key=value / header secrets (Microsoft, Xbox Live, Ely.by, Yggdrasil, CurseForge)
+    // JSON / key=value / header secrets (Microsoft, Xbox Live, Ely.by, Yggdrasil, CurseForge, OpenRouter/AI)
     private static final Pattern KV_SECRET_PATTERN = Pattern.compile(
             "(?i)((?:access_token|accessToken|refresh_token|refreshToken|id_token|client_secret|"
                     + "client_token|clientToken|auth_access_token|auth_session|session_id|sessionId|"
                     + "ely_token|elyToken|yggdrasil_token|device_code|user_code|xsts_token|"
                     + "xbl_token|mc_token|minecraftToken|msaToken|auth_?code|api[_-]?key|"
+                    + "openRouterApiKey|bridge[_-]?token|bridgeAuthToken|"
                     + "x-api-key|keystore_password|storePassword|keyPassword|xuid)"
                     + "\\\"?\\s*[:=]\\s*\\\"?)([^\\\"\\s,&\\}\\]]+)"
     );
@@ -143,6 +144,11 @@ public final class LogRedactor {
             "\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{40,}"
     );
 
+    // OpenRouter / OpenAI-compatible sk-... API keys
+    private static final Pattern LLM_API_KEY_PATTERN = Pattern.compile(
+            "\\bsk-(?:or-v1-|proj-)?[A-Za-z0-9_-]{20,}\\b"
+    );
+
     private LogRedactor() {
     }
 
@@ -168,6 +174,7 @@ public final class LogRedactor {
         out = JWT_PATTERN.matcher(out).replaceAll(REDACTED);
         out = MS_OAUTH_PATTERN.matcher(out).replaceAll(REDACTED);
         out = CF_KEY_PATTERN.matcher(out).replaceAll(REDACTED);
+        out = LLM_API_KEY_PATTERN.matcher(out).replaceAll(REDACTED);
         out = ACCOUNT_PATH_PATTERN.matcher(out).replaceAll("$1" + REDACTED_PATH);
         out = EMAIL_PATTERN.matcher(out).replaceAll(REDACTED_EMAIL);
         out = UUID_PATTERN.matcher(out).replaceAll(REDACTED_UUID);

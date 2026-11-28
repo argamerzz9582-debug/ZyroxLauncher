@@ -67,6 +67,8 @@ public final class GameHudCoordinator {
     private View mHotbarView;
     @Nullable
     private VoiceChatOverlayController mVoiceChatOverlay;
+    @Nullable
+    private AiFriendOverlayController mAiFriendOverlay;
 
     // v2.6.0 — Floating Coordinate & Death Waypoint Pill
     @Nullable
@@ -181,6 +183,13 @@ public final class GameHudCoordinator {
                 new VoiceChatOverlayController(mActivity, contentFrame);
         voiceOverlay.setOverlayEnabled(LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY);
         mVoiceChatOverlay = voiceOverlay;
+
+        // Floating AI Friend Quick Prompt & Live Companion Bot Status Pill
+        if (contentFrame instanceof FrameLayout) {
+            AiFriendOverlayController aiOverlay = new AiFriendOverlayController(mActivity);
+            aiOverlay.attachToFrame((FrameLayout) contentFrame);
+            mAiFriendOverlay = aiOverlay;
+        }
 
         git.artdeell.mojo.game.platform.Platform.addGrabListener(mContextGrabListener);
     }
@@ -698,6 +707,9 @@ public final class GameHudCoordinator {
         if (mVoiceChatOverlay != null) {
             appendViewRectIfVisible(mVoiceChatOverlay.getMicPillView(), mParentLoc, outRects);
         }
+        if (mAiFriendOverlay != null) {
+            appendViewRectIfVisible(mAiFriendOverlay.getOverlayView(), mParentLoc, outRects);
+        }
         appendViewRectIfVisible(mHotbarView, mParentLoc, outRects);
         if (mControlLayout != null) {
             mControlLayout.collectControlObstacleRects(hudParent, outRects);
@@ -745,6 +757,9 @@ public final class GameHudCoordinator {
         if (mVoiceChatOverlay != null) {
             mVoiceChatOverlay.setEditorHidden(inEditor);
         }
+        if (mAiFriendOverlay != null) {
+            mAiFriendOverlay.setInEditorMode(inEditor);
+        }
         refreshWaypointDisplay();
         if (mOverlay != null && mOverlay.isHudEnabled()) {
             mOverlay.post(mOverlay::applyClampedCollisionFreePlacement);
@@ -755,6 +770,9 @@ public final class GameHudCoordinator {
     public void syncPreferencesLive() {
         if (mVoiceChatOverlay != null) {
             mVoiceChatOverlay.setOverlayEnabled(LauncherPreferences.PREF_ZYROX_VOICE_CHAT_OVERLAY);
+        }
+        if (mAiFriendOverlay != null) {
+            mAiFriendOverlay.syncVisibility();
         }
         refreshWaypointDisplay();
         if (mOverlay == null) return;
@@ -864,6 +882,10 @@ public final class GameHudCoordinator {
             mVoiceChatOverlay.destroy();
             mVoiceChatOverlay = null;
         }
+        if (mAiFriendOverlay != null) {
+            mAiFriendOverlay.destroy();
+            mAiFriendOverlay = null;
+        }
         if (mOverlay != null) {
             mOverlay.stopMonitoring(true);
             mOverlay = null;
@@ -877,6 +899,14 @@ public final class GameHudCoordinator {
     @Nullable
     public PerformanceHudOverlay getOverlay() {
         return mOverlay;
+    }
+
+    public void showAiFriendQuickDialog(@Nullable String activeServerAddress) {
+        if (mAiFriendOverlay != null) {
+            mAiFriendOverlay.showQuickCommandDialog(activeServerAddress);
+        } else {
+            new AiFriendOverlayController(mActivity).showQuickCommandDialog(activeServerAddress);
+        }
     }
 
     private int dp(float value) {

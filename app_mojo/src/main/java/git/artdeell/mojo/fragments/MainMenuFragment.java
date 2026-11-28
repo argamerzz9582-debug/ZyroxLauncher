@@ -100,6 +100,7 @@ public class MainMenuFragment extends Fragment {
         Button mWorldsButton = view.findViewById(R.id.worlds_button);
         Button mServersButton = view.findViewById(R.id.servers_button);
         Button mSkinsButton = view.findViewById(R.id.skins_button);
+        Button mAiFriendButton = view.findViewById(R.id.ai_friend_button);
         Button mDownloadsButton = view.findViewById(R.id.downloads_button);
         Button mHomeSettingsButton = view.findViewById(R.id.home_settings_button);
         mInstanceCapsule = view.findViewById(R.id.tv_home_instance_capsule);
@@ -180,6 +181,10 @@ public class MainMenuFragment extends Fragment {
         if (mSkinsButton != null) {
             mSkinsButton.setOnClickListener(v ->
                     Tools.swapFragment(requireActivity(), SkinStudioFragment.class, SkinStudioFragment.TAG, null));
+        }
+        if (mAiFriendButton != null) {
+            mAiFriendButton.setOnClickListener(v ->
+                    Tools.swapFragment(requireActivity(), AiFriendFragment.class, AiFriendFragment.TAG, null));
         }
         if (mDownloadsButton != null) {
             mDownloadsButton.setOnClickListener(v ->

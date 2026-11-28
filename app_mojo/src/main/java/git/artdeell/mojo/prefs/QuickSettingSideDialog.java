@@ -35,7 +35,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
     private SwitchCompat mGyroSwitch, mGyroXSwitch, mGyroYSwitch, mGestureSwitch, mHapticsSwitch, mEdgeGuardSwitch;
     private SwitchCompat mHudEnabledSwitch, mHudLockSwitch, mHudCompactSwitch;
     private SwitchCompat mVoiceChatSwitch, mThermalGovernorSwitch;
-    private SwitchCompat mWaypointPillSwitch, mAutoReconnectSwitch;
+    private SwitchCompat mWaypointPillSwitch, mAutoReconnectSwitch, mAiFriendPillSwitch;
     private CustomSeekbar mGyroSensitivityBar, mMouseSpeedBar, mGestureDelayBar, mResolutionBar, mTransparencyBar, mGyroDeadzoneBar;
     private CustomSeekbar mHudScaleBar, mHudOpacityBar;
     private TextView mGyroSensitivityText, mGyroSensitivityDisplayText, mMouseSpeedText, mGestureDelayText, mGestureDelayDisplayText, mResolutionText, mTransparencyText, mGyroDeadzoneText, mGyroDeadzoneLabel;
@@ -45,7 +45,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
     private boolean mOriginalGyroEnabled, mOriginalGyroXEnabled, mOriginalGyroYEnabled, mOriginalGestureDisabled, mOriginalHaptics, mOriginalEdgeGuard;
     private boolean mOriginalHudEnabled, mOriginalHudLocked, mOriginalHudCompact;
     private boolean mOriginalVoiceChat, mOriginalThermalGovernor;
-    private boolean mOriginalWaypointPill, mOriginalAutoReconnect;
+    private boolean mOriginalWaypointPill, mOriginalAutoReconnect, mOriginalAiFriendPill;
     private float mOriginalGyroSensitivity, mOriginalMouseSpeed, mOriginalResolution, mOriginalGyroDeadzone;
     private int mOriginalGestureDelay, mOriginalHudScale, mOriginalHudOpacity;
     private short mOriginalTransparency;
@@ -111,6 +111,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         mThermalGovernorSwitch = mDialogContent.findViewById(R.id.checkboxThermalGovernor);
         mWaypointPillSwitch = mDialogContent.findViewById(R.id.checkboxWaypointPill);
         mAutoReconnectSwitch = mDialogContent.findViewById(R.id.checkboxAutoReconnect);
+        mAiFriendPillSwitch = mDialogContent.findViewById(R.id.checkboxAiFriendPill);
         mHudResetButton = mDialogContent.findViewById(R.id.quickBtn_hudReset);
         if (mHudResetButton != null) {
             mHudResetButton.setOnClickListener(v -> {
@@ -344,6 +345,21 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
                 onHudPreferencesChanged();
             });
         }
+        mOriginalAiFriendPill = LauncherPreferences.DEFAULT_PREF == null
+                || LauncherPreferences.DEFAULT_PREF.getBoolean(
+                        git.artdeell.mojo.game.AiFriendOverlayController.PREF_KEY_HUD_PILL, true);
+        if (mAiFriendPillSwitch != null) {
+            mAiFriendPillSwitch.setChecked(mOriginalAiFriendPill);
+            mAiFriendPillSwitch.setOnCheckedChangeListener((b, checked) -> {
+                mEditor.putBoolean(git.artdeell.mojo.game.AiFriendOverlayController.PREF_KEY_HUD_PILL, checked);
+                if (LauncherPreferences.DEFAULT_PREF != null) {
+                    LauncherPreferences.DEFAULT_PREF.edit()
+                            .putBoolean(git.artdeell.mojo.game.AiFriendOverlayController.PREF_KEY_HUD_PILL, checked)
+                            .apply();
+                }
+                onHudPreferencesChanged();
+            });
+        }
         updateHudControlsVisibility(mOriginalHudEnabled);
     }
 
@@ -414,6 +430,7 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
         if (mThermalGovernorSwitch != null) mThermalGovernorSwitch.setOnCheckedChangeListener(null);
         if (mWaypointPillSwitch != null) mWaypointPillSwitch.setOnCheckedChangeListener(null);
         if (mAutoReconnectSwitch != null) mAutoReconnectSwitch.setOnCheckedChangeListener(null);
+        if (mAiFriendPillSwitch != null) mAiFriendPillSwitch.setOnCheckedChangeListener(null);
 
         mGyroSensitivityBar.setOnSeekBarChangeListener(null);
         if (mGyroDeadzoneBar != null) mGyroDeadzoneBar.setOnSeekBarChangeListener(null);
@@ -459,6 +476,11 @@ public abstract class QuickSettingSideDialog extends com.kdt.SideDialogView {
             LauncherPreferences.PREF_ZYROX_THERMAL_GOVERNOR = mOriginalThermalGovernor;
             LauncherPreferences.PREF_ZYROX_WAYPOINT_PILL = mOriginalWaypointPill;
             LauncherPreferences.PREF_ZYROX_AUTO_RECONNECT = mOriginalAutoReconnect;
+            if (LauncherPreferences.DEFAULT_PREF != null) {
+                LauncherPreferences.DEFAULT_PREF.edit()
+                        .putBoolean(git.artdeell.mojo.game.AiFriendOverlayController.PREF_KEY_HUD_PILL, mOriginalAiFriendPill)
+                        .apply();
+            }
 
             onGyroStateChanged();
             onResolutionChanged();
