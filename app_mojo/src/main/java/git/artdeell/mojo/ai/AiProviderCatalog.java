@@ -712,7 +712,8 @@ public final class AiProviderCatalog {
             int code = response.code();
             ResponseBody body = response.body();
             String text = body != null ? body.string() : "";
-            long retryMs = ZyroxHttpClient.parseRetryAfterMs(response, code == 429 ? 1200L : 450L);
+            long parsedRetry = ZyroxHttpClient.parseRetryAfterMs(response.header("Retry-After"));
+            long retryMs = parsedRetry > 0L ? parsedRetry : (code == 429 ? 1200L : 450L);
             return new HttpResult(code, text, retryMs);
         }
     }

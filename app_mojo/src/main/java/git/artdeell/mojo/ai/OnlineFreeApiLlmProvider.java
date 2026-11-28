@@ -347,7 +347,8 @@ public final class OnlineFreeApiLlmProvider implements LlmProvider {
             }
 
             if (code == 429 || code == 404 || code == 408 || code >= 500) {
-                long retryMs = ZyroxHttpClient.parseRetryAfterMs(response, code == 429 ? 900L : 450L);
+                long parsedRetry = ZyroxHttpClient.parseRetryAfterMs(response.header("Retry-After"));
+                long retryMs = parsedRetry > 0L ? parsedRetry : (code == 429 ? 900L : 450L);
                 return AttemptResult.failure("HTTP " + code + " (" + safeErrPreview + ")", true, retryMs);
             }
 

@@ -196,7 +196,7 @@ public final class AiFriendConfigStore {
             sanitizeInPlace(clean);
             clean.lastUpdatedEpochMs = System.currentTimeMillis();
             try {
-                JSONUtils.writeToFileAtomic(configFile, clean);
+                JSONUtils.writeToFileAtomic(configFile, clean, true);
                 cached = clean;
                 lastLoadedMtime = configFile.lastModified();
             } catch (IOException e) {

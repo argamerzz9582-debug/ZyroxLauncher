@@ -1912,13 +1912,13 @@ public class AiFriendFragment extends Fragment implements StateListener {
                         final String[] labels = new String[found.size()];
                         for (int i = 0; i < found.size(); i++) {
                             ServerPinger.LanWorldEntry w = found.get(i);
-                            labels[i] = w.motd + " (" + w.getConnectAddress() + ")";
+                            labels[i] = w.motd + " (" + w.address + ")";
                         }
                         new AlertDialog.Builder(ctx)
                                 .setTitle("Select Discovered LAN World")
                                 .setItems(labels, (d, which) -> {
                                     ConfigData next = mManager.getConfigStore().load();
-                                    next.lanAddress = found.get(which).getConnectAddress();
+                                    next.lanAddress = found.get(which).address;
                                     next.targetMode = TargetConnectionMode.LAN_WORLD.name();
                                     mManager.getConfigStore().save(next);
                                     refreshAllUi();

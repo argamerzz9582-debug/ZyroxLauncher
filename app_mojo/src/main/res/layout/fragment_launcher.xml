@@ -555,7 +555,7 @@
             app:fontFamily="@font/noto_sans_bold"
             android:visibility="gone"
             tools:visibility="visible"
-            tools:text="⬆ UPDATE v2.9.0 READY  ·  TAP TO INSTALL" />
+            tools:text="⬆ UPDATE v2.10.0 READY  ·  TAP TO INSTALL" />
     </LinearLayout>
 
     <!-- 3. SUBTLE QUICK-JOIN SERVER CAPSULE (shown only when active instance has saved servers) -->

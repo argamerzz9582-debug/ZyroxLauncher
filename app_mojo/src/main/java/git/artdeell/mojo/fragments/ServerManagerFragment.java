@@ -92,7 +92,8 @@ public class ServerManagerFragment extends Fragment {
 
         Button btnAiFriend = ZyroxStudioUi.createSecondaryButton(ctx, "AI Friend", true);
         btnAiFriend.setOnClickListener(v -> {
-            ZyroxRoomBridge.HostSession activeRoom = ZyroxRoomBridge.getActiveHost();
+            git.artdeell.mojo.servers.ZyroxRoomBridge.HostSession activeRoom =
+                    git.artdeell.mojo.servers.ZyroxRoomBridge.getActiveHost();
             Bundle args = activeRoom != null
                     ? AiFriendFragment.createPresetArgs(
                             git.artdeell.mojo.ai.AiFriendModels.TargetConnectionMode.ZYROX_SELF_HOSTED,
